@@ -20,29 +20,47 @@ class _UsersState extends State<Users> {
   void initState() {
     super.initState();
     _fetchUsers();
+    _searchController.addListener(_onSearchChanged); // Listen to search changes
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    super.dispose();
   }
 
   // Fetch user data from Firestore and put it in _usersList
   Future<void> _fetchUsers() async {
-    final snapshot = await FirebaseFirestore.instance.collection('users').get();
-    List<Map<String, dynamic>> userList = snapshot.docs.map((doc) {
-      return {
-        'id': doc.id,
-        'name': doc['name'],
-        'category': doc['category'],
-        'contact': doc['contact'],
-        'address': doc['address'],
-        'email': doc['email'],
-        'uid': doc['uid'],
-        'status': doc['status'] ??
-            'unbooked', // Default to 'unbooked' if status is empty or null
-      };
-    }).toList();
+    try {
+      final snapshot =
+          await FirebaseFirestore.instance.collection('users').get();
+      List<Map<String, dynamic>> userList = snapshot.docs.map((doc) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
 
-    setState(() {
-      _usersList = userList;
-      _filteredUsers = userList; // Initialize filtered list with all users
-    });
+        return {
+          'id': doc.id,
+          'firstName': data['firstName'] ?? 'No First Name', // Default if null
+          'lastName': data['lastName'] ?? 'No Last Name', // Default if null
+          'category': data['category'] ?? 'Unknown', // Default if null
+          'contact': data['contact'] ?? 'No Contact', // Default if null
+          'address': data['address'] ?? 'No Address', // Default if null
+          'email': data['email'] ?? 'No Email', // Default if null
+          'balance': data['balance'] ?? 0.0, // Default if null
+          'profileImage': data['profileImage'] ?? '', // Default profile image
+          'landmark': data['landmark'] ?? 'No Landmark', // Default if null
+          'location': data['location'] ?? GeoPoint(0, 0), // Default GeoPoint
+        };
+      }).toList();
+
+      setState(() {
+        _usersList = userList;
+        _filteredUsers = userList; // Initialize filtered list with all users
+      });
+    } catch (e) {
+      print('Error fetching users: $e');
+      // Optionally, show an error message to the user
+    }
   }
 
   // Function to handle search changes
@@ -50,11 +68,12 @@ class _UsersState extends State<Users> {
     String searchTerm = _searchController.text.toLowerCase();
     setState(() {
       _filteredUsers = _usersList.where((user) {
-        return user['name'].toLowerCase().contains(searchTerm) ||
+        String fullName =
+            '${user['firstName']} ${user['lastName']}'.toLowerCase();
+        return fullName.contains(searchTerm) ||
             user['category'].toLowerCase().contains(searchTerm) ||
             user['contact'].toLowerCase().contains(searchTerm) ||
             user['address'].toLowerCase().contains(searchTerm) ||
-            user['uid'].toLowerCase().contains(searchTerm) ||
             user['status'].toLowerCase().contains(searchTerm);
       }).toList();
     });
@@ -81,6 +100,7 @@ class _UsersState extends State<Users> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Header Row
                 Row(
                   children: [
                     IconButton(
@@ -101,6 +121,7 @@ class _UsersState extends State<Users> {
                   ],
                 ),
                 SizedBox(height: 20),
+                // Search Bar Row
                 Row(
                   children: [
                     Container(
@@ -113,57 +134,58 @@ class _UsersState extends State<Users> {
                       child: TextField(
                         controller: _searchController,
                         decoration: InputDecoration(
-                          hintText: 'Search by employee name, id, or position',
+                          hintText:
+                              'Search by name, category, contact, address, or status',
                           border: InputBorder.none,
                           prefixIcon: Icon(Icons.search),
                         ),
-                        onChanged: (value) {
-                          _onSearchChanged();
-                        },
                       ),
                     ),
                   ],
                 ),
                 SizedBox(height: 20),
+                // Users List Container
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(border: Border.all()),
                     child: Column(
                       children: [
+                        // Table Headers
                         Row(
                           children: [
-                            title('Name', 2),
-                            title('Category', 1),
-                            title('Contact', 1),
-                            title('Address', 2),
-                            title('UID', 1),
-                            title('Status', 1),
+                            title('Name', 3),
+                            title('Category', 2),
+                            title('Contact', 2),
+                            title('Address', 3),
+                            title('Status', 2),
                             title('Details', 1),
                           ],
                         ),
+                        // Users List
                         Expanded(
-                          child: ListView.builder(
-                            itemCount: _filteredUsers.length,
-                            itemBuilder: (context, index) {
-                              final user = _filteredUsers[index];
-                              final uid = user['uid'];
+                          child: _filteredUsers.isNotEmpty
+                              ? ListView.builder(
+                                  itemCount: _filteredUsers.length,
+                                  itemBuilder: (context, index) {
+                                    final user = _filteredUsers[index];
+                                    final uid = user['id'];
 
-                              // Initialize checkbox state if not present
-                              _selectedOptions[uid] =
-                                  _selectedOptions[uid] ?? false;
+                                    // Initialize checkbox state if not present
+                                    _selectedOptions[uid] =
+                                        _selectedOptions[uid] ?? false;
 
-                              return _buildCustomCheckboxTile(
-                                uid,
-                                user['name'],
-                                user['category'],
-                                user['contact'],
-                                user['address'],
-                                user['uid'],
-                                user['status'],
-                                user,
-                              );
-                            },
-                          ),
+                                    return _buildCustomCheckboxTile(
+                                      uid,
+                                      '${user['firstName']} ${user['lastName']}',
+                                      user['category'],
+                                      user['contact'],
+                                      user['address'],
+                                      // user['status'],
+                                      user,
+                                    );
+                                  },
+                                )
+                              : Center(child: Text('No users found.')),
                         ),
                       ],
                     ),
@@ -177,6 +199,7 @@ class _UsersState extends State<Users> {
     );
   }
 
+  // Title widget for table headers
   Widget title(String text, int flex) {
     return Expanded(
       flex: flex,
@@ -202,35 +225,16 @@ class _UsersState extends State<Users> {
     );
   }
 
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'booked':
-        return Color.fromARGB(255, 66, 167, 250);
-      case 'completed':
-        return Color.fromARGB(255, 76, 181, 80);
-      case 'in progress':
-        return Colors.grey;
-      case 'delayed':
-        return Color.fromARGB(255, 249, 81, 70);
-      case 'unbooked':
-        return Color(0xFFF5D322);
-      default:
-        return Color.fromARGB(255, 150, 141, 61);
-    }
-  }
-
+  // Custom Checkbox List Tile for each user
   Widget _buildCustomCheckboxTile(
     String uid,
     String name,
     String category,
     String contact,
     String address,
-    String userId,
-    String status,
+    // String status,
     Map<String, dynamic> user,
   ) {
-    String displayStatus = status.isEmpty ? 'unbooked' : status;
-
     return CheckboxListTile(
       value: _selectedOptions[uid],
       activeColor: Colors.green,
@@ -242,34 +246,27 @@ class _UsersState extends State<Users> {
       title: Row(
         children: [
           Expanded(
-              flex: 2,
-              child: Text(name, style: TextStyle(fontWeight: FontWeight.bold))),
-          Expanded(flex: 1, child: Text(category)),
-          Expanded(flex: 1, child: Text(contact)),
-          Expanded(flex: 2, child: Text(address)),
-          Expanded(flex: 1, child: Text(userId)),
-          Expanded(
-            flex: 1,
-            child: Container(
-              height: 22.5,
-              width: 30,
-              decoration: BoxDecoration(
-                color: _getStatusColor(displayStatus),
-                borderRadius: BorderRadius.circular(25),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    offset: Offset(0, 1),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Text(
-                  displayStatus,
-                  style: TextStyle(color: Colors.white, fontSize: 12),
-                ),
-              ),
+            flex: 3,
+            child: Text(
+              name,
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(category),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(contact),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(address),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text('unbooked'),
           ),
           Expanded(
             flex: 1,
@@ -286,3 +283,21 @@ class _UsersState extends State<Users> {
     );
   }
 }
+
+
+// Color _getStatusColor(String status) {
+//   switch (status.toLowerCase()) {
+//     case 'booked':
+//       return Color.fromARGB(255, 66, 167, 250);
+//     case 'completed':
+//       return Color.fromARGB(255, 76, 181, 80);
+//     case 'in progress':
+//       return Colors.grey;
+//     case 'delayed':
+//       return Color.fromARGB(255, 249, 81, 70);
+//     case 'unbooked':
+//       return Color(0xFFF5D322);
+//     default:
+//       return Color.fromARGB(255, 150, 141, 61);
+//   }
+// }

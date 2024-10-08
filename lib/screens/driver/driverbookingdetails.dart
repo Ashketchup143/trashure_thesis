@@ -32,11 +32,18 @@ class DriverBookingDetails extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text("Booking Details"),
+        iconTheme: IconThemeData(color: Colors.white),
+        title: Text(
+          "Booking Details",
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: Colors.green,
         actions: [
           IconButton(
-            icon: Icon(Icons.map), // Add the map icon
+            icon: Icon(
+              Icons.map,
+              color: Colors.white,
+            ), // Add the map icon
             onPressed: () {
               Navigator.push(
                 context,
@@ -77,9 +84,10 @@ class DriverBookingDetails extends StatelessWidget {
                 Text('Status: $status', style: TextStyle(fontSize: 18)),
                 Text('Vehicle: $vehicle', style: TextStyle(fontSize: 18)),
                 Text('Vehicle ID: $vehicleId', style: TextStyle(fontSize: 18)),
-                Text('Total Price: \$${overallPrice.toStringAsFixed(2)}',
+                Text('Est. Total Price: ₱${overallPrice.toStringAsFixed(2)}',
                     style: TextStyle(fontSize: 18)),
-                Text('Total Weight: ${overallWeight.toStringAsFixed(2)} kg',
+                Text(
+                    'Est. Total Weight: ${overallWeight.toStringAsFixed(2)} kg',
                     style: TextStyle(fontSize: 18)),
                 Text('Date: $formattedDate', style: TextStyle(fontSize: 18)),
                 SizedBox(height: 20),
@@ -124,7 +132,7 @@ class DriverBookingDetails extends StatelessWidget {
                                 style: TextStyle(fontWeight: FontWeight.bold),
                               ),
                               subtitle: Text(
-                                  'Address: $address, Contact: $contact\nEmail: $email\nTotal Price: \$$totalPrice'),
+                                  'Address: $address, Contact: $contact\nEmail: $email\nTotal Price: ₱$totalPrice'),
                               children: [
                                 StreamBuilder(
                                   stream: FirebaseFirestore.instance
@@ -172,8 +180,8 @@ class DriverBookingDetails extends StatelessWidget {
                                             children: [
                                               Text('Type: $type'),
                                               Text('Weight: $weight kg'),
-                                              Text('Price: \$$price'),
-                                              Text('Item Price: \$$itemPrice'),
+                                              Text('Price: ₱$price'),
+                                              Text('Item Price: ₱$itemPrice'),
                                               Divider(),
                                             ],
                                           ),

@@ -61,8 +61,8 @@ class _MapsState extends State<Maps> {
         backgroundColor: Colors.green[700],
       ),
       body: Container(
-        height: MediaQuery.of(context).size.height * .8,
-        width: MediaQuery.of(context).size.width * .8,
+        height: MediaQuery.of(context).size.height,
+        width: MediaQuery.of(context).size.width,
         child: FlutterMap(
           options: MapOptions(
             center: _markers.isNotEmpty

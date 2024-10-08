@@ -12,10 +12,17 @@ class BookingDetails extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        iconTheme: IconThemeData(color: Colors.white),
+        backgroundColor: Colors.green,
         title: Row(
           children: [
-            Text('Booking Details'),
-            ElevatedButton(
+            Text(
+              'Booking Details',
+              style: TextStyle(color: Colors.white),
+            ),
+            Spacer(),
+            IconButton(
+              icon: Icon(Icons.map), // Add the map icon
               onPressed: () {
                 Navigator.push(
                   context,
@@ -24,8 +31,7 @@ class BookingDetails extends StatelessWidget {
                           bookingId: bookingId)), // Pushing the Maps widget
                 );
               },
-              child: (Text("Map")),
-            )
+            ),
           ],
         ),
       ),
@@ -43,169 +49,188 @@ class BookingDetails extends StatelessWidget {
             SizedBox(height: 20),
 
             // Fetch and display user data with recyclables
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('bookings')
-                    .doc(bookingId)
-                    .collection('users')
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return Center(child: CircularProgressIndicator());
-                  }
-
-                  var users = snapshot.data?.docs ?? [];
-                  if (users.isEmpty) {
-                    return Center(
-                        child: Text('No users associated with this booking.'));
-                  }
-
-                  double overallTotal = 0; // Initialize overall total
-
-                  // Iterate over all users to compute the overall total
-                  return FutureBuilder(
-                    future: _calculateOverallTotal(users),
-                    builder: (context, totalSnapshot) {
-                      if (!totalSnapshot.hasData) {
+            Center(
+              child: Expanded(
+                child: Container(
+                  height: MediaQuery.of(context).size.height * .5,
+                  width: MediaQuery.of(context).size.width * .95,
+                  decoration: BoxDecoration(border: Border.all()),
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('bookings')
+                        .doc(bookingId)
+                        .collection('users')
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
                         return Center(child: CircularProgressIndicator());
                       }
 
-                      overallTotal = totalSnapshot.data ?? 0;
+                      var users = snapshot.data?.docs ?? [];
+                      if (users.isEmpty) {
+                        return Center(
+                            child:
+                                Text('No users associated with this booking.'));
+                      }
 
-                      return Column(
-                        children: [
-                          Expanded(
-                            child: ListView.builder(
-                              itemCount: users.length,
-                              itemBuilder: (context, index) {
-                                var userDoc = users[index];
-                                var userData =
-                                    userDoc.data() as Map<String, dynamic>;
+                      double overallTotal = 0; // Initialize overall total
 
-                                return StreamBuilder<QuerySnapshot>(
-                                  stream: FirebaseFirestore.instance
-                                      .collection('bookings')
-                                      .doc(bookingId)
-                                      .collection('users')
-                                      .doc(userDoc.id)
-                                      .collection('recyclables')
-                                      .snapshots(),
-                                  builder: (context, recyclablesSnapshot) {
-                                    if (!recyclablesSnapshot.hasData) {
-                                      return Center(
-                                          child: CircularProgressIndicator());
-                                    }
+                      // Iterate over all users to compute the overall total
+                      return FutureBuilder(
+                        future: _calculateOverallTotal(users),
+                        builder: (context, totalSnapshot) {
+                          if (!totalSnapshot.hasData) {
+                            return Center(child: CircularProgressIndicator());
+                          }
 
-                                    var recyclables =
-                                        recyclablesSnapshot.data?.docs ?? [];
-                                    double userTotal = 0;
+                          overallTotal = totalSnapshot.data ?? 0;
 
-                                    // Calculate the user total from recyclables
-                                    if (recyclables.isNotEmpty) {
-                                      recyclables.forEach((recyclableDoc) {
-                                        var recyclableData = recyclableDoc
-                                            .data() as Map<String, dynamic>;
-                                        double weight =
-                                            recyclableData['weight'] ?? 0;
-                                        double price =
-                                            recyclableData['price'] ?? 0;
-                                        double itemTotal = weight * price;
+                          return Column(
+                            children: [
+                              Expanded(
+                                child: ListView.builder(
+                                  itemCount: users.length,
+                                  itemBuilder: (context, index) {
+                                    var userDoc = users[index];
+                                    var userData =
+                                        userDoc.data() as Map<String, dynamic>;
 
-                                        userTotal += itemTotal;
-                                      });
-                                    }
+                                    return StreamBuilder<QuerySnapshot>(
+                                      stream: FirebaseFirestore.instance
+                                          .collection('bookings')
+                                          .doc(bookingId)
+                                          .collection('users')
+                                          .doc(userDoc.id)
+                                          .collection('recyclables')
+                                          .snapshots(),
+                                      builder: (context, recyclablesSnapshot) {
+                                        if (!recyclablesSnapshot.hasData) {
+                                          return Center(
+                                              child:
+                                                  CircularProgressIndicator());
+                                        }
 
-                                    return ExpansionTile(
-                                      title: Text(
-                                        "UID: ${userData['uid'] ?? 'No UID'} | Name: ${userData['name'] ?? 'No Name'} | Email: ${userData['email'] ?? 'No Email'} | Address: ${userData['address'] ?? 'No Address'} | Number: ${userData['number'] ?? 'No Number'}",
-                                      ),
-                                      subtitle: Text(
-                                          "Total for user: \$${userTotal.toStringAsFixed(2)}"),
-                                      children: [
-                                        Column(
-                                          children:
-                                              recyclables.map((recyclableDoc) {
+                                        var recyclables =
+                                            recyclablesSnapshot.data?.docs ??
+                                                [];
+                                        double userTotal = 0;
+
+                                        // Calculate the user total from recyclables
+                                        if (recyclables.isNotEmpty) {
+                                          recyclables.forEach((recyclableDoc) {
                                             var recyclableData = recyclableDoc
                                                 .data() as Map<String, dynamic>;
-
                                             double weight =
                                                 recyclableData['weight'] ?? 0;
                                             double price =
                                                 recyclableData['price'] ?? 0;
-                                            double itemTotal = weight *
-                                                price; // Calculate item total
+                                            double itemTotal = weight * price;
 
-                                            return ListTile(
-                                              title: Text(
-                                                  "Type: ${recyclableData['type'] ?? 'No Type'}"),
-                                              subtitle: Text(
-                                                  "Weight: $weight kg, Price: \$${price.toStringAsFixed(2)}, Item Total: \$${itemTotal.toStringAsFixed(2)}"),
-                                              trailing: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  IconButton(
-                                                    icon: Icon(Icons.edit),
-                                                    onPressed: () {
-                                                      // Edit recyclable
-                                                      showEditRecyclableDialog(
-                                                          context,
-                                                          bookingId,
-                                                          userDoc.id,
-                                                          recyclableDoc.id,
-                                                          recyclableData);
-                                                    },
+                                            userTotal += itemTotal;
+                                          });
+                                        }
+
+                                        return ExpansionTile(
+                                          title: Text(
+                                            "UID: ${userData['uid'] ?? 'No UID'} | Name: ${userData['name'] ?? 'No Name'} | Email: ${userData['email'] ?? 'No Email'} | Address: ${userData['address'] ?? 'No Address'} | Number: ${userData['number'] ?? 'No Number'}",
+                                          ),
+                                          subtitle: Text(
+                                              "Total for user: ₱${userTotal.toStringAsFixed(2)}"),
+                                          children: [
+                                            Column(
+                                              children: recyclables
+                                                  .map((recyclableDoc) {
+                                                var recyclableData =
+                                                    recyclableDoc.data()
+                                                        as Map<String, dynamic>;
+
+                                                double weight =
+                                                    recyclableData['weight'] ??
+                                                        0;
+                                                double price =
+                                                    recyclableData['price'] ??
+                                                        0;
+                                                double itemTotal = weight *
+                                                    price; // Calculate item total
+
+                                                return ListTile(
+                                                  title: Text(
+                                                      "Type: ${recyclableData['type'] ?? 'No Type'}"),
+                                                  subtitle: Text(
+                                                      "Weight: $weight kg, Price: ₱${price.toStringAsFixed(2)}, Item Total: ₱${itemTotal.toStringAsFixed(2)}"),
+                                                  trailing: Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      IconButton(
+                                                        icon: Icon(Icons.edit),
+                                                        onPressed: () {
+                                                          // Edit recyclable
+                                                          showEditRecyclableDialog(
+                                                              context,
+                                                              bookingId,
+                                                              userDoc.id,
+                                                              recyclableDoc.id,
+                                                              recyclableData);
+                                                        },
+                                                      ),
+                                                      IconButton(
+                                                        icon:
+                                                            Icon(Icons.delete),
+                                                        onPressed: () {
+                                                          // Delete recyclable
+                                                          FirebaseFirestore
+                                                              .instance
+                                                              .collection(
+                                                                  'bookings')
+                                                              .doc(bookingId)
+                                                              .collection(
+                                                                  'users')
+                                                              .doc(userDoc.id)
+                                                              .collection(
+                                                                  'recyclables')
+                                                              .doc(recyclableDoc
+                                                                  .id)
+                                                              .delete();
+                                                        },
+                                                      ),
+                                                    ],
                                                   ),
-                                                  IconButton(
-                                                    icon: Icon(Icons.delete),
-                                                    onPressed: () {
-                                                      // Delete recyclable
-                                                      FirebaseFirestore.instance
-                                                          .collection(
-                                                              'bookings')
-                                                          .doc(bookingId)
-                                                          .collection('users')
-                                                          .doc(userDoc.id)
-                                                          .collection(
-                                                              'recyclables')
-                                                          .doc(recyclableDoc.id)
-                                                          .delete();
-                                                    },
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                          }).toList(),
-                                        ),
-                                        ElevatedButton(
-                                          onPressed: () {
-                                            // Add new recyclable
-                                            showAddRecyclableDialog(
-                                                context, bookingId, userDoc.id);
-                                          },
-                                          child: Text("Add Recyclable"),
-                                        ),
-                                      ],
+                                                );
+                                              }).toList(),
+                                            ),
+                                            ElevatedButton(
+                                              onPressed: () {
+                                                // Add new recyclable
+                                                showAddRecyclableDialog(context,
+                                                    bookingId, userDoc.id);
+                                              },
+                                              child: Text("Add Recyclable"),
+                                            ),
+                                          ],
+                                        );
+                                      },
                                     );
                                   },
-                                );
-                              },
-                            ),
-                          ),
-                          // Display overall total for booking
-                          Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Text(
-                              "Overall Total for Booking: \$${overallTotal.toStringAsFixed(2)}",
-                              style: TextStyle(
-                                  fontSize: 20, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
+                                ),
+                              ),
+                              // Display overall total for booking
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Text(
+                                  "Overall Total for Booking: ₱${overallTotal.toStringAsFixed(2)}",
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       );
                     },
-                  );
-                },
+                  ),
+                ),
               ),
             ),
           ],

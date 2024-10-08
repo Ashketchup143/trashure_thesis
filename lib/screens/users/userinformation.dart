@@ -13,7 +13,10 @@ class _UserInformationState extends State<UserInformation> {
   late TextEditingController _contactController;
   late TextEditingController _emailController;
   late TextEditingController _addressController;
-  late String _selectedStatus; // Updated: Status as String
+  late TextEditingController _balanceController;
+  late TextEditingController _landmarkController;
+  late GeoPoint _location; // For storing GeoPoint
+  late String _selectedStatus;
   bool _isLoading = false;
   bool _isEditing = false;
   Map<String, dynamic>? user;
@@ -36,6 +39,8 @@ class _UserInformationState extends State<UserInformation> {
     _contactController = TextEditingController();
     _emailController = TextEditingController();
     _addressController = TextEditingController();
+    _balanceController = TextEditingController();
+    _landmarkController = TextEditingController();
     _selectedStatus = 'Unbooked'; // Default status
   }
 
@@ -49,12 +54,22 @@ class _UserInformationState extends State<UserInformation> {
       if (user != null) {
         originalUserData = Map<String, dynamic>.from(user!);
 
-        // Set initial values of the controllers with the user data
-        _nameController.text = user!['name'] ?? '';
-        _categoryController.text = user!['category'] ?? '';
-        _contactController.text = user!['contact'] ?? '';
-        _emailController.text = user!['email'] ?? '';
-        _addressController.text = user!['address'] ?? '';
+        // Safely assign the values or provide defaults if they are null
+        String firstName = user!['firstName'] ?? 'No First Name';
+        String lastName = user!['lastName'] ?? 'No Last Name';
+
+        // Combine firstName and lastName to create the name
+        _nameController.text = '$firstName $lastName';
+        _categoryController.text = user!['category'] ?? 'No Category';
+        _contactController.text = user!['contact'] ?? 'No Contact';
+        _emailController.text = user!['email'] ?? 'No Email';
+        _addressController.text = user!['address'] ?? 'No Address';
+        _balanceController.text =
+            user!['balance']?.toString() ?? '0.0'; // Handle balance
+        _landmarkController.text =
+            user!['landmark'] ?? 'No Landmark'; // Handle landmark
+        _location =
+            user!['location'] ?? GeoPoint(0, 0); // Handle GeoPoint for location
         _selectedStatus = user!['status'] ?? 'Unbooked';
       }
     }
@@ -74,6 +89,10 @@ class _UserInformationState extends State<UserInformation> {
         _contactController.text != originalUserData!['contact'] ||
         _emailController.text != originalUserData!['email'] ||
         _addressController.text != originalUserData!['address'] ||
+        _balanceController.text != originalUserData!['balance']?.toString() ||
+        _landmarkController.text != originalUserData!['landmark'] ||
+        _location.latitude != originalUserData!['location']?.latitude ||
+        _location.longitude != originalUserData!['location']?.longitude ||
         _selectedStatus != originalUserData!['status'];
   }
 
@@ -91,11 +110,18 @@ class _UserInformationState extends State<UserInformation> {
 
     try {
       await FirebaseFirestore.instance.collection('users').doc(userId).update({
-        'name': _nameController.text,
+        'firstName': _nameController.text.split(' ')[0], // Update firstName
+        'lastName': _nameController.text.split(' ').length > 1
+            ? _nameController.text.split(' ').sublist(1).join(' ')
+            : '', // Update lastName
         'category': _categoryController.text,
         'contact': _contactController.text,
         'email': _emailController.text,
         'address': _addressController.text,
+        'balance':
+            double.tryParse(_balanceController.text) ?? 0.0, // Save balance
+        'landmark': _landmarkController.text, // Save landmark
+        'location': _location, // Save GeoPoint location
         'status': _selectedStatus,
       });
 
@@ -103,11 +129,17 @@ class _UserInformationState extends State<UserInformation> {
       setState(() {
         _isEditing = false;
         originalUserData = {
-          'name': _nameController.text,
+          'firstName': _nameController.text.split(' ')[0],
+          'lastName': _nameController.text.split(' ').length > 1
+              ? _nameController.text.split(' ').sublist(1).join(' ')
+              : '',
           'category': _categoryController.text,
           'contact': _contactController.text,
           'email': _emailController.text,
           'address': _addressController.text,
+          'balance': double.tryParse(_balanceController.text) ?? 0.0,
+          'landmark': _landmarkController.text,
+          'location': _location,
           'status': _selectedStatus,
         };
       });
@@ -177,7 +209,7 @@ class _UserInformationState extends State<UserInformation> {
               icon: Icon(_isEditing ? Icons.save : Icons.edit),
               onPressed: () {
                 if (_isEditing && user != null) {
-                  _saveChanges(user!['uid']);
+                  _saveChanges(user!['id']); // Use document ID for user ID
                 } else {
                   _toggleEdit();
                 }
@@ -197,8 +229,8 @@ class _UserInformationState extends State<UserInformation> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildProfileField('User ID', user!['uid'],
-                              isEditable: false),
+                          _buildProfileField('User ID', user!['id'] ?? 'N/A',
+                              isEditable: false), // Use document ID here
                           SizedBox(height: 16),
                           _buildProfileField('Name', _nameController.text,
                               controller: _nameController),
@@ -215,6 +247,17 @@ class _UserInformationState extends State<UserInformation> {
                           SizedBox(height: 16),
                           _buildProfileField('Address', _addressController.text,
                               controller: _addressController),
+                          SizedBox(height: 16),
+                          _buildProfileField('Balance', _balanceController.text,
+                              controller: _balanceController), // Balance field
+                          SizedBox(height: 16),
+                          _buildProfileField(
+                              'Landmark', _landmarkController.text,
+                              controller:
+                                  _landmarkController), // Landmark field
+                          SizedBox(height: 16),
+                          _buildLocationField(
+                              'Location', _location), // Location field
                           SizedBox(height: 16),
                           _buildStatusField('Status', _selectedStatus),
                         ],
@@ -264,6 +307,36 @@ class _UserInformationState extends State<UserInformation> {
                     ),
                   ),
                 ),
+        ),
+      ],
+    );
+  }
+
+  // Widget for displaying location (GeoPoint) with latitude and longitude
+  Widget _buildLocationField(String fieldName, GeoPoint location) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 1,
+          child: Text(
+            '$fieldName:',
+            style: GoogleFonts.poppins(
+              textStyle: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          flex: 2,
+          child: Text(
+            'Lat: ${location.latitude}, Long: ${location.longitude}',
+            style: GoogleFonts.poppins(
+              textStyle: TextStyle(fontSize: 16),
+            ),
+          ),
         ),
       ],
     );

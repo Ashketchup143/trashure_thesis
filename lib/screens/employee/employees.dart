@@ -26,26 +26,60 @@ class _EmployeesState extends State<Employees> {
   }
 
   void _fetchEmployees() async {
-    QuerySnapshot snapshot =
-        await FirebaseFirestore.instance.collection('employees').get();
+    QuerySnapshot snapshot = await FirebaseFirestore.instance
+        .collection('employees')
+        .where('status', isEqualTo: 'active')
+        .get();
+
+    List<Map<String, dynamic>> tempEmployeesList = snapshot.docs.map((doc) {
+      return {
+        'id': doc.id,
+        'name': doc['name'],
+        'position': doc['position'],
+        'exp_time_in': doc['exp_time_in'],
+        'exp_time_out': doc['exp_time_out'],
+        'address': doc['address'],
+        'birth_date': doc['birth_date'],
+        'contact_number': doc['contact_number'],
+        'email_address': doc['email_address'],
+        'salary_per_hour': doc['salary_per_hour'],
+      };
+    }).toList();
+
+    // Initialize attendance status for each employee
+    Map<String, bool> tempAttendanceStatus = {};
+    Map<String, bool> tempSelectedOptions = {};
+
+    for (var employee in tempEmployeesList) {
+      String employeeid = employee['id'];
+      // Initialize selected options
+      tempSelectedOptions[employeeid] = false;
+      // Check if the employee is currently clocked in
+      bool isClockedIn = await _checkIfClockedIn(employeeid);
+      tempAttendanceStatus[employeeid] = isClockedIn;
+    }
 
     setState(() {
-      _employeesList = snapshot.docs.map((doc) {
-        return {
-          'id': doc.id,
-          'name': doc['name'],
-          'position': doc['position'],
-          'exp_time_in': doc['exp_time_in'],
-          'exp_time_out': doc['exp_time_out'],
-          'address': doc['address'],
-          'birth_date': doc['birth_date'],
-          'contact_number': doc['contact_number'],
-          'email_address': doc['email_address'],
-          'salary_per_hour': doc['salary_per_hour'],
-        };
-      }).toList();
+      _employeesList = tempEmployeesList;
       _filteredEmployees = _employeesList;
+      _attendanceStatus = tempAttendanceStatus;
+      _selectedOptions = tempSelectedOptions;
     });
+  }
+
+  Future<bool> _checkIfClockedIn(String employeeid) async {
+    try {
+      DocumentReference employeeDocRef =
+          FirebaseFirestore.instance.collection('employees').doc(employeeid);
+      QuerySnapshot dtrSnapshot = await employeeDocRef
+          .collection('daily_time_record')
+          .where('time_out', isNull: true)
+          .get();
+      return dtrSnapshot.docs.isNotEmpty;
+    } catch (e) {
+      print('Error checking attendance status for $employeeid: $e');
+      return false;
+    }
   }
 
   void _onSearchChanged() {
@@ -155,7 +189,8 @@ class _EmployeesState extends State<Employees> {
                               SizedBox(width: 20),
                               ElevatedButton(
                                 onPressed: () {
-                                  // Handle payroll action
+                                  Navigator.pushNamed(context,
+                                      '/payroll'); // Navigate to payroll screen
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Color(0xFF0062FF),
@@ -294,94 +329,83 @@ class _EmployeesState extends State<Employees> {
                 flex: 2,
                 child: ElevatedButton(
                   onPressed: () async {
-                    setState(() {
-                      _attendanceStatus[option] = !_attendanceStatus[option]!;
-                    });
-
-                    String todayDate =
-                        DateFormat('yyyy-MM-dd').format(DateTime.now());
-
-                    if (_attendanceStatus[option]!) {
-                      // Time Out
+                    if (_attendanceStatus[option] == null ||
+                        !_attendanceStatus[option]!) {
+                      // Employee is not clocked in; proceed to Time In
                       try {
                         DocumentReference employeeDocRef = FirebaseFirestore
                             .instance
                             .collection('employees')
                             .doc(employeeid);
 
-                        // Get the 'daily_time_record' document for today
+                        // Create a new time record with time_in
+                        await employeeDocRef
+                            .collection('daily_time_record')
+                            .add({
+                          'date': DateTime.now(),
+                          'time_in': FieldValue.serverTimestamp(),
+                          'time_out': null,
+                        });
+
+                        setState(() {
+                          _attendanceStatus[option] = true;
+                        });
+
+                        print('Time In recorded for employee $employeeid');
+                      } catch (e) {
+                        print('Error during Time In: $e');
+                      }
+                    } else {
+                      // Employee is clocked in; proceed to Time Out
+                      try {
+                        DocumentReference employeeDocRef = FirebaseFirestore
+                            .instance
+                            .collection('employees')
+                            .doc(employeeid);
+
+                        print(
+                            'Attempting to Time Out for employee: $employeeid');
+
+                        // Find all time_in records without time_out
                         QuerySnapshot dtrSnapshot = await employeeDocRef
                             .collection('daily_time_record')
-                            .where('date', isEqualTo: todayDate)
-                            .limit(1)
+                            .where('time_out', isNull: true)
                             .get();
 
+                        print(
+                            'Number of open time_in records: ${dtrSnapshot.docs.length}');
+
                         if (dtrSnapshot.docs.isNotEmpty) {
-                          // Update 'time_out' field
+                          // Update the earliest time_in record
                           DocumentReference dtrDocRef =
                               dtrSnapshot.docs.first.reference;
                           await dtrDocRef.update({
                             'time_out': FieldValue.serverTimestamp(),
                           });
-                        } else {
-                          // No existing record found, create a new one with time_out
-                          await employeeDocRef
-                              .collection('daily_time_record')
-                              .add({
-                            'date': todayDate,
-                            'time_in': null,
-                            'time_out': FieldValue.serverTimestamp(),
+
+                          setState(() {
+                            _attendanceStatus[option] = false;
                           });
+
+                          print('Time Out recorded for employee $employeeid');
+                        } else {
+                          // No time_in record found without time_out
+                          print('No time_in record found to update time_out');
                         }
                       } catch (e) {
                         print('Error during Time Out: $e');
                       }
-                    } else {
-                      // Time In
-                      try {
-                        DocumentReference employeeDocRef = FirebaseFirestore
-                            .instance
-                            .collection('employees')
-                            .doc(employeeid);
-
-                        // Check if there's already a 'daily_time_record' for today
-                        QuerySnapshot dtrSnapshot = await employeeDocRef
-                            .collection('daily_time_record')
-                            .where('date', isEqualTo: todayDate)
-                            .limit(1)
-                            .get();
-
-                        if (dtrSnapshot.docs.isEmpty) {
-                          // No existing record, create one
-                          await employeeDocRef
-                              .collection('daily_time_record')
-                              .add({
-                            'date': todayDate,
-                            'time_in': FieldValue.serverTimestamp(),
-                            'time_out': null,
-                          });
-                        } else {
-                          // Existing record found, update 'time_in'
-                          DocumentReference dtrDocRef =
-                              dtrSnapshot.docs.first.reference;
-                          await dtrDocRef.update({
-                            'time_in': FieldValue.serverTimestamp(),
-                          });
-                        }
-                      } catch (e) {
-                        print('Error during Time In: $e');
-                      }
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _attendanceStatus[option]!
+                    backgroundColor: _attendanceStatus[option] == true
                         ? Colors.red // Time Out
                         : Colors.blue, // Time In
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(15)),
                   ),
                   child: Text(
-                    _attendanceStatus[option]! ? 'Time Out' : 'Time In',
+                    _attendanceStatus[option] == true ? 'Time Out' : 'Time In',
                     style: TextStyle(color: Colors.white),
                   ),
                 ),
@@ -558,6 +582,7 @@ class _EmployeesState extends State<Employees> {
                     'exp_time_out': expTimeOutController.text.isNotEmpty
                         ? expTimeOutController.text
                         : "",
+                    'status': 'active',
                   });
 
                   Navigator.of(context).pop(); // Close dialog
@@ -584,87 +609,5 @@ class _EmployeesState extends State<Employees> {
         );
       },
     );
-  }
-
-  // Time In: Adds or updates the "time_in" field for the current date
-  Future<void> _timeIn(String employeeId) async {
-    String currentDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    DocumentReference employeeRef =
-        FirebaseFirestore.instance.collection('employees').doc(employeeId);
-
-    // Reference the subcollection and document for the current date
-    DocumentReference dailyRecordRef =
-        employeeRef.collection('daily_time_record').doc(currentDate);
-
-    try {
-      // Fetch the document to check if it exists
-      DocumentSnapshot dailyRecord = await dailyRecordRef.get();
-
-      // Check if the document exists
-      if (!dailyRecord.exists) {
-        // No document for today exists, create the subcollection and the document
-        await dailyRecordRef.set({
-          'time_in': Timestamp.now(),
-          'time_out': null, // Initialize time_out as null
-        });
-        print("Subcollection 'daily_time_record' created with time_in");
-      } else {
-        // If the record exists, just update the time_in field
-        await dailyRecordRef.update({
-          'time_in': Timestamp.now(),
-        });
-        print("time_in updated in the subcollection 'daily_time_record'");
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Time In recorded for $employeeId')),
-      );
-    } catch (e) {
-      // Log the error
-      print('Error creating subcollection: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to record Time In: $e')),
-      );
-    }
-  }
-
-// Time Out: Adds or updates the "time_out" field for the current date
-  Future<void> _timeOut(String employeeId) async {
-    String currentDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    DocumentReference employeeRef =
-        FirebaseFirestore.instance.collection('employees').doc(employeeId);
-
-    // Reference the subcollection and document for the current date
-    DocumentReference dailyRecordRef =
-        employeeRef.collection('daily_time_record').doc(currentDate);
-
-    try {
-      // Fetch the document to check if it exists
-      DocumentSnapshot dailyRecord = await dailyRecordRef.get();
-
-      if (dailyRecord.exists) {
-        // If the record exists, update the time_out field
-        await dailyRecordRef.update({
-          'time_out': Timestamp.now(),
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Time Out recorded for $employeeId')),
-        );
-        print("time_out updated in the subcollection 'daily_time_record'");
-      } else {
-        // If no Time In is found for today, show an error message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No Time In found for today!')),
-        );
-        print("No time_in found for today; cannot record time_out");
-      }
-    } catch (e) {
-      // Log the error
-      print('Error updating time_out: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to record Time Out: $e')),
-      );
-    }
   }
 }

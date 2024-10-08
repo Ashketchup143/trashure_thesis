@@ -337,7 +337,7 @@ class _ProductsState extends State<Products> {
           ),
           Expanded(
             flex: 2,
-            child: Text('Php${price}/${unit}'),
+            child: Text('₱${price}/${unit}'),
           ),
           Expanded(
             flex: 4,

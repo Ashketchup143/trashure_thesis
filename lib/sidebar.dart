@@ -82,7 +82,6 @@ class _SidebarState extends State<Sidebar> {
                 //   radius: 60,
                 //   backgroundImage: AssetImage('assets/trashure.jpg'),
                 // ),
-                SizedBox(height: 10),
                 Text(
                   userName,
                   style: GoogleFonts.poppins(),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:trashure_thesis/screens/booking/bookingdetails.dart';
+import 'package:trashure_thesis/screens/map.dart';
+import 'package:intl/intl.dart';
 
 import 'package:trashure_thesis/sidebar.dart';
 
@@ -16,6 +18,8 @@ class _BookingState extends State<Booking> {
   final _formKey = GlobalKey<FormState>();
   DateTime selectedDate = DateTime.now();
   TextEditingController dateController = TextEditingController();
+  TextEditingController searchController = TextEditingController();
+  String searchQuery = "";
 
   // Dropdown selections
   String? selectedDriver;
@@ -29,6 +33,11 @@ class _BookingState extends State<Booking> {
     super.initState();
     dateController.text =
         "${selectedDate.year}-${selectedDate.month}-${selectedDate.day}";
+  }
+
+  String _formatDate(DateTime date) {
+    // Format date as "Month, Day, Year (Day of Week)"
+    return DateFormat('MMMM d, yyyy (EEEE)').format(date);
   }
 
   @override
@@ -75,6 +84,31 @@ class _BookingState extends State<Booking> {
                             // Add Schedule Modal Button
                             Row(
                               children: [
+                                Container(
+                                  height: 30,
+                                  width: 430,
+                                  decoration: BoxDecoration(
+                                    border: Border.all(),
+                                    borderRadius: BorderRadius.circular(17.5),
+                                  ),
+                                  child: TextField(
+                                    controller:
+                                        searchController, // Use your existing search controller
+                                    decoration: InputDecoration(
+                                      hintText:
+                                          'Search by ID, Date, Driver, Vehicle, Status', // Adjust the hint text as needed
+                                      border: InputBorder.none,
+                                      prefixIcon: Icon(Icons.search),
+                                    ),
+                                    onChanged: (value) {
+                                      setState(() {
+                                        searchQuery = value
+                                            .toLowerCase(); // Update the search query
+                                      });
+                                    },
+                                  ),
+                                ),
+                                SizedBox(width: 20),
                                 ElevatedButton(
                                   onPressed:
                                       _showAddScheduleModal, // Show modal
@@ -96,8 +130,9 @@ class _BookingState extends State<Booking> {
                                         'Add Schedule',
                                         style: GoogleFonts.roboto(
                                           textStyle: TextStyle(
-                                              fontWeight: FontWeight.w300,
-                                              color: Colors.white),
+                                            fontWeight: FontWeight.w300,
+                                            color: Colors.white,
+                                          ),
                                         ),
                                       ),
                                       Icon(
@@ -108,7 +143,6 @@ class _BookingState extends State<Booking> {
                                   ),
                                 ),
                                 SizedBox(width: 20),
-                                // Assign Driver/Vehicle Modal Button
                                 ElevatedButton(
                                   onPressed:
                                       _showAssignDriverModal, // Show modal
@@ -130,8 +164,9 @@ class _BookingState extends State<Booking> {
                                         'Assign Driver/Vehicle',
                                         style: GoogleFonts.roboto(
                                           textStyle: TextStyle(
-                                              fontWeight: FontWeight.w300,
-                                              color: Colors.white),
+                                            fontWeight: FontWeight.w300,
+                                            color: Colors.white,
+                                          ),
                                         ),
                                       ),
                                       Icon(
@@ -141,6 +176,8 @@ class _BookingState extends State<Booking> {
                                     ],
                                   ),
                                 ),
+                                SizedBox(width: 20),
+                                // Adding the search bar next to the buttons
                               ],
                             ),
                             SizedBox(height: 20),
@@ -153,11 +190,12 @@ class _BookingState extends State<Booking> {
                                 children: [
                                   Row(
                                     children: [
-                                      title('Schedule ID', 2),
-                                      title('Date', 2),
-                                      title('Driver', 1),
-                                      title('Vehicle', 1),
+                                      title('Schedule ID', 3),
+                                      title('Date', 3),
+                                      title('Driver', 2),
+                                      title('Vehicle', 2),
                                       title('Overall Price', 1),
+                                      title('Overall Weight', 1),
                                       title('Status', 1),
                                       title('Details', 1),
                                     ],
@@ -170,13 +208,25 @@ class _BookingState extends State<Booking> {
                                             .snapshots(),
                                         builder: (context, snapshot) {
                                           if (!snapshot.hasData) {
-                                            return CircularProgressIndicator();
+                                            return Center(
+                                                child:
+                                                    CircularProgressIndicator());
                                           }
                                           var bookings =
                                               snapshot.data?.docs ?? [];
 
+                                          // Ensure safe handling of null data
+                                          var filteredBookings =
+                                              bookings.where((doc) {
+                                            var data = doc.data()
+                                                as Map<String, dynamic>?;
+                                            return _matchesSearchQuery(
+                                                data); // Safely pass data to search function
+                                          }).toList();
+
                                           return ListView(
-                                            children: bookings.map((doc) {
+                                            children:
+                                                filteredBookings.map((doc) {
                                               var bookingData = doc.data()
                                                   as Map<String, dynamic>;
                                               var scheduleId = doc.id;
@@ -197,6 +247,47 @@ class _BookingState extends State<Booking> {
                     ),
                   ),
                 )));
+  }
+
+  // Search bar widget
+  Widget _buildSearchBar() {
+    return TextFormField(
+      controller: searchController,
+      decoration: InputDecoration(
+        hintText: 'Search by ID, Date, Driver, Vehicle, Status',
+        prefixIcon: Icon(Icons.search),
+      ),
+      onChanged: (value) {
+        setState(() {
+          searchQuery = value.toLowerCase();
+        });
+      },
+    );
+  }
+
+  // Function to check if a booking matches the search query
+  bool _matchesSearchQuery(Map<String, dynamic>? data) {
+    if (data == null) return false; // Handle null data
+
+    // Handle potential null values for fields
+    String id = (data['id']?.toString() ?? '').toLowerCase();
+    String driver =
+        (data['driver']?.toString() ?? 'no driver assigned').toLowerCase();
+    String vehicle =
+        (data['vehicle']?.toString() ?? 'no vehicle assigned').toLowerCase();
+    String status = (data['status']?.toString() ?? '').toLowerCase();
+    String date = _formatDate(data['date']?.toDate() ?? DateTime(1970))
+        .toLowerCase(); // Default date if null
+
+    // Normalize searchQuery (e.g., search for 'no driver', 'no vehicle')
+    String normalizedQuery = searchQuery.toLowerCase();
+
+    // Search logic
+    return id.contains(normalizedQuery) ||
+        driver.contains(normalizedQuery) ||
+        vehicle.contains(normalizedQuery) ||
+        status.contains(normalizedQuery) ||
+        date.contains(normalizedQuery);
   }
 
   // Show modal for adding schedule
@@ -320,6 +411,11 @@ class _BookingState extends State<Booking> {
                           style: TextStyle(fontSize: 16),
                         );
                       },
+                    )
+                  else
+                    Text(
+                      'No driver assigned yet.',
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
                     ),
                 ],
               ),
@@ -380,9 +476,18 @@ class _BookingState extends State<Booking> {
 
 // Function to update driver and vehicle information for selected bookings
   Future<void> _updateDriverVehicle() async {
-    if (selectedDriver == null || selectedVehicle == null) {
+    if (selectedVehicle == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Please select a vehicle')),
+      );
+      return;
+    }
+
+    if (selectedDriver == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(
+                'The selected vehicle has no driver assigned. Please assign a driver first.')),
       );
       return;
     }
@@ -482,25 +587,25 @@ class _BookingState extends State<Booking> {
       title: Row(
         children: [
           Expanded(
-            flex: 2,
+            flex: 3,
             child: Text(scheduleId),
           ),
           Expanded(
-            flex: 2,
+            flex: 3,
             child: Text(
               bookingData['date'] != null
-                  ? bookingData['date'].toDate().toString()
+                  ? _formatDate(bookingData['date'].toDate()).toString()
                   : 'No Date',
             ),
           ),
           Expanded(
-            flex: 1,
+            flex: 2,
             child: Text(
               bookingData['driver']?.toString() ?? 'No Driver Assigned',
             ),
           ),
           Expanded(
-            flex: 1,
+            flex: 2,
             child: Text(
               bookingData['vehicle']?.toString() ?? 'No Vehicle Assigned',
             ),
@@ -508,7 +613,16 @@ class _BookingState extends State<Booking> {
           Expanded(
             flex: 1,
             child: Text(
-              bookingData['overall_price']?.toString() ??
+              bookingData['overall_price'] != null
+                  ? '₱${bookingData['overall_price'].toString()}' // Add the peso sign ₱
+                  : '₱0', // Default to ₱0 if the price is null
+              style: GoogleFonts.poppins(),
+            ),
+          ),
+          Expanded(
+            flex: 1,
+            child: Text(
+              bookingData['overall_weight']?.toString() ??
                   'N/A', // Added this line to display the overall price
               style: GoogleFonts.poppins(),
             ),
@@ -522,22 +636,41 @@ class _BookingState extends State<Booking> {
           Expanded(
             flex: 1,
             child: Container(
-              child: IconButton(
-                icon: Icon(
-                  Icons.info_outline,
-                  size: 20,
-                ),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => BookingDetails(
-                        bookingId: scheduleId,
-                        bookingData: bookingData,
-                      ),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 30,
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.map), // Add the map icon
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => Maps(
+                                bookingId:
+                                    scheduleId)), // Pushing the Maps widget
+                      );
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.info_outline,
+                      size: 20,
                     ),
-                  );
-                },
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => BookingDetails(
+                            bookingId: scheduleId,
+                            bookingData: bookingData,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
           ),
