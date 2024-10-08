@@ -1,9 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:trashure_thesis/screens/map.dart'; // Import intl package for date formatting
 
-class DriverBookingDetails extends StatelessWidget {
+class DriverBookingDetails extends StatefulWidget {
+  @override
+  _DriverBookingDetailsState createState() => _DriverBookingDetailsState();
+}
+
+class _DriverBookingDetailsState extends State<DriverBookingDetails> {
+  Map<String, bool> isEditingWeight =
+      {}; // Track whether the user is editing the weight for each recyclable
+  Map<String, TextEditingController> weightControllers =
+      {}; // Store controllers for each weight input
+  Map<String, double> updatedWeights = {}; // Track updated weights locally
+
   @override
   Widget build(BuildContext context) {
     final args =
@@ -38,22 +48,6 @@ class DriverBookingDetails extends StatelessWidget {
           style: TextStyle(color: Colors.white),
         ),
         backgroundColor: Colors.green,
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.map,
-              color: Colors.white,
-            ), // Add the map icon
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) =>
-                        Maps(bookingId: bookingId)), // Pushing the Maps widget
-              );
-            },
-          ),
-        ],
       ),
       body: Center(
         child: Container(
@@ -84,10 +78,9 @@ class DriverBookingDetails extends StatelessWidget {
                 Text('Status: $status', style: TextStyle(fontSize: 18)),
                 Text('Vehicle: $vehicle', style: TextStyle(fontSize: 18)),
                 Text('Vehicle ID: $vehicleId', style: TextStyle(fontSize: 18)),
-                Text('Est. Total Price: ₱${overallPrice.toStringAsFixed(2)}',
+                Text('Total Price: ₱${overallPrice.toStringAsFixed(2)}',
                     style: TextStyle(fontSize: 18)),
-                Text(
-                    'Est. Total Weight: ${overallWeight.toStringAsFixed(2)} kg',
+                Text('Total Weight: ${overallWeight.toStringAsFixed(2)} kg',
                     style: TextStyle(fontSize: 18)),
                 Text('Date: $formattedDate', style: TextStyle(fontSize: 18)),
                 SizedBox(height: 20),
@@ -139,10 +132,8 @@ class DriverBookingDetails extends StatelessWidget {
                                       .collection('bookings')
                                       .doc(bookingId)
                                       .collection('users')
-                                      .doc(users[userIndex]
-                                          .id) // Correct user document
-                                      .collection(
-                                          'recyclables') // Subcollection
+                                      .doc(users[userIndex].id)
+                                      .collection('recyclables')
                                       .snapshots(),
                                   builder: (context, recyclableSnapshot) {
                                     if (!recyclableSnapshot.hasData) {
@@ -169,8 +160,26 @@ class DriverBookingDetails extends StatelessWidget {
                                             recyclableData['weight'] ?? 0.0;
                                         double price =
                                             recyclableData['price'] ?? 0.0;
-                                        double itemPrice =
-                                            recyclableData['item_price'] ?? 0.0;
+
+                                        // Dynamically calculate item price
+                                        double itemPrice = weight * price;
+
+                                        String recyclableId =
+                                            recyclables[recIndex].id;
+
+                                        // Initialize weight controller if not yet initialized
+                                        if (!weightControllers
+                                            .containsKey(recyclableId)) {
+                                          weightControllers[recyclableId] =
+                                              TextEditingController(
+                                                  text: weight.toString());
+                                          updatedWeights[recyclableId] = weight;
+                                        }
+
+                                        // Track if the user is editing this specific recyclable's weight
+                                        bool isEditing =
+                                            isEditingWeight[recyclableId] ??
+                                                false;
 
                                         return Padding(
                                           padding: const EdgeInsets.all(8.0),
@@ -179,9 +188,63 @@ class DriverBookingDetails extends StatelessWidget {
                                                 CrossAxisAlignment.start,
                                             children: [
                                               Text('Type: $type'),
-                                              Text('Weight: $weight kg'),
+                                              Row(
+                                                children: [
+                                                  isEditing
+                                                      ? Expanded(
+                                                          child: TextFormField(
+                                                            controller:
+                                                                weightControllers[
+                                                                    recyclableId],
+                                                            decoration:
+                                                                InputDecoration(
+                                                              labelText:
+                                                                  'Weight (kg)',
+                                                              border:
+                                                                  OutlineInputBorder(),
+                                                            ),
+                                                            keyboardType:
+                                                                TextInputType
+                                                                    .number,
+                                                          ),
+                                                        )
+                                                      : Text(
+                                                          'Weight: ${updatedWeights[recyclableId]!.toStringAsFixed(2)} kg'),
+                                                  IconButton(
+                                                    icon: Icon(isEditing
+                                                        ? Icons.check
+                                                        : Icons.edit),
+                                                    onPressed: () {
+                                                      setState(() {
+                                                        if (isEditing) {
+                                                          // Save the edited value locally
+                                                          double newWeight =
+                                                              double.tryParse(
+                                                                      weightControllers[
+                                                                              recyclableId]!
+                                                                          .text) ??
+                                                                  weight;
+
+                                                          updatedWeights[
+                                                                  recyclableId] =
+                                                              newWeight; // Update weight locally
+
+                                                          // Update item price dynamically
+                                                          itemPrice =
+                                                              newWeight * price;
+                                                        }
+                                                        isEditingWeight[
+                                                                recyclableId] =
+                                                            !isEditing;
+                                                      });
+                                                    },
+                                                  ),
+                                                ],
+                                              ),
+                                              SizedBox(height: 8),
                                               Text('Price: ₱$price'),
-                                              Text('Item Price: ₱$itemPrice'),
+                                              Text(
+                                                  'Item Price: ₱${(updatedWeights[recyclableId]! * price).toStringAsFixed(2)}'),
                                               Divider(),
                                             ],
                                           ),
@@ -189,6 +252,16 @@ class DriverBookingDetails extends StatelessWidget {
                                       },
                                     );
                                   },
+                                ),
+                                ElevatedButton(
+                                  onPressed: () async {
+                                    // Mark the user as collected and update recyclables' final_weight and final_item_price
+                                    await _markAsCollected(
+                                        bookingId, users[userIndex].id);
+                                  },
+                                  child: Text('Collected'),
+                                  style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green),
                                 ),
                               ],
                             ),
@@ -203,6 +276,54 @@ class DriverBookingDetails extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  // Function to mark a user's recyclables as collected
+  Future<void> _markAsCollected(String bookingId, String userId) async {
+    var recyclablesSnapshot = await FirebaseFirestore.instance
+        .collection('bookings')
+        .doc(bookingId)
+        .collection('users')
+        .doc(userId)
+        .collection('recyclables')
+        .get();
+
+    var batch = FirebaseFirestore.instance.batch();
+
+    for (var rec in recyclablesSnapshot.docs) {
+      var recyclableData = rec.data() as Map<String, dynamic>;
+      String recyclableId = rec.id;
+
+      // Use the locally updated weight or the original weight if not edited
+      double finalWeight =
+          updatedWeights[recyclableId] ?? recyclableData['weight'];
+      double price = recyclableData['price'] ?? 0.0;
+      double finalItemPrice = finalWeight * price;
+
+      // Update the final_weight and final_item_price fields in Firestore
+      batch.update(
+        rec.reference,
+        {
+          'final_weight': finalWeight,
+          'final_item_price': finalItemPrice,
+        },
+      );
+    }
+
+    // Update the user's status to "collected"
+    var userRef = FirebaseFirestore.instance
+        .collection('bookings')
+        .doc(bookingId)
+        .collection('users')
+        .doc(userId);
+
+    batch.update(userRef, {'status': 'collected'});
+
+    await batch.commit();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('User marked as collected')),
     );
   }
 }
