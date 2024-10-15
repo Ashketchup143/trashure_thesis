@@ -12,6 +12,8 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
   Map<String, bool> isEditingWeight = {};
   Map<String, TextEditingController> weightControllers = {};
   Map<String, double> updatedWeights = {};
+  List<Map<String, dynamic>> selectedProducts = [];
+  TextEditingController nameController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
