@@ -146,6 +146,7 @@ class _DriverTransactionsState extends State<DriverTransactions> {
 
                           return Card(
                             margin: const EdgeInsets.all(10),
+                            color: Colors.lightGreen[100],
                             child: ListTile(
                               title: Text(
                                 'Date: ${formatDate(bookingDate)}',

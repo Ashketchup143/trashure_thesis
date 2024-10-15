@@ -319,10 +319,12 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                   ),
                 ),
                 ElevatedButton(
-                  onPressed: _showFinalCollectedConfirmation,
+                  onPressed: () async {
+                    await _showFinalCollectedConfirmation(bookingId);
+                  },
                   child: Text('Mark Booking as Collected'),
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.redAccent),
+                  style:
+                      ElevatedButton.styleFrom(backgroundColor: Colors.green),
                 ),
               ],
             ),
@@ -434,10 +436,8 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
     );
   }
 
-  Future<void> _showFinalCollectedConfirmation() async {
+  Future<void> _showFinalCollectedConfirmation(String bookingId) async {
     bool hasUncollectedUsers = false;
-    var bookingId = ModalRoute.of(context)?.settings.arguments as String?;
-    if (bookingId == null) return;
 
     var usersSnapshot = await FirebaseFirestore.instance
         .collection('bookings')
@@ -477,7 +477,10 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
-            title: Text('Mark Booking as Completed'),
+            title: Text(
+              'Mark Booking as Completed',
+              style: TextStyle(color: Colors.white),
+            ),
             content: Text(
                 'Are you sure you want to mark the entire booking as completed?'),
             actions: [
@@ -499,12 +502,34 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
       );
 
       if (confirmed) {
+        // Calculate the total final_overall_price and final_overall_weight
+        double finalOverallPrice = 0.0;
+        double finalOverallWeight = 0.0;
+
+        for (var userDoc in usersSnapshot.docs) {
+          var userData = userDoc.data() as Map<String, dynamic>;
+          double finalTotalPrice = userData['final_total_price'] ?? 0.0;
+          double finalTotalWeight = userData['final_total_weight'] ?? 0.0;
+
+          finalOverallPrice += finalTotalPrice;
+          finalOverallWeight += finalTotalWeight;
+        }
+
+        // Update the booking document with the final overall price and weight
         await FirebaseFirestore.instance
             .collection('bookings')
             .doc(bookingId)
-            .update({'status': 'collected'});
+            .update({
+          'status': 'collected',
+          'final_overall_price': finalOverallPrice,
+          'final_overall_weight': finalOverallWeight,
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Booking marked as collected')),
+          SnackBar(
+              backgroundColor: Colors.green,
+              content: Text(
+                  'Booking marked as collected. Final overall price and weight updated.')),
         );
       }
     }
