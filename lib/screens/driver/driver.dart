@@ -279,16 +279,8 @@ class _DriverState extends State<Driver> {
                                       child: Text('Collect'),
                                     )
                                   else
-                                    Row(
+                                    Column(
                                       children: [
-                                        Text(
-                                          'Collecting',
-                                          style: TextStyle(
-                                            color: Colors.orange,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        SizedBox(width: 8),
                                         ElevatedButton(
                                           onPressed: () async {
                                             await _updateBookingStatus(
@@ -297,8 +289,16 @@ class _DriverState extends State<Driver> {
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: Colors.redAccent,
                                           ),
-                                          child: Text('Set Pending'),
+                                          child: Text('Revert back to pending'),
                                         ),
+                                        Text(
+                                          'Collecting',
+                                          style: TextStyle(
+                                            color: Colors.orange,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        SizedBox(width: 8),
                                       ],
                                     ),
                                   IconButton(

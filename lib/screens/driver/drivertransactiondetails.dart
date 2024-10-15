@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:trashure_thesis/screens/addusermodal.dart';
 import 'package:trashure_thesis/screens/map.dart';
 
-class DriverBookingDetails extends StatefulWidget {
+class DriverTransactionDetails extends StatefulWidget {
   @override
-  _DriverBookingDetailsState createState() => _DriverBookingDetailsState();
+  _DriverTransactionDetails createState() => _DriverTransactionDetails();
 }
 
-class _DriverBookingDetailsState extends State<DriverBookingDetails> {
+class _DriverTransactionDetails extends State<DriverTransactionDetails> {
   Map<String, bool> isEditingWeight = {};
   Map<String, TextEditingController> weightControllers = {};
   Map<String, double> updatedWeights = {};
@@ -39,7 +38,8 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
         iconTheme: IconThemeData(color: Colors.white),
         title: Row(
           children: [
-            Text("Booking Details", style: TextStyle(color: Colors.white)),
+            Text("Booking History Details",
+                style: TextStyle(color: Colors.white)),
             Spacer(),
             IconButton(
               icon: Icon(Icons.map),
@@ -70,29 +70,11 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Text('Booking Details',
-                        style: TextStyle(
-                            color: Colors.green,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold)),
-                    Spacer(),
-                    ElevatedButton(
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (BuildContext context) {
-                            return AddUserModal(bookingId: bookingId);
-                          },
-                        );
-                      },
-                      child: Text('Add Guest User'),
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green),
-                    ),
-                  ],
-                ),
+                Text('Booking Details',
+                    style: TextStyle(
+                        color: Colors.green,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold)),
                 SizedBox(height: 10),
                 Text('Booking ID: $bookingId', style: TextStyle(fontSize: 18)),
                 Text('Status: $status', style: TextStyle(fontSize: 18)),
@@ -317,20 +299,6 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                     );
                                   },
                                 ),
-                                if (!isCollected)
-                                  ElevatedButton(
-                                    onPressed: () async {
-                                      _showCollectedConfirmation(
-                                          userId,
-                                          bookingId,
-                                          firstName,
-                                          lastName,
-                                          userData);
-                                    },
-                                    child: Text('Collected'),
-                                    style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.green),
-                                  ),
                               ],
                             ),
                           );
@@ -339,221 +307,11 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                     },
                   ),
                 ),
-                ElevatedButton(
-                  onPressed: () async {
-                    await _showFinalCollectedConfirmation(bookingId);
-                  },
-                  child: Text('Mark Booking as Collected'),
-                  style:
-                      ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                ),
               ],
             ),
           ),
         ),
       ),
     );
-  }
-
-  Future<void> _showCollectedConfirmation(String userId, String bookingId,
-      String firstName, String lastName, Map<String, dynamic> userData) async {
-    // Show modal to confirm collection
-    bool confirmed = await showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Confirm Collection'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                  'Are you sure you want to mark $firstName $lastName as collected?'),
-              Text(
-                  'Recyclables and their updated weights/prices will be finalized.'),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(false); // Cancel
-              },
-              child: Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(true); // Confirm
-              },
-              child: Text('Confirm'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed == true) {
-      await _markAsCollected(bookingId, userId);
-    }
-  }
-
-  Future<void> _markAsCollected(String bookingId, String userId) async {
-    var recyclablesSnapshot = await FirebaseFirestore.instance
-        .collection('bookings')
-        .doc(bookingId)
-        .collection('users')
-        .doc(userId)
-        .collection('recyclables')
-        .get();
-
-    double finalTotalPrice = 0.0;
-    double finalTotalWeight = 0.0; // New variable for total weight
-
-    var batch = FirebaseFirestore.instance.batch();
-
-    for (var rec in recyclablesSnapshot.docs) {
-      var recyclableData = rec.data() as Map<String, dynamic>;
-      String recyclableId = rec.id;
-
-      // Calculate final weight and final item price
-      double finalWeight =
-          updatedWeights[recyclableId] ?? recyclableData['weight'];
-      double price = recyclableData['price'] ?? 0.0;
-      double finalItemPrice = finalWeight * price;
-
-      // Sum up the final item prices and final weights
-      finalTotalPrice += finalItemPrice;
-      finalTotalWeight += finalWeight; // Add weight to total weight
-
-      // Update each recyclable with final weight and final item price
-      batch.update(
-        rec.reference,
-        {
-          'final_weight': finalWeight,
-          'final_item_price': finalItemPrice,
-        },
-      );
-    }
-
-    // Now update the user's document with final_total_price, final_total_weight, and collected status
-    var userRef = FirebaseFirestore.instance
-        .collection('bookings')
-        .doc(bookingId)
-        .collection('users')
-        .doc(userId);
-
-    batch.update(userRef, {
-      'status': 'collected',
-      'final_total_price': finalTotalPrice, // Store the final total price
-      'final_total_weight': finalTotalWeight, // Store the final total weight
-      'collected_timestamp':
-          Timestamp.now(), // Add collected timestamp for the user
-    });
-
-    await batch.commit();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content: Text(
-              'User marked as collected, total price and weight calculated')),
-    );
-  }
-
-  Future<void> _showFinalCollectedConfirmation(String bookingId) async {
-    bool hasUncollectedUsers = false;
-
-    var usersSnapshot = await FirebaseFirestore.instance
-        .collection('bookings')
-        .doc(bookingId)
-        .collection('users')
-        .get();
-
-    for (var userDoc in usersSnapshot.docs) {
-      var userData = userDoc.data() as Map<String, dynamic>;
-      if (userData['status'] != 'collected') {
-        hasUncollectedUsers = true;
-        break;
-      }
-    }
-
-    if (hasUncollectedUsers) {
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text('Incomplete Collection'),
-            content: Text(
-                'There are users who have not been marked as collected. Please finish collecting before marking the booking as completed.'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: Text('Ok'),
-              ),
-            ],
-          );
-        },
-      );
-    } else {
-      bool confirmed = await showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text(
-              'Mark Booking as Completed',
-            ),
-            content: Text(
-                'Are you sure you want to mark the entire booking as completed?'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop(false); // Cancel
-                },
-                child: Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop(true); // Confirm
-                },
-                child: Text('Confirm'),
-              ),
-            ],
-          );
-        },
-      );
-
-      if (confirmed) {
-        // Calculate the total final_overall_price and final_overall_weight
-        double finalOverallPrice = 0.0;
-        double finalOverallWeight = 0.0;
-
-        for (var userDoc in usersSnapshot.docs) {
-          var userData = userDoc.data() as Map<String, dynamic>;
-          double finalTotalPrice = userData['final_total_price'] ?? 0.0;
-          double finalTotalWeight = userData['final_total_weight'] ?? 0.0;
-
-          finalOverallPrice += finalTotalPrice;
-          finalOverallWeight += finalTotalWeight;
-        }
-
-        // Update the booking document with the final overall price and weight
-        await FirebaseFirestore.instance
-            .collection('bookings')
-            .doc(bookingId)
-            .update({
-          'status': 'collected',
-          'final_overall_price': finalOverallPrice,
-          'final_overall_weight': finalOverallWeight,
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              backgroundColor: Colors.green,
-              content: Text(
-                  'Booking marked as collected. Final overall price and weight updated.')),
-        );
-        // Pop the current screen after the operation is complete
-        Navigator.of(context).pop();
-      }
-    }
   }
 }

@@ -71,7 +71,7 @@ class _DriverTransactionsState extends State<DriverTransactions> {
               },
             ),
             Text(
-              "Transactions",
+              "Booking History",
               style: TextStyle(color: Colors.white),
             ), // Display the driver's name in the app bar
           ],
@@ -168,7 +168,7 @@ class _DriverTransactionsState extends State<DriverTransactions> {
                                 onPressed: () {
                                   Navigator.pushNamed(
                                     context,
-                                    '/driverbookingdetails',
+                                    '/drivertransactiondetails',
                                     arguments: {
                                       'bookingId': bookingId,
                                       'vehicle': bookingData['vehicle'],
