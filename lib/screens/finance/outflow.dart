@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:trashure_thesis/sidebar.dart';
 
@@ -10,6 +11,8 @@ class Outflow extends StatefulWidget {
 }
 
 class _OutflowState extends State<Outflow> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -56,7 +59,7 @@ class _OutflowState extends State<Outflow> {
                             // controller: _searchController,
                             decoration: InputDecoration(
                               hintText:
-                                  'Search by vehicle ID, assigned_driver, brand, color, fuel_type, model, vehicle_type, weight_limit, and license_plate_number',
+                                  'Search by category, name, status, or other fields',
                               border: InputBorder.none,
                               prefixIcon: Icon(Icons.search),
                             ),
@@ -65,8 +68,7 @@ class _OutflowState extends State<Outflow> {
                         SizedBox(width: 20),
                         ElevatedButton(
                           onPressed: () {
-                            // _showAddVehicleDialog(
-                            //     context); // Call add vehicle function
+                            // _showAddOutflowDialog(context); // Call add outflow function
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Color(0xFF4CAF4F),
@@ -81,38 +83,7 @@ class _OutflowState extends State<Outflow> {
                             children: [
                               SizedBox(width: 8),
                               Text(
-                                'Add Vehicle',
-                                style: GoogleFonts.roboto(
-                                    textStyle: TextStyle(
-                                        fontWeight: FontWeight.w300,
-                                        color: Colors.white)),
-                              ),
-                              Icon(
-                                Icons.add,
-                                color: Colors.white,
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(width: 20),
-                        ElevatedButton(
-                          onPressed: () {
-                            // _assignDriverToVehicles();
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Color(0xFF0062FF),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30)),
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                            textStyle: TextStyle(fontSize: 16),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              SizedBox(width: 8),
-                              Text(
-                                'Assign Driver',
+                                'Add Outflow',
                                 style: GoogleFonts.roboto(
                                     textStyle: TextStyle(
                                         fontWeight: FontWeight.w300,
@@ -128,31 +99,114 @@ class _OutflowState extends State<Outflow> {
                       ],
                     ),
                     SizedBox(height: 20),
-                    Container(
-                      height: MediaQuery.of(context).size.height * .825,
-                      decoration: BoxDecoration(border: Border.all()),
-                      child: Column(
-                        children: [
-                          Container(
-                            child: Row(
-                              children: [
-                                Container(
-                                    height: 20,
-                                    width: 20,
-                                    decoration: BoxDecoration(
-                                        border: Border(bottom: BorderSide()))),
-                                title('Vehicle ID', 1),
-                                title('Brand', 2),
-                                title('Vehicle Type', 1),
-                                title('Model', 1),
-                                title('Plate Number', 1),
-                                title('Assigned Driver', 2),
-                                title('Weight Limit', 1),
-                                title('Details', 1),
-                              ],
+                    Expanded(
+                      child: Container(
+                        height: MediaQuery.of(context).size.height * .825,
+                        decoration: BoxDecoration(border: Border.all()),
+                        child: Column(
+                          children: [
+                            Container(
+                              child: Row(
+                                children: [
+                                  title('Document ID', 2),
+                                  title('Category', 2),
+                                  title('Details', 2),
+                                  title('Employee', 2),
+                                  title('Total Amount', 1),
+                                  title('Status', 1),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                            Expanded(
+                              child: StreamBuilder<QuerySnapshot>(
+                                stream: _firestore
+                                    .collection('outflow')
+                                    .snapshots(),
+                                builder: (context, snapshot) {
+                                  if (!snapshot.hasData) {
+                                    return Center(
+                                      child: CircularProgressIndicator(),
+                                    );
+                                  }
+
+                                  final outflowList = snapshot.data!.docs;
+
+                                  return ListView.builder(
+                                    itemCount: outflowList.length,
+                                    itemBuilder: (context, index) {
+                                      final outflowData = outflowList[index];
+                                      return Container(
+                                        decoration: BoxDecoration(
+                                          border: Border(
+                                            bottom: BorderSide(),
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              flex: 2,
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.all(8.0),
+                                                child: Text(outflowData.id),
+                                              ),
+                                            ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.all(8.0),
+                                                child: Text(
+                                                    outflowData['category']),
+                                              ),
+                                            ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.all(8.0),
+                                                child: Text(
+                                                    outflowData['details']),
+                                              ),
+                                            ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.all(8.0),
+                                                child: Text(
+                                                    outflowData['employee']),
+                                              ),
+                                            ),
+                                            Expanded(
+                                              flex: 1,
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.all(8.0),
+                                                child: Text(
+                                                    outflowData['total_amount']
+                                                        .toString()),
+                                              ),
+                                            ),
+                                            Expanded(
+                                              flex: 1,
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.all(8.0),
+                                                child:
+                                                    Text(outflowData['status']),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],

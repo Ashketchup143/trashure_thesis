@@ -543,7 +543,7 @@ class _BookingState extends State<Booking> {
     try {
       await FirebaseFirestore.instance.collection('bookings').add({
         'date': Timestamp.fromDate(selectedDate),
-        'status': 'Pending',
+        'status': 'pending',
         'driver': null, // Initialize as null
         'vehicle': null, // Initialize as null
       });

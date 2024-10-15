@@ -60,26 +60,35 @@ class _MapsState extends State<Maps> {
         title: const Text('User Locations Map'),
         backgroundColor: Colors.green[700],
       ),
-      body: Container(
-        height: MediaQuery.of(context).size.height,
-        width: MediaQuery.of(context).size.width,
-        child: FlutterMap(
-          options: MapOptions(
-            center: _markers.isNotEmpty
-                ? _markers.first.point
-                : LatLng(7.0800, 125.6200), // Center on the first marker
-            zoom: 15.0, // Set appropriate zoom level
-            maxZoom: 18.0, // Optional max zoom
-            minZoom: 5.0, // Optional min zoom
-            // scrollWheelZoom: true, // Enable scroll wheel zoom
-          ),
-          children: [
-            TileLayer(
-              urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-              subdomains: ['a', 'b', 'c'],
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Container(
+          height: MediaQuery.of(context).size.height,
+          width: MediaQuery.of(context).size.width,
+          decoration: BoxDecoration(
+              border: Border.all(color: Colors.green, width: 4),
+              borderRadius: BorderRadius.circular(25)),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(25), // Apply radius here
+            child: FlutterMap(
+              options: MapOptions(
+                center: _markers.isNotEmpty
+                    ? _markers.first.point
+                    : LatLng(7.0800, 125.6200), // Center on the first marker
+                zoom: 15.0, // Set appropriate zoom level
+                maxZoom: 18.0, // Optional max zoom
+                minZoom: 5.0, // Optional min zoom
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate:
+                      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  subdomains: ['a', 'b', 'c'],
+                ),
+                MarkerLayer(markers: _markers), // Display the markers
+              ],
             ),
-            MarkerLayer(markers: _markers), // Display the markers
-          ],
+          ),
         ),
       ),
     );

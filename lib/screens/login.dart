@@ -29,11 +29,12 @@ class _LoginState extends State<Login> {
           password: _passwordController.text.trim(),
         );
 
-        // Special handling for the master user
+        // Special handling for the master user (super admin)
         if (_emailController.text.trim() == 'anmlim@addu.edu.ph') {
           Provider.of<UserModel>(context, listen: false)
-              .setUserName(userCredential.user!.email!);
-
+              .setUserName('Super Admin'); // Set the username
+          Provider.of<UserModel>(context, listen: false)
+              .setUserRole('admin'); // Set role as 'admin'
           Navigator.pushReplacementNamed(context, '/dashboard');
           return;
         }
@@ -44,20 +45,21 @@ class _LoginState extends State<Login> {
             .where('email_address', isEqualTo: _emailController.text.trim())
             .get();
 
-        // Debugging: Check if documents were returned from the query
         if (employeeSnapshot.docs.isNotEmpty) {
           // User exists in employees collection
           var employeeData =
               employeeSnapshot.docs.first.data() as Map<String, dynamic>;
           String employeeId = employeeSnapshot.docs.first.id;
           String userName = employeeData['name'] ?? userCredential.user!.email!;
-          String position = employeeData['position'] ?? '';
+          String position = employeeData['position'] ?? 'employee';
 
+          // Set the username and position in the UserModel
           Provider.of<UserModel>(context, listen: false).setUserName(userName);
+          Provider.of<UserModel>(context, listen: false)
+              .setUserRole(position.toLowerCase());
 
-          // Check if the employee's position is "driver"
           if (position.toLowerCase() == 'driver') {
-            // Navigate to the driver dashboard and pass the name and id
+            // Navigate to the driver dashboard if the user is a driver
             Navigator.pushReplacementNamed(
               context,
               '/driver',
@@ -67,7 +69,7 @@ class _LoginState extends State<Login> {
               },
             );
           } else {
-            // Navigate to the regular dashboard
+            // Navigate to the regular dashboard for other roles
             Navigator.pushReplacementNamed(context, '/dashboard');
           }
         } else {

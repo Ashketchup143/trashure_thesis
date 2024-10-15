@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:trashure_thesis/screens/map.dart';
 
 class DriverBookingDetails extends StatefulWidget {
   @override
@@ -43,9 +44,25 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
     return Scaffold(
       appBar: AppBar(
         iconTheme: IconThemeData(color: Colors.white),
-        title: Text(
-          "Booking Details",
-          style: TextStyle(color: Colors.white),
+        title: Row(
+          children: [
+            Text(
+              "Booking Details",
+              style: TextStyle(color: Colors.white),
+            ),
+            Spacer(),
+            IconButton(
+              icon: Icon(Icons.map), // Add the map icon
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => Maps(
+                          bookingId: bookingId)), // Pushing the Maps widget
+                );
+              },
+            ),
+          ],
         ),
         backgroundColor: Colors.green,
       ),

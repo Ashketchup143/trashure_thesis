@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Authentication
@@ -43,15 +44,61 @@ class _SidebarState extends State<Sidebar> {
     }
   }
 
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   _retrieveUserData(); // Fetch user data when the Sidebar initializes
+  // }
+
+  // Future<void> _retrieveUserData() async {
+  //   final User? currentUser = FirebaseAuth.instance.currentUser;
+
+  //   if (currentUser != null) {
+  //     try {
+  //       // Fetch the user's document from Firestore based on the current user's UID
+  //       DocumentSnapshot<Map<String, dynamic>> userSnapshot =
+  //           await FirebaseFirestore.instance
+  //               .collection('employees')
+  //               .doc(currentUser.uid)
+  //               .get();
+
+  //       if (userSnapshot.exists) {
+  //         // Cast the document data safely
+  //         Map<String, dynamic>? userData = userSnapshot.data();
+  //         if (userData != null) {
+  //           // Set the user name in the UserModel
+  //           Provider.of<UserModel>(context, listen: false)
+  //               .setUserName(userData['name'] ?? 'Unknown User');
+  //         } else {
+  //           // If no data, set a fallback user name
+  //           Provider.of<UserModel>(context, listen: false)
+  //               .setUserName('Unknown');
+  //         }
+  //       } else {
+  //         // Document does not exist, handle accordingly
+  //         Provider.of<UserModel>(context, listen: false).setUserName('Unknown');
+  //         print('User document does not exist.');
+  //       }
+  //     } catch (e) {
+  //       // Handle any Firestore errors
+  //       print('Error fetching user data: $e');
+  //     }
+  //   }
+  // }
+
   @override
   Widget build(BuildContext context) {
     final userName =
         Provider.of<UserModel>(context).userName; // Get the user's name
+    final userRole =
+        Provider.of<UserModel>(context).userRole; // Get the user's role
     final userEmail =
         FirebaseAuth.instance.currentUser?.email ?? ''; // Get the user's email
 
-    // Check if the user has full access or limited access
-    final bool hasFullAccess = userEmail == 'anmlim@addu.edu.ph';
+    // Check if the user has full access (super admin, manager, or owner)
+    final bool hasFullAccess = userEmail == 'anmlim@addu.edu.ph' ||
+        userRole == 'manager' ||
+        userRole == 'owner';
 
     return Drawer(
       width: 250,
@@ -115,8 +162,8 @@ class _SidebarState extends State<Sidebar> {
           // Logout tile with logout function
           _buildHoverableListTile(11, Icons.logout_outlined, 'Logout', '',
               onTap: _handleLogout),
-          _buildHoverableListTile(
-              15, Icons.drive_eta_outlined, 'Driver', '/driver'),
+          // _buildHoverableListTile(
+          //     15, Icons.drive_eta_outlined, 'Driver', '/driver'),
         ],
       ),
     );

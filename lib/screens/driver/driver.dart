@@ -11,6 +11,53 @@ class Driver extends StatefulWidget {
 }
 
 class _DriverState extends State<Driver> {
+  String name = 'Unknown Driver';
+  String id = 'Unknown ID';
+  bool isCollecting = false; // Flag to check if any booking is collecting
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDriverData(); // Fetch driver data when the page initializes
+    _checkIfCollecting(); // Check if any booking has status "collecting"
+  }
+
+  // Function to fetch the logged-in driver’s information from Firebase
+  Future<void> _fetchDriverData() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      String email = user.email ?? 'Unknown';
+
+      // Query Firestore to get the driver’s information based on their email
+      QuerySnapshot driverSnapshot = await FirebaseFirestore.instance
+          .collection('employees')
+          .where('email_address', isEqualTo: email)
+          .get();
+
+      if (driverSnapshot.docs.isNotEmpty) {
+        var driverData =
+            driverSnapshot.docs.first.data() as Map<String, dynamic>;
+        setState(() {
+          name = driverData['name'] ?? 'Unknown Driver';
+          id = driverSnapshot.docs.first.id; // Get the document ID
+        });
+      }
+    }
+  }
+
+  // Function to check if any booking already has the status "collecting"
+  Future<void> _checkIfCollecting() async {
+    QuerySnapshot collectingSnapshot = await FirebaseFirestore.instance
+        .collection('bookings')
+        .where('driverId', isEqualTo: id)
+        .where('status', isEqualTo: 'collecting')
+        .get();
+
+    setState(() {
+      isCollecting = collectingSnapshot.docs.isNotEmpty;
+    });
+  }
+
   Future<void> _logout() async {
     await FirebaseAuth.instance.signOut(); // Sign out from Firebase
     Navigator.pushReplacementNamed(context, '/login'); // Navigate to login page
@@ -26,23 +73,70 @@ class _DriverState extends State<Driver> {
     return '${formatter.format(date)}, $dayOfWeek'; // Return formatted date and day of the week
   }
 
-  // Function to update the status of the booking to "collecting"
-  Future<void> _updateBookingStatus(String bookingId) async {
+  // Function to update the status of the booking
+  Future<void> _updateBookingStatus(String bookingId, String newStatus) async {
     await FirebaseFirestore.instance
         .collection('bookings')
         .doc(bookingId)
-        .update({'status': 'collecting'}); // Update status to "collecting"
+        .update({'status': newStatus}); // Update status to the new value
+    _checkIfCollecting(); // Recheck if a booking is set to "collecting"
+  }
+
+  // Function to show a confirmation modal before changing status to "collecting"
+  Future<void> _showCollectConfirmation(String bookingId) async {
+    bool confirmed = await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Collect Recyclables'),
+          content: Text(
+              'Are you going to collect the recyclables for this booking?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(false); // Cancel
+              },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(true); // Confirm
+              },
+              child: Text('Confirm'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await _updateBookingStatus(bookingId, 'collecting');
+    }
+  }
+
+  // Function to show a modal when a booking is already in progress
+  void _showErrorModal() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Booking in Progress'),
+          content: Text('You still have a booking in progress.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Dismiss the modal
+              },
+              child: Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Retrieve the passed arguments and handle null safely
-    final args =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-
-    String name = args != null ? args['name'] : 'Unknown Driver';
-    String id = args != null ? args['id'] : 'Unknown ID';
-
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -57,7 +151,7 @@ class _DriverState extends State<Driver> {
               onPressed: _logout, // Call the logout function
             ),
             Text(
-              name,
+              "Booking",
               style: TextStyle(color: Colors.white),
             ), // Display the driver's name in the app bar
           ],
@@ -80,7 +174,7 @@ class _DriverState extends State<Driver> {
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Text(
-                    'Booking', // Header for Booking data
+                    'Driver: $name', // Header for Booking data
                     style: TextStyle(
                       color: Colors.green,
                       fontSize: 24,
@@ -103,8 +197,7 @@ class _DriverState extends State<Driver> {
                   child: StreamBuilder<QuerySnapshot>(
                     stream: FirebaseFirestore.instance
                         .collection('bookings')
-                        .where('driverId',
-                            isEqualTo: id) // Changed to 'driverId'
+                        .where('driverId', isEqualTo: id)
                         .snapshots(),
                     builder: (context, snapshot) {
                       if (!snapshot.hasData) {
@@ -146,36 +239,52 @@ class _DriverState extends State<Driver> {
                                   Text('Vehicle: ${bookingData['vehicle']}'),
                                   Text(
                                       'Vehicle ID: ${bookingData['vehicleId']}'),
-                                  Text('Overall Price: \$${overallPrice}'),
+                                  Text('Overall Price: ₱${overallPrice}'),
                                   Text('Overall Weight: ${overallWeight} kg'),
                                 ],
                               ),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  bookingStatus != 'collecting'
-                                      ? ElevatedButton(
-                                          onPressed: () async {
-                                            await _updateBookingStatus(
-                                                bookingId);
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors
-                                                .green, // Changed from `primary`
-                                          ),
-                                          child: Text('Collect'),
-                                        )
-                                      : Text(
+                                  if (bookingStatus != 'collecting')
+                                    ElevatedButton(
+                                      onPressed: isCollecting
+                                          ? _showErrorModal // Show modal if another booking is collecting
+                                          : () {
+                                              _showCollectConfirmation(
+                                                  bookingId);
+                                            },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.green,
+                                      ),
+                                      child: Text('Collect'),
+                                    )
+                                  else
+                                    Row(
+                                      children: [
+                                        Text(
                                           'Collecting',
                                           style: TextStyle(
                                             color: Colors.orange,
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
+                                        SizedBox(width: 8),
+                                        ElevatedButton(
+                                          onPressed: () async {
+                                            await _updateBookingStatus(
+                                                bookingId, 'pending');
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.redAccent,
+                                          ),
+                                          child: Text('Set Pending'),
+                                        ),
+                                      ],
+                                    ),
                                   IconButton(
                                     icon: Icon(Icons.info),
                                     onPressed: () {
-                                      // Ensure that all necessary fields are passed when navigating
                                       Navigator.pushNamed(
                                         context,
                                         '/driverbookingdetails',
@@ -188,8 +297,7 @@ class _DriverState extends State<Driver> {
                                               bookingData['overall_price'],
                                           'overall_weight':
                                               bookingData['overall_weight'],
-                                          'date': bookingData[
-                                              'date'], // Ensure this is a Timestamp
+                                          'date': bookingData['date'],
                                         },
                                       );
                                     },
