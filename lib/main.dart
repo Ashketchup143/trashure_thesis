@@ -6,6 +6,7 @@ import 'package:trashure_thesis/screens/booking/booking.dart';
 import 'package:trashure_thesis/screens/dashboard.dart';
 import 'package:trashure_thesis/screens/driver/driver.dart';
 import 'package:trashure_thesis/screens/driver/driverbookingdetails.dart';
+import 'package:trashure_thesis/screens/driver/drivertransaction.dart';
 import 'package:trashure_thesis/screens/employee/employeeprofile.dart';
 import 'package:trashure_thesis/screens/employee/employees.dart';
 import 'package:trashure_thesis/screens/employee/payroll.dart';
@@ -70,6 +71,7 @@ class MyApp extends StatelessWidget {
           '/driver': (context) => Driver(),
           '/driverbookingdetails': (context) => DriverBookingDetails(),
           '/payroll': (context) => PayrollScreen(),
+          '/drivertransactions': (context) => DriverTransactions()
         },
       ),
     );

@@ -19,7 +19,7 @@ class _DriverState extends State<Driver> {
   void initState() {
     super.initState();
     _fetchDriverData(); // Fetch driver data when the page initializes
-    _checkIfCollecting(); // Check if any booking has status "collecting"
+    // _checkIfCollecting(); // Check if any booking has status "collecting"
   }
 
   // Function to fetch the logged-in driver’s information from Firebase
@@ -156,6 +156,23 @@ class _DriverState extends State<Driver> {
             ), // Display the driver's name in the app bar
           ],
         ),
+        actions: [
+          // Add the transaction icon on the right
+          IconButton(
+            icon: Icon(
+              Icons
+                  .receipt_long, // Icon representing transactions (receipt icon)
+              color: Colors.white,
+            ),
+            onPressed: () {
+              // Navigate to the transaction screen or perform any action
+              Navigator.pushNamed(context, '/drivertransactions');
+            },
+          ),
+          SizedBox(
+            width: 10,
+          )
+        ],
       ),
       body: Container(
         child: Center(
@@ -198,6 +215,8 @@ class _DriverState extends State<Driver> {
                     stream: FirebaseFirestore.instance
                         .collection('bookings')
                         .where('driverId', isEqualTo: id)
+                        .where('status', isNotEqualTo: 'collected')
+                        .orderBy('status')
                         .snapshots(),
                     builder: (context, snapshot) {
                       if (!snapshot.hasData) {

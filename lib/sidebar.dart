@@ -5,6 +5,48 @@ import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Authentica
 import 'package:provider/provider.dart';
 import 'package:trashure_thesis/user_model.dart';
 
+// @override
+// void initState() {
+//   super.initState();
+//   _retrieveUserData(); // Fetch user data when the Sidebar initializes
+// }
+
+// Future<void> _retrieveUserData() async {
+//   final User? currentUser = FirebaseAuth.instance.currentUser;
+
+//   if (currentUser != null) {
+//     try {
+//       // Fetch the user's document from Firestore based on the current user's UID
+//       DocumentSnapshot<Map<String, dynamic>> userSnapshot =
+//           await FirebaseFirestore.instance
+//               .collection('employees')
+//               .doc(currentUser.uid)
+//               .get();
+
+//       if (userSnapshot.exists) {
+//         // Cast the document data safely
+//         Map<String, dynamic>? userData = userSnapshot.data();
+//         if (userData != null) {
+//           // Set the user name in the UserModel
+//           Provider.of<UserModel>(context, listen: false)
+//               .setUserName(userData['name'] ?? 'Unknown User');
+//         } else {
+//           // If no data, set a fallback user name
+//           Provider.of<UserModel>(context, listen: false)
+//               .setUserName('Unknown');
+//         }
+//       } else {
+//         // Document does not exist, handle accordingly
+//         Provider.of<UserModel>(context, listen: false).setUserName('Unknown');
+//         print('User document does not exist.');
+//       }
+//     } catch (e) {
+//       // Handle any Firestore errors
+//       print('Error fetching user data: $e');
+//     }
+//   }
+// }
+
 class Sidebar extends StatefulWidget {
   const Sidebar({super.key});
 
@@ -43,48 +85,6 @@ class _SidebarState extends State<Sidebar> {
       );
     }
   }
-
-  // @override
-  // void initState() {
-  //   super.initState();
-  //   _retrieveUserData(); // Fetch user data when the Sidebar initializes
-  // }
-
-  // Future<void> _retrieveUserData() async {
-  //   final User? currentUser = FirebaseAuth.instance.currentUser;
-
-  //   if (currentUser != null) {
-  //     try {
-  //       // Fetch the user's document from Firestore based on the current user's UID
-  //       DocumentSnapshot<Map<String, dynamic>> userSnapshot =
-  //           await FirebaseFirestore.instance
-  //               .collection('employees')
-  //               .doc(currentUser.uid)
-  //               .get();
-
-  //       if (userSnapshot.exists) {
-  //         // Cast the document data safely
-  //         Map<String, dynamic>? userData = userSnapshot.data();
-  //         if (userData != null) {
-  //           // Set the user name in the UserModel
-  //           Provider.of<UserModel>(context, listen: false)
-  //               .setUserName(userData['name'] ?? 'Unknown User');
-  //         } else {
-  //           // If no data, set a fallback user name
-  //           Provider.of<UserModel>(context, listen: false)
-  //               .setUserName('Unknown');
-  //         }
-  //       } else {
-  //         // Document does not exist, handle accordingly
-  //         Provider.of<UserModel>(context, listen: false).setUserName('Unknown');
-  //         print('User document does not exist.');
-  //       }
-  //     } catch (e) {
-  //       // Handle any Firestore errors
-  //       print('Error fetching user data: $e');
-  //     }
-  //   }
-  // }
 
   @override
   Widget build(BuildContext context) {
@@ -150,8 +150,7 @@ class _SidebarState extends State<Sidebar> {
               5, Icons.library_books_outlined, 'Bookings', '/bookings'),
           _buildHoverableListTile(
               6, Icons.directions_car_outlined, 'Vehicle', '/vehicle'),
-          _buildHoverableListTile(
-              8, Icons.inventory_outlined, 'Inventory', '/inventory'),
+          _buildInventoryTile(),
           if (hasFullAccess)
             _buildHoverableListTile(
                 7, Icons.groups_outlined, 'Employees', '/employee'),
@@ -350,6 +349,77 @@ class _SidebarState extends State<Sidebar> {
               12, Icons.money_off_outlined, 'Outflow', '/outflow'),
           _buildsecondHoverableListTile(
               13, Icons.monetization_on_outlined, 'Inflow', '/inflow'),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildInventoryTile() {
+    return Column(
+      children: [
+        MouseRegion(
+          onEnter: (_) => setState(() => _hoveredIndex = 15),
+          onExit: (_) => setState(() => _hoveredIndex = -1),
+          child: Container(
+            height: 70,
+            color: _hoveredIndex == 15
+                ? Color(0xFF4CAF4F)
+                : Colors.transparent, // Changes color on hover
+            child: Center(
+              child: ListTile(
+                leading: Icon(
+                  Icons.inventory_outlined,
+                  color: _hoveredIndex == 15 ? Colors.white : Color(0xFF4CAF4F),
+                ),
+                title: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Inventory',
+                      style: GoogleFonts.poppins(
+                        textStyle: TextStyle(
+                          color: _hoveredIndex == 15
+                              ? Colors.white
+                              : Color(0xFF4CAF4F),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 20,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _isFinanceExpanded =
+                              !_isFinanceExpanded; // Toggle dropdown
+                        });
+                      },
+                      child: Container(
+                        height: 60,
+                        width: 60,
+                        color: Colors.transparent,
+                        child: Center(
+                          child: Icon(
+                            _isFinanceExpanded
+                                ? Icons.expand_less
+                                : Icons.expand_more,
+                            color: _hoveredIndex == 15
+                                ? Colors.white
+                                : Color(0xFF4CAF4F),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (_isFinanceExpanded) ...[
+          _buildsecondHoverableListTile(
+              16, Icons.inventory_2_outlined, 'Receiving', '/'),
+          _buildsecondHoverableListTile(
+              17, Icons.inventory_outlined, 'Inventory', '/inventory'),
         ],
       ],
     );

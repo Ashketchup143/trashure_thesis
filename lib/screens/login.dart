@@ -163,9 +163,13 @@ class _LoginState extends State<Login> {
                 ElevatedButton(
                   onPressed: _login,
                   style: ElevatedButton.styleFrom(
-                      // Color from Trashure palette
-                      ),
-                  child: Text('Login'),
+                    backgroundColor:
+                        Colors.green, // Use backgroundColor instead of primary
+                  ),
+                  child: Text(
+                    'Login',
+                    style: TextStyle(color: Colors.white), // Set text color
+                  ),
                 ),
                 SizedBox(height: 16.0),
                 if (_errorMessage.isNotEmpty)
@@ -243,9 +247,13 @@ class _LoginState extends State<Login> {
                     ElevatedButton(
                       onPressed: _login,
                       style: ElevatedButton.styleFrom(
-                          // Color from Trashure palette
-                          ),
-                      child: Text('Login'),
+                        backgroundColor: Colors
+                            .green, // Use backgroundColor instead of primary
+                      ),
+                      child: Text(
+                        'Login',
+                        style: TextStyle(color: Colors.white), // Set text color
+                      ),
                     ),
                     SizedBox(height: 16.0),
                     if (_errorMessage.isNotEmpty)
