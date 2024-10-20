@@ -31,10 +31,10 @@ class _LoginState extends State<Login> {
 
         // Special handling for the master user (super admin)
         if (_emailController.text.trim() == 'anmlim@addu.edu.ph') {
-          Provider.of<UserModel>(context, listen: false)
-              .setUserName('Super Admin'); // Set the username
-          Provider.of<UserModel>(context, listen: false)
-              .setUserRole('admin'); // Set role as 'admin'
+          // Provider.of<UserModel>(context, listen: false)
+          //     .setUserName('Super Admin'); // Set the username
+          // Provider.of<UserModel>(context, listen: false)
+          //     .setUserRole('admin'); // Set role as 'admin'
           Navigator.pushReplacementNamed(context, '/dashboard');
           return;
         }

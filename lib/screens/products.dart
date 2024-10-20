@@ -1,7 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:trashure_thesis/screens/productinformation.dart';
 import 'package:trashure_thesis/sidebar.dart'; // Import your custom sidebar
+import 'dart:io';
+import 'dart:typed_data'; // For kIsWeb
+import 'package:file_picker/file_picker.dart'; // Add this for file picker
+import 'package:firebase_storage/firebase_storage.dart'; // Add this for Firebase Storage
+import 'package:flutter/foundation.dart';
 
 class Products extends StatefulWidget {
   const Products({super.key});
@@ -23,6 +29,12 @@ class _ProductsState extends State<Products> {
   List<DocumentSnapshot> _allCategories = [];
   String _searchTerm = '';
   String? _selectedCategory;
+  String? _imageFileName;
+
+  // Add these two variables to manage image uploading
+  String? _imageUrl; // Holds the image URL
+  bool _isUploading = false; // Tracks the upload status
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   @override
   void initState() {
@@ -74,6 +86,63 @@ class _ProductsState extends State<Products> {
     });
   }
 
+  // Add this method to handle image selection and uploading
+  Future<void> _pickAndUploadImage() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+    );
+
+    if (result != null) {
+      setState(() {
+        _isUploading = true;
+      });
+
+      try {
+        // Generate a unique file name based on the current timestamp
+        String filename = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+        Reference storageReference =
+            _storage.ref().child('product_images/$filename');
+
+        SettableMetadata metadata = SettableMetadata(
+          contentType: 'image/jpeg',
+        );
+
+        // For web
+        if (kIsWeb) {
+          Uint8List? fileBytes = result.files.first.bytes;
+          if (fileBytes != null) {
+            UploadTask uploadTask =
+                storageReference.putData(fileBytes, metadata);
+            await uploadTask;
+          }
+        } else {
+          // For mobile
+          File file = File(result.files.single.path!);
+          UploadTask uploadTask = storageReference.putFile(file, metadata);
+          await uploadTask;
+        }
+
+        // Set the filename (not the full URL) in the state
+        setState(() {
+          _imageFileName = filename;
+          _isUploading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image uploaded successfully!')),
+        );
+      } catch (e) {
+        setState(() {
+          _isUploading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to upload image: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -102,7 +171,7 @@ class _ProductsState extends State<Products> {
                             },
                           ),
                           Text(
-                            'Settings',
+                            'Products',
                             style: GoogleFonts.poppins(
                               textStyle: TextStyle(
                                   fontWeight: FontWeight.bold, fontSize: 20),
@@ -111,6 +180,9 @@ class _ProductsState extends State<Products> {
                         ],
                       ),
                       SizedBox(height: 20),
+                      Image.network(
+                        'https://firebasestorage.googleapis.com/v0/b/thesis-5212b.appspot.com/o/profile_images%2F2UQKQM35gOeaALiRAgBlQQusnnj2.jpg?alt=media&token=df090cc7-7d24-4eb6-b9be-7dfa9c18adbf',
+                      ),
                       Row(
                         children: [
                           Container(
@@ -301,6 +373,7 @@ class _ProductsState extends State<Products> {
     return details;
   }
 
+// Inside _buildProductTile
   Widget _buildProductTile(
       String productId,
       String productName,
@@ -310,16 +383,30 @@ class _ProductsState extends State<Products> {
       String details,
       String picture) {
     return ListTile(
-      leading: picture.isNotEmpty
-          ? ClipOval(
-              child: Image.network(
-                picture,
-                width: 50,
-                height: 50,
-                fit: BoxFit.cover,
-              ),
-            )
-          : Icon(Icons.image_not_supported, size: 50),
+      leading: FutureBuilder<String?>(
+        future: _getProductImage(picture), // Fetch the image URL by filename
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.done) {
+            if (snapshot.hasData && snapshot.data != null) {
+              // Display the fetched image
+              return ClipOval(
+                child: Image.network(
+                  snapshot.data!,
+                  width: 50,
+                  height: 50,
+                  fit: BoxFit.cover,
+                ),
+              );
+            } else {
+              // Fallback to default image if no URL is found
+              return Icon(Icons.image_not_supported, size: 50);
+            }
+          } else {
+            // Display a loading indicator while fetching the image URL
+            return CircularProgressIndicator();
+          }
+        },
+      ),
       title: Row(
         children: [
           Expanded(
@@ -327,7 +414,8 @@ class _ProductsState extends State<Products> {
             child: Text(
               productName,
               style: GoogleFonts.poppins(
-                  textStyle: TextStyle(fontWeight: FontWeight.bold)),
+                textStyle: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ),
           Expanded(flex: 1, child: Container()),
@@ -337,7 +425,7 @@ class _ProductsState extends State<Products> {
           ),
           Expanded(
             flex: 2,
-            child: Text('₱${price}/${unit}'),
+            child: Text('₱${price.toStringAsFixed(2)}/$unit'),
           ),
           Expanded(
             flex: 4,
@@ -362,9 +450,41 @@ class _ProductsState extends State<Products> {
               _showDeleteProductDialog(context, productId);
             },
           ),
+          IconButton(
+            icon: Icon(
+              Icons.info_outline,
+            ), // Added Details Icon
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProductInformation(
+                    productId: productId,
+                    productName: productName,
+                    details: details,
+                    category: category,
+                    imageUrl: picture, // Pass file name to details screen
+                  ),
+                ),
+              );
+            },
+          ),
         ],
       ),
     );
+  }
+
+  Future<String?> _getProductImage(String imageFileName) async {
+    try {
+      String downloadUrl = await _storage
+          .ref()
+          .child('product_images/$imageFileName')
+          .getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      print('Error fetching image: $e');
+      return null;
+    }
   }
 
   // Function to show a dialog to add a new category
@@ -558,12 +678,11 @@ class _ProductsState extends State<Products> {
     );
   }
 
-  // Function to show a dialog to add a new product
+  // Add Product Dialog updated with image upload
   void _showAddProductDialog(BuildContext context) {
     final TextEditingController productNameController = TextEditingController();
     final TextEditingController priceController = TextEditingController();
     final TextEditingController detailsController = TextEditingController();
-    final TextEditingController imageUrlController = TextEditingController();
     String _selectedUnit = 'kg'; // Default unit
 
     showDialog(
@@ -572,66 +691,53 @@ class _ProductsState extends State<Products> {
         return AlertDialog(
           title: Text('Add New Product'),
           content: SingleChildScrollView(
-            child: Container(
-              height: MediaQuery.of(context).size.height * 0.6,
-              width: MediaQuery.of(context).size.width * 0.4,
-              child: Column(
-                children: [
-                  TextField(
-                    controller: productNameController,
-                    decoration: InputDecoration(labelText: 'Product Name'),
-                  ),
-                  SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                    value: _selectedCategory,
-                    onChanged: (newValue) {
-                      setState(() {
-                        _selectedCategory = newValue;
-                      });
-                    },
-                    items: _allCategories.map((categoryDoc) {
-                      return DropdownMenuItem<String>(
-                        value: categoryDoc['category_name'],
-                        child: Text(categoryDoc['category_name']),
-                      );
-                    }).toList(),
-                    decoration: InputDecoration(labelText: 'Category'),
-                  ),
-                  SizedBox(height: 10),
-                  TextField(
-                    controller: priceController,
-                    decoration: InputDecoration(labelText: 'Price'),
-                    keyboardType: TextInputType.number,
-                  ),
-                  SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                    value: _selectedUnit,
-                    onChanged: (newValue) {
-                      setState(() {
-                        _selectedUnit = newValue!;
-                      });
-                    },
-                    items: ['kg', 'g', 'ton'].map((unit) {
-                      return DropdownMenuItem<String>(
-                        value: unit,
-                        child: Text(unit),
-                      );
-                    }).toList(),
-                    decoration: InputDecoration(labelText: 'Unit'),
-                  ),
-                  SizedBox(height: 10),
-                  TextField(
-                    controller: detailsController,
-                    decoration: InputDecoration(labelText: 'Details'),
-                  ),
-                  SizedBox(height: 10),
-                  TextField(
-                    controller: imageUrlController,
-                    decoration:
-                        InputDecoration(labelText: 'Image URL (Optional)'),
-                  ),
-                ],
-              ),
+            child: Column(
+              children: [
+                TextField(
+                  controller: productNameController,
+                  decoration: InputDecoration(labelText: 'Product Name'),
+                ),
+                SizedBox(height: 10),
+                TextField(
+                  controller: priceController,
+                  decoration: InputDecoration(labelText: 'Price'),
+                  keyboardType: TextInputType.number,
+                ),
+                SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: _selectedUnit,
+                  onChanged: (newValue) {
+                    setState(() {
+                      _selectedUnit = newValue!;
+                    });
+                  },
+                  items: ['kg', 'g', 'ton'].map((unit) {
+                    return DropdownMenuItem<String>(
+                      value: unit,
+                      child: Text(unit),
+                    );
+                  }).toList(),
+                  decoration: InputDecoration(labelText: 'Unit'),
+                ),
+                SizedBox(height: 10),
+                TextField(
+                  controller: detailsController,
+                  decoration: InputDecoration(labelText: 'Details'),
+                ),
+                SizedBox(height: 10),
+
+                // Image Upload Button
+                ElevatedButton(
+                  onPressed: _isUploading ? null : _pickAndUploadImage,
+                  child: _isUploading
+                      ? CircularProgressIndicator(color: Colors.white)
+                      : Text('Choose Image'),
+                ),
+                SizedBox(height: 20),
+
+                // Display the uploaded image
+                if (_imageFileName != null) Text('Image File: $_imageFileName'),
+              ],
             ),
           ),
           actions: [
@@ -651,18 +757,17 @@ class _ProductsState extends State<Products> {
                 double price =
                     double.tryParse(priceController.text.trim()) ?? 0;
                 String details = detailsController.text.trim();
-                String imageUrl = imageUrlController.text.trim();
 
-                if (productName.isNotEmpty && _selectedCategory != null) {
+                if (productName.isNotEmpty && _imageFileName != null) {
+                  // Save the product to Firestore with the image filename
                   DocumentReference productRef = await _productsCollection.add({
                     'product_name': productName,
-                    'category': _selectedCategory,
+                    'price': price,
                     'details': details,
-                    'picture': imageUrl,
-                    'unit': _selectedUnit, // Unit from dropdown
+                    'imageFileName': _imageFileName, // Save the image file name
+                    'unit': _selectedUnit,
                   });
 
-                  // Add the price to the subcollection 'prices'
                   await productRef.collection('prices').add({
                     'price': price,
                     'time': FieldValue.serverTimestamp(),
@@ -670,6 +775,7 @@ class _ProductsState extends State<Products> {
 
                   _fetchProducts(); // Refresh products after adding a new one
                 }
+
                 Navigator.of(context).pop();
               },
               child: Text('Add Product'),

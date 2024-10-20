@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:trashure_thesis/screens/booking/booking.dart';
+import 'package:trashure_thesis/screens/booking/collectedbookings.dart';
 import 'package:trashure_thesis/screens/dashboard.dart';
 import 'package:trashure_thesis/screens/driver/driver.dart';
 import 'package:trashure_thesis/screens/driver/driverbookingdetails.dart';
@@ -15,6 +16,7 @@ import 'package:trashure_thesis/screens/finance/finance.dart';
 import 'package:trashure_thesis/screens/finance/inflow.dart';
 import 'package:trashure_thesis/screens/finance/outflow.dart';
 import 'package:trashure_thesis/screens/inventory/inventory.dart';
+import 'package:trashure_thesis/screens/inventory/receiving.dart';
 import 'package:trashure_thesis/screens/login.dart';
 import 'package:trashure_thesis/screens/users/userbusiness.dart';
 import 'package:trashure_thesis/screens/users/userhouse.dart';
@@ -67,13 +69,15 @@ class MyApp extends StatelessWidget {
           '/finance': (context) => Finance(),
           '/inflow': (context) => Inflow(),
           '/outflow': (context) => Outflow(),
-          '/settings': (context) => Products(),
+          '/products': (context) => Products(),
           // '/schedule': (context) => Schedule(),
           '/driver': (context) => Driver(),
           '/driverbookingdetails': (context) => DriverBookingDetails(),
           '/payroll': (context) => PayrollScreen(),
           '/drivertransactions': (context) => DriverTransactions(),
-          '/drivertransactiondetails': (context) => DriverTransactionDetails()
+          '/drivertransactiondetails': (context) => DriverTransactionDetails(),
+          '/receiving': (context) => Receiving(),
+          '/collectedbookings': (context) => CollectedBookings(),
         },
       ),
     );

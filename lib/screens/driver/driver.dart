@@ -217,6 +217,7 @@ class _DriverState extends State<Driver> {
                         .where('driverId', isEqualTo: id)
                         .where('status', isNotEqualTo: 'collected')
                         .orderBy('status')
+                        // .orderBy('status')
                         .snapshots(),
                     builder: (context, snapshot) {
                       if (!snapshot.hasData) {

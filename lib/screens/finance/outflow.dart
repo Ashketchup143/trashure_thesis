@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:trashure_thesis/sidebar.dart';
+import 'package:intl/intl.dart';
 
 class Outflow extends StatefulWidget {
   const Outflow({super.key});
@@ -108,12 +109,13 @@ class _OutflowState extends State<Outflow> {
                             Container(
                               child: Row(
                                 children: [
-                                  title('Document ID', 2),
                                   title('Category', 2),
-                                  title('Details', 2),
+                                  title('Date', 2),
+                                  title('Price', 2),
+                                  title('Weight', 2),
                                   title('Employee', 2),
-                                  title('Total Amount', 1),
-                                  title('Status', 1),
+                                  title('Status', 2),
+                                  title('Vehicle', 2),
                                 ],
                               ),
                             ),
@@ -134,7 +136,29 @@ class _OutflowState extends State<Outflow> {
                                   return ListView.builder(
                                     itemCount: outflowList.length,
                                     itemBuilder: (context, index) {
-                                      final outflowData = outflowList[index];
+                                      final outflowData = outflowList[index]
+                                          .data() as Map<String, dynamic>;
+                                      String category =
+                                          outflowData['category'] ?? '';
+                                      Timestamp? timestamp =
+                                          outflowData['date'];
+                                      String formattedDate = timestamp != null
+                                          ? DateFormat('MM/dd/yyyy, hh:mm a')
+                                              .format(timestamp.toDate())
+                                          : '';
+                                      double price =
+                                          outflowData['price']?.toDouble() ??
+                                              0.0;
+                                      double weight =
+                                          outflowData['weight']?.toDouble() ??
+                                              0.0;
+                                      String employee =
+                                          outflowData['employee'] ?? '';
+                                      String status =
+                                          outflowData['status'] ?? '';
+                                      String vehicle =
+                                          outflowData['vehicle'] ?? '';
+
                                       return Container(
                                         decoration: BoxDecoration(
                                           border: Border(
@@ -148,7 +172,15 @@ class _OutflowState extends State<Outflow> {
                                               child: Padding(
                                                 padding:
                                                     const EdgeInsets.all(8.0),
-                                                child: Text(outflowData.id),
+                                                child: Text(category),
+                                              ),
+                                            ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.all(8.0),
+                                                child: Text(formattedDate),
                                               ),
                                             ),
                                             Expanded(
@@ -157,7 +189,7 @@ class _OutflowState extends State<Outflow> {
                                                 padding:
                                                     const EdgeInsets.all(8.0),
                                                 child: Text(
-                                                    outflowData['category']),
+                                                    '₱${price.toStringAsFixed(2)}'),
                                               ),
                                             ),
                                             Expanded(
@@ -166,7 +198,7 @@ class _OutflowState extends State<Outflow> {
                                                 padding:
                                                     const EdgeInsets.all(8.0),
                                                 child: Text(
-                                                    outflowData['details']),
+                                                    '${weight.toStringAsFixed(2)} kg'),
                                               ),
                                             ),
                                             Expanded(
@@ -174,27 +206,23 @@ class _OutflowState extends State<Outflow> {
                                               child: Padding(
                                                 padding:
                                                     const EdgeInsets.all(8.0),
-                                                child: Text(
-                                                    outflowData['employee']),
+                                                child: Text(employee),
                                               ),
                                             ),
                                             Expanded(
-                                              flex: 1,
+                                              flex: 2,
                                               child: Padding(
                                                 padding:
                                                     const EdgeInsets.all(8.0),
-                                                child: Text(
-                                                    outflowData['total_amount']
-                                                        .toString()),
+                                                child: Text(status),
                                               ),
                                             ),
                                             Expanded(
-                                              flex: 1,
+                                              flex: 2,
                                               child: Padding(
                                                 padding:
                                                     const EdgeInsets.all(8.0),
-                                                child:
-                                                    Text(outflowData['status']),
+                                                child: Text(vehicle),
                                               ),
                                             ),
                                           ],

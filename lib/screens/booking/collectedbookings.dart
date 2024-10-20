@@ -2,19 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:trashure_thesis/screens/booking/bookingdetails.dart';
-import 'package:trashure_thesis/screens/map.dart';
 import 'package:intl/intl.dart';
-
+import 'package:trashure_thesis/screens/map.dart';
 import 'package:trashure_thesis/sidebar.dart';
 
-class Booking extends StatefulWidget {
-  const Booking({super.key});
+class CollectedBookings extends StatefulWidget {
+  const CollectedBookings({super.key});
 
   @override
-  State<Booking> createState() => _BookingState();
+  State<CollectedBookings> createState() => _CollectedBookingsState();
 }
 
-class _BookingState extends State<Booking> {
+class _CollectedBookingsState extends State<CollectedBookings> {
   final _formKey = GlobalKey<FormState>();
   DateTime selectedDate = DateTime.now();
   TextEditingController dateController = TextEditingController();
@@ -73,7 +72,7 @@ class _BookingState extends State<Booking> {
                                   },
                                 ),
                                 Text(
-                                  'Booking',
+                                  'Collected Bookings',
                                   textAlign: TextAlign.left,
                                   style: GoogleFonts.poppins(
                                     textStyle: TextStyle(
@@ -112,76 +111,6 @@ class _BookingState extends State<Booking> {
                                     },
                                   ),
                                 ),
-                                SizedBox(width: 20),
-                                ElevatedButton(
-                                  onPressed:
-                                      _showAddScheduleModal, // Show modal
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Color(0xFF4CAF4F),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30),
-                                    ),
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 8,
-                                    ),
-                                    textStyle: TextStyle(fontSize: 16),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        'Add Schedule',
-                                        style: GoogleFonts.roboto(
-                                          textStyle: TextStyle(
-                                            fontWeight: FontWeight.w300,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                      Icon(
-                                        Icons.add,
-                                        color: Colors.white,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                SizedBox(width: 20),
-                                ElevatedButton(
-                                  onPressed:
-                                      _showAssignDriverModal, // Show modal
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Color(0xFF0062FF),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30),
-                                    ),
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 8,
-                                    ),
-                                    textStyle: TextStyle(fontSize: 16),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        'Assign Driver/Vehicle',
-                                        style: GoogleFonts.roboto(
-                                          textStyle: TextStyle(
-                                            fontWeight: FontWeight.w300,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                      Icon(
-                                        Icons.add,
-                                        color: Colors.white,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                SizedBox(width: 20),
-                                // Adding the search bar next to the buttons
                               ],
                             ),
                             SizedBox(height: 20),
@@ -230,7 +159,7 @@ class _BookingState extends State<Booking> {
 
                                           // Exclude bookings with 'collected' status
                                           if (data == null ||
-                                              data['status'] == 'collected') {
+                                              data['status'] != 'collected') {
                                             return false;
                                           }
 

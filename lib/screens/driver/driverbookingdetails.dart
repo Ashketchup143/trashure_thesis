@@ -405,7 +405,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
         .get();
 
     double finalTotalPrice = 0.0;
-    double finalTotalWeight = 0.0; // New variable for total weight
+    double finalTotalWeight = 0.0;
 
     var batch = FirebaseFirestore.instance.batch();
 
@@ -421,7 +421,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
 
       // Sum up the final item prices and final weights
       finalTotalPrice += finalItemPrice;
-      finalTotalWeight += finalWeight; // Add weight to total weight
+      finalTotalWeight += finalWeight;
 
       // Update each recyclable with final weight and final item price
       batch.update(
@@ -448,12 +448,37 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
           Timestamp.now(), // Add collected timestamp for the user
     });
 
+    // Add new document to the `outflow` collection
+    var bookingDoc = await FirebaseFirestore.instance
+        .collection('bookings')
+        .doc(bookingId)
+        .get();
+    var bookingData = bookingDoc.data() as Map<String, dynamic>;
+
+    String vehicle = bookingData['vehicle'] ?? 'Unknown Vehicle';
+    String vehicleId = bookingData['vehicleId'] ?? 'Unknown Vehicle ID';
+    String employee = bookingData['driver'] ?? 'Unknown Driver';
+    String employeeId = bookingData['driverId'] ?? 'Unknown Driver ID';
+
+    await FirebaseFirestore.instance.collection('outflow').add({
+      'date': Timestamp.now(),
+      'price': finalTotalPrice,
+      'weight': finalTotalWeight,
+      'vehicle': vehicle,
+      'vehicleId': vehicleId,
+      'employee': employee,
+      'employeeId': employeeId,
+      'bookingId': bookingId,
+      'status': 'collected',
+      'category': 'booking',
+    });
+
     await batch.commit();
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
           content: Text(
-              'User marked as collected, total price and weight calculated')),
+              'User marked as collected, total price and weight calculated, and outflow recorded')),
     );
   }
 
@@ -543,6 +568,32 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
           'status': 'collected',
           'final_overall_price': finalOverallPrice,
           'final_overall_weight': finalOverallWeight,
+        });
+
+        // Get booking details for outflow entry
+        var bookingDoc = await FirebaseFirestore.instance
+            .collection('bookings')
+            .doc(bookingId)
+            .get();
+        var bookingData = bookingDoc.data() as Map<String, dynamic>;
+
+        String vehicle = bookingData['vehicle'] ?? 'Unknown';
+        String vehicleId = bookingData['vehicleId'] ?? 'Unknown';
+        String employee = bookingData['driver'] ?? 'Unknown';
+        String employeeId = bookingData['driverId'] ?? 'Unknown';
+
+        // Add the outflow entry
+        await FirebaseFirestore.instance.collection('outflow').add({
+          'date': Timestamp.now(), // Current date and time
+          'price': finalOverallPrice, // final_overall_price
+          'weight': finalOverallWeight, // final_overall_weight
+          'vehicle': vehicle,
+          'vehicleId': vehicleId,
+          'employee': employee,
+          'employeeId': employeeId,
+          'bookingId': bookingId,
+          'status': 'collected',
+          'category': 'booking',
         });
 
         ScaffoldMessenger.of(context).showSnackBar(

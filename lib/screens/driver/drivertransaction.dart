@@ -140,9 +140,9 @@ class _DriverTransactionsState extends State<DriverTransactions> {
                           var bookingId = bookings[index].id;
                           var bookingDate = bookingData['date'] as Timestamp;
                           var overallPrice =
-                              bookingData['overall_price'] ?? 'Not set';
+                              bookingData['final_overall_price'] ?? 'Not set';
                           var overallWeight =
-                              bookingData['overall_weight'] ?? 'Not set';
+                              bookingData['final_overall_weight'] ?? 'Not set';
 
                           return Card(
                             margin: const EdgeInsets.all(10),

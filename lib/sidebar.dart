@@ -58,6 +58,7 @@ class _SidebarState extends State<Sidebar> {
   int _hoveredIndex = -1; // To track the hovered tile
   bool _isUsersExpanded = false; // To track if the Users dropdown is expanded
   bool _isFinanceExpanded = false; // Track the Finance tile's expansion
+  bool _isInventoryExpanded = false;
 
   // Function to handle user logout
   Future<void> _handleLogout() async {
@@ -120,6 +121,7 @@ class _SidebarState extends State<Sidebar> {
                   ),
                 ),
                 SizedBox(height: 8),
+                Text(userRole),
                 Image.asset(
                   'assets/trashure_noname.png',
                   width: 300,
@@ -157,7 +159,7 @@ class _SidebarState extends State<Sidebar> {
           if (hasFullAccess)
             _buildFinanceTile(), // Add finance only if full access
           _buildHoverableListTile(
-              10, Icons.settings_outlined, 'Settings', '/settings'),
+              10, Icons.settings_outlined, 'Products', '/products'),
           // Logout tile with logout function
           _buildHoverableListTile(11, Icons.logout_outlined, 'Logout', '',
               onTap: _handleLogout),
@@ -389,8 +391,8 @@ class _SidebarState extends State<Sidebar> {
                     GestureDetector(
                       onTap: () {
                         setState(() {
-                          _isFinanceExpanded =
-                              !_isFinanceExpanded; // Toggle dropdown
+                          _isInventoryExpanded =
+                              !_isInventoryExpanded; // Toggle dropdown
                         });
                       },
                       child: Container(
@@ -399,7 +401,7 @@ class _SidebarState extends State<Sidebar> {
                         color: Colors.transparent,
                         child: Center(
                           child: Icon(
-                            _isFinanceExpanded
+                            _isInventoryExpanded
                                 ? Icons.expand_less
                                 : Icons.expand_more,
                             color: _hoveredIndex == 15
@@ -415,9 +417,9 @@ class _SidebarState extends State<Sidebar> {
             ),
           ),
         ),
-        if (_isFinanceExpanded) ...[
+        if (_isInventoryExpanded) ...[
           _buildsecondHoverableListTile(
-              16, Icons.inventory_2_outlined, 'Receiving', '/'),
+              16, Icons.inventory_2_outlined, 'Receiving', '/receiving'),
           _buildsecondHoverableListTile(
               17, Icons.inventory_outlined, 'Inventory', '/inventory'),
         ],

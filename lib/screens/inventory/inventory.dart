@@ -68,6 +68,39 @@ class _InventoryState extends State<Inventory> {
     });
   }
 
+  // Function to handle the sell product modal
+  void _openSellProductModal() {
+    final selectedItems = filteredInventory
+        .where((item) => _selectedOptions[item['id']] == true)
+        .toList();
+
+    if (selectedItems.isEmpty) {
+      // Show a dialog if no items are selected
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: Text('No Items Selected'),
+            content: Text('Please select at least one item to sell.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (context) {
+          return SellProductModal(selectedItems: selectedItems);
+        },
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -97,6 +130,17 @@ class _InventoryState extends State<Inventory> {
                         textStyle: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 20,
+                        ),
+                      ),
+                    ),
+                    Spacer(), // Push the button to the right
+                    ElevatedButton(
+                      onPressed: _openSellProductModal,
+                      child: Text('Sell Product'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
                         ),
                       ),
                     ),
@@ -252,6 +296,146 @@ class _InventoryState extends State<Inventory> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
       ),
+    );
+  }
+}
+
+// Modal for selling products
+class SellProductModal extends StatefulWidget {
+  final List<Map<String, dynamic>> selectedItems;
+
+  const SellProductModal({required this.selectedItems});
+
+  @override
+  _SellProductModalState createState() => _SellProductModalState();
+}
+
+class _SellProductModalState extends State<SellProductModal> {
+  final Map<String, TextEditingController> weightControllers = {};
+  final Map<String, TextEditingController> priceControllers =
+      {}; // Added for price input
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize text controllers for each selected item
+    widget.selectedItems.forEach((item) {
+      weightControllers[item['id']] = TextEditingController();
+      priceControllers[item['id']] =
+          TextEditingController(); // Initialize price controllers
+    });
+  }
+
+  @override
+  void dispose() {
+    // Dispose all controllers
+    weightControllers.forEach((key, controller) => controller.dispose());
+    priceControllers.forEach(
+        (key, controller) => controller.dispose()); // Dispose price controllers
+    super.dispose();
+  }
+
+  // Function to handle selling the product
+  Future<void> _sellProduct() async {
+    for (var item in widget.selectedItems) {
+      String itemId = item['id'];
+      double currentWeight = item['weight'];
+      double inputWeight =
+          double.tryParse(weightControllers[itemId]?.text ?? '0') ?? 0;
+      double inputPrice =
+          double.tryParse(priceControllers[itemId]?.text ?? '0') ?? 0;
+
+      if (inputWeight <= 0 || inputWeight > currentWeight) {
+        // Show an error dialog if the input weight is invalid
+        showDialog(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              title: Text('Invalid Input'),
+              content: Text(
+                  'The weight entered exceeds the available inventory or is invalid.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+        continue;
+      }
+
+      // Update the inventory in Firestore
+      DocumentReference itemDoc =
+          FirebaseFirestore.instance.collection('inventory').doc(itemId);
+
+      await itemDoc.update({
+        'weight': FieldValue.increment(-inputWeight), // Subtract the weight
+      });
+
+      // Add entry to the weight_history subcollection
+      await itemDoc.collection('weight_history').add({
+        'weight': inputWeight,
+        'operation': 'minus',
+        'price': inputPrice, // Record the price
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    }
+
+    Navigator.of(context).pop(); // Close the modal after processing
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Sell Products'),
+      content: SingleChildScrollView(
+        child: Column(
+          children: widget.selectedItems.map((item) {
+            String itemId = item['id'];
+            String category = item['category'];
+            String type = item['type'];
+            double currentWeight = item['weight'];
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('$category - $type (Available: $currentWeight kg)'),
+                SizedBox(height: 10),
+                TextField(
+                  controller: weightControllers[itemId],
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Enter weight to sell (kg)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                SizedBox(height: 10),
+                TextField(
+                  controller: priceControllers[itemId], // Input field for price
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Enter price per kg',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                SizedBox(height: 20),
+              ],
+            );
+          }).toList(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(), // Close modal
+          child: Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _sellProduct,
+          child: Text('Confirm Sell'),
+        ),
+      ],
     );
   }
 }
