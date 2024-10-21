@@ -5,48 +5,6 @@ import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Authentica
 import 'package:provider/provider.dart';
 import 'package:trashure_thesis/user_model.dart';
 
-// @override
-// void initState() {
-//   super.initState();
-//   _retrieveUserData(); // Fetch user data when the Sidebar initializes
-// }
-
-// Future<void> _retrieveUserData() async {
-//   final User? currentUser = FirebaseAuth.instance.currentUser;
-
-//   if (currentUser != null) {
-//     try {
-//       // Fetch the user's document from Firestore based on the current user's UID
-//       DocumentSnapshot<Map<String, dynamic>> userSnapshot =
-//           await FirebaseFirestore.instance
-//               .collection('employees')
-//               .doc(currentUser.uid)
-//               .get();
-
-//       if (userSnapshot.exists) {
-//         // Cast the document data safely
-//         Map<String, dynamic>? userData = userSnapshot.data();
-//         if (userData != null) {
-//           // Set the user name in the UserModel
-//           Provider.of<UserModel>(context, listen: false)
-//               .setUserName(userData['name'] ?? 'Unknown User');
-//         } else {
-//           // If no data, set a fallback user name
-//           Provider.of<UserModel>(context, listen: false)
-//               .setUserName('Unknown');
-//         }
-//       } else {
-//         // Document does not exist, handle accordingly
-//         Provider.of<UserModel>(context, listen: false).setUserName('Unknown');
-//         print('User document does not exist.');
-//       }
-//     } catch (e) {
-//       // Handle any Firestore errors
-//       print('Error fetching user data: $e');
-//     }
-//   }
-// }
-
 class Sidebar extends StatefulWidget {
   const Sidebar({super.key});
 
@@ -57,8 +15,9 @@ class Sidebar extends StatefulWidget {
 class _SidebarState extends State<Sidebar> {
   int _hoveredIndex = -1; // To track the hovered tile
   bool _isUsersExpanded = false; // To track if the Users dropdown is expanded
+  bool _isBookingsExpanded = false; // Track the Bookings tile's expansion
   bool _isFinanceExpanded = false; // Track the Finance tile's expansion
-  bool _isInventoryExpanded = false;
+  bool _isInventoryExpanded = false; // Track the Inventory tile's expansion
 
   // Function to handle user logout
   Future<void> _handleLogout() async {
@@ -127,10 +86,6 @@ class _SidebarState extends State<Sidebar> {
                   width: 300,
                   height: 200,
                 ),
-                // CircleAvatar(
-                //   radius: 60,
-                //   backgroundImage: AssetImage('assets/trashure.jpg'),
-                // ),
                 Text(
                   userName,
                   style: GoogleFonts.poppins(),
@@ -148,14 +103,12 @@ class _SidebarState extends State<Sidebar> {
           _buildHoverableListTile(
               4, Icons.dashboard_outlined, 'Dashboard', '/dashboard'),
           _buildUsersTile(),
-          _buildHoverableListTile(
-              5, Icons.library_books_outlined, 'Bookings', '/bookings'),
+          _buildBookingsTile(), // Updated Bookings Tile with dropdown
           _buildHoverableListTile(
               6, Icons.directions_car_outlined, 'Vehicle', '/vehicle'),
           _buildInventoryTile(),
           if (hasFullAccess)
-            _buildHoverableListTile(
-                7, Icons.groups_outlined, 'Employees', '/employee'),
+            _buildEmployeesTile(), // Updated Employees Tile with dropdown
           if (hasFullAccess)
             _buildFinanceTile(), // Add finance only if full access
           _buildHoverableListTile(
@@ -163,8 +116,6 @@ class _SidebarState extends State<Sidebar> {
           // Logout tile with logout function
           _buildHoverableListTile(11, Icons.logout_outlined, 'Logout', '',
               onTap: _handleLogout),
-          // _buildHoverableListTile(
-          //     15, Icons.drive_eta_outlined, 'Driver', '/driver'),
         ],
       ),
     );
@@ -239,6 +190,79 @@ class _SidebarState extends State<Sidebar> {
               2, Icons.house_outlined, 'Households', '/userhouse'),
           _buildsecondHoverableListTile(
               3, Icons.business_center_outlined, 'Business', '/userbusiness'),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildBookingsTile() {
+    return Column(
+      children: [
+        MouseRegion(
+          onEnter: (_) => setState(() => _hoveredIndex = 5),
+          onExit: (_) => setState(() => _hoveredIndex = -1),
+          child: Container(
+            height: 70,
+            color: _hoveredIndex == 5
+                ? Color(0xFF4CAF4F)
+                : Colors.transparent, // Changes color on hover
+            child: Center(
+              child: ListTile(
+                leading: Icon(
+                  Icons.library_books_outlined,
+                  color: _hoveredIndex == 5 ? Colors.white : Color(0xFF4CAF4F),
+                ),
+                title: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Bookings',
+                      style: GoogleFonts.poppins(
+                        textStyle: TextStyle(
+                          color: _hoveredIndex == 5
+                              ? Colors.white
+                              : Color(0xFF4CAF4F),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 20,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _isBookingsExpanded =
+                              !_isBookingsExpanded; // Toggle dropdown
+                        });
+                      },
+                      child: Container(
+                        height: 60, // Adjust height as needed
+                        width: 60, // Adjust width as needed
+                        color: Colors.transparent,
+                        child: Center(
+                          child: Icon(
+                            _isBookingsExpanded
+                                ? Icons.expand_less
+                                : Icons.expand_more,
+                            color: _hoveredIndex == 5
+                                ? Colors.white
+                                : Color(0xFF4CAF4F),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (_isBookingsExpanded) ...[
+          _buildsecondHoverableListTile(
+              2, Icons.list_alt_outlined, 'All Bookings', '/bookings'),
+          _buildsecondHoverableListTile(3, Icons.check_circle_outline,
+              'Collected Bookings', '/collectedbookings'),
+          _buildsecondHoverableListTile(4, Icons.done_all_outlined,
+              'Completed Bookings', '/completedbookings'),
         ],
       ],
     );
@@ -427,6 +451,79 @@ class _SidebarState extends State<Sidebar> {
     );
   }
 
+  Widget _buildEmployeesTile() {
+    return Column(
+      children: [
+        // Main Employees tile with dropdown toggle, but no navigation on tap
+        MouseRegion(
+          onEnter: (_) => setState(() => _hoveredIndex = 7),
+          onExit: (_) => setState(() => _hoveredIndex = -1),
+          child: Container(
+            height: 70,
+            color: _hoveredIndex == 7
+                ? Color(0xFF4CAF4F)
+                : Colors.transparent, // Changes color on hover
+            child: Center(
+              child: ListTile(
+                leading: Icon(
+                  Icons.groups_outlined,
+                  color: _hoveredIndex == 7 ? Colors.white : Color(0xFF4CAF4F),
+                ),
+                title: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Employee',
+                      style: GoogleFonts.poppins(
+                        textStyle: TextStyle(
+                          color: _hoveredIndex == 7
+                              ? Colors.white
+                              : Color(0xFF4CAF4F),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 20,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _isFinanceExpanded =
+                              !_isFinanceExpanded; // Toggle dropdown
+                        });
+                      },
+                      child: Container(
+                        height: 60, // Adjust height as needed
+                        width: 60, // Adjust width as needed
+                        color: Colors.transparent,
+                        child: Center(
+                          child: Icon(
+                            _isFinanceExpanded
+                                ? Icons.expand_less
+                                : Icons.expand_more,
+                            color: _hoveredIndex == 7
+                                ? Colors.white
+                                : Color(0xFF4CAF4F),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        // Dropdown options
+        if (_isFinanceExpanded) ...[
+          _buildsecondHoverableListTile(
+              8, Icons.group_outlined, 'All Employees', '/employee'),
+          _buildsecondHoverableListTile(
+              9, Icons.payment_outlined, 'Payroll', '/payroll'),
+        ],
+      ],
+    );
+  }
+
   Widget _buildHoverableListTile(
       int index, IconData icon, String title, String route,
       {VoidCallback? onTap}) {
@@ -465,3 +562,46 @@ class _SidebarState extends State<Sidebar> {
     );
   }
 }
+
+
+// @override
+// void initState() {
+//   super.initState();
+//   _retrieveUserData(); // Fetch user data when the Sidebar initializes
+// }
+
+// Future<void> _retrieveUserData() async {
+//   final User? currentUser = FirebaseAuth.instance.currentUser;
+
+//   if (currentUser != null) {
+//     try {
+//       // Fetch the user's document from Firestore based on the current user's UID
+//       DocumentSnapshot<Map<String, dynamic>> userSnapshot =
+//           await FirebaseFirestore.instance
+//               .collection('employees')
+//               .doc(currentUser.uid)
+//               .get();
+
+//       if (userSnapshot.exists) {
+//         // Cast the document data safely
+//         Map<String, dynamic>? userData = userSnapshot.data();
+//         if (userData != null) {
+//           // Set the user name in the UserModel
+//           Provider.of<UserModel>(context, listen: false)
+//               .setUserName(userData['name'] ?? 'Unknown User');
+//         } else {
+//           // If no data, set a fallback user name
+//           Provider.of<UserModel>(context, listen: false)
+//               .setUserName('Unknown');
+//         }
+//       } else {
+//         // Document does not exist, handle accordingly
+//         Provider.of<UserModel>(context, listen: false).setUserName('Unknown');
+//         print('User document does not exist.');
+//       }
+//     } catch (e) {
+//       // Handle any Firestore errors
+//       print('Error fetching user data: $e');
+//     }
+//   }
+// }

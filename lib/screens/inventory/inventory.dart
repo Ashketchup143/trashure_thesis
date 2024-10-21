@@ -133,36 +133,43 @@ class _InventoryState extends State<Inventory> {
                         ),
                       ),
                     ),
+                  ],
+                ),
+                SizedBox(height: 20),
+                // Search Bar
+                Row(
+                  children: [
+                    Container(
+                      height: 30,
+                      width: 430,
+                      decoration: BoxDecoration(
+                        border: Border.all(),
+                        borderRadius: BorderRadius.circular(17.5),
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          hintText: 'Search by type or category',
+                          border: InputBorder.none,
+                          prefixIcon: Icon(Icons.search),
+                        ),
+                      ),
+                    ),
                     Spacer(), // Push the button to the right
                     ElevatedButton(
                       onPressed: _openSellProductModal,
-                      child: Text('Sell Product'),
+                      child: Text(
+                        'Sell Product',
+                        style: TextStyle(color: Colors.white),
+                      ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
+                        backgroundColor: Color(0xFF4CAF4F),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
                     ),
                   ],
-                ),
-                SizedBox(height: 20),
-                // Search Bar
-                Container(
-                  height: 30,
-                  width: 430,
-                  decoration: BoxDecoration(
-                    border: Border.all(),
-                    borderRadius: BorderRadius.circular(17.5),
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Search by type or category',
-                      border: InputBorder.none,
-                      prefixIcon: Icon(Icons.search),
-                    ),
-                  ),
                 ),
                 SizedBox(height: 20),
                 // Bordered Container for Titles and List
@@ -242,7 +249,7 @@ class _InventoryState extends State<Inventory> {
     String itemId = item['id'] ?? 'N/A';
     String category = item['category'] ?? 'N/A';
     String type = item['type'] ?? 'N/A';
-    String weight = item['weight'].toString() ?? 'N/A';
+    String weight = item['weight'].toStringAsFixed(2) ?? 'N/A';
 
     if (_selectedOptions[itemId] == null) {
       _selectedOptions[itemId] = false;

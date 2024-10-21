@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:trashure_thesis/sidebar.dart';
 
 class PayrollScreen extends StatefulWidget {
   @override
@@ -204,6 +205,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
     final currencyFormatter = NumberFormat.currency(symbol: '\$');
 
     return Scaffold(
+      drawer: Sidebar(),
       appBar: AppBar(
         title: Text('Payroll'),
       ),

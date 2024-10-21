@@ -13,6 +13,8 @@ class Receiving extends StatefulWidget {
 class _ReceivingState extends State<Receiving> {
   TextEditingController searchController = TextEditingController();
   String searchQuery = "";
+  List<Map<String, dynamic>> significantDifferences =
+      []; // To store the significant differences
 
   @override
   Widget build(BuildContext context) {
@@ -74,46 +76,71 @@ class _ReceivingState extends State<Receiving> {
                   ],
                 ),
                 SizedBox(height: 20),
-                // Container with border wrapping the entire list of bookings
-                Container(
-                  padding: EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Expanded(
-                    child: StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance
-                          .collection('bookings')
-                          .orderBy('date', descending: false) // Order by date
-                          .snapshots(),
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData) {
-                          return Center(child: CircularProgressIndicator());
-                        }
-                        var bookings = snapshot.data?.docs ?? [];
+                // Titles Row
 
-                        // Filter bookings to include only 'collected' status
-                        var collectedBookings = bookings.where((doc) {
-                          var data = doc.data() as Map<String, dynamic>?;
-                          return data?['status'] == 'collected' &&
-                              _matchesSearchQuery(data);
-                        }).toList();
+                SizedBox(height: 10),
+                // List of bookings with StreamBuilder inside Container
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(),
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            border:
+                                Border(bottom: BorderSide(color: Colors.black)),
+                          ),
+                          child: Row(
+                            children: [
+                              title('Booking ID', 3),
+                              title('Date', 2),
+                              title('Driver', 2),
+                              title('Vehicle', 2),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          child: StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection('bookings')
+                                .orderBy('date',
+                                    descending: false) // Order by date
+                                .snapshots(),
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData) {
+                                return Center(
+                                    child: CircularProgressIndicator());
+                              }
+                              var bookings = snapshot.data?.docs ?? [];
 
-                        if (collectedBookings.isEmpty) {
-                          return Center(child: Text('No bookings found'));
-                        }
+                              // Filter bookings to include only 'collected' status
+                              var collectedBookings = bookings.where((doc) {
+                                var data = doc.data() as Map<String, dynamic>?;
+                                return data?['status'] == 'collected' &&
+                                    _matchesSearchQuery(data);
+                              }).toList();
 
-                        return ListView(
-                          shrinkWrap: true, // Ensure ListView doesn't overflow
-                          children: collectedBookings.map((doc) {
-                            var bookingData =
-                                doc.data() as Map<String, dynamic>;
-                            var bookingId = doc.id;
-                            return _buildExpansionTile(bookingId, bookingData);
-                          }).toList(),
-                        );
-                      },
+                              if (collectedBookings.isEmpty) {
+                                return Center(child: Text('No bookings found'));
+                              }
+
+                              return ListView(
+                                shrinkWrap:
+                                    true, // Ensure ListView doesn't overflow
+                                children: collectedBookings.map((doc) {
+                                  var bookingData =
+                                      doc.data() as Map<String, dynamic>;
+                                  var bookingId = doc.id;
+                                  return _buildExpansionTile(
+                                      bookingId, bookingData);
+                                }).toList(),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -147,7 +174,9 @@ class _ReceivingState extends State<Receiving> {
           ),
           Expanded(flex: 2, child: Text(bookingData['driver'] ?? 'No Driver')),
           Expanded(
-              flex: 2, child: Text(bookingData['vehicle'] ?? 'No Vehicle')),
+            flex: 2,
+            child: Text(bookingData['vehicle'] ?? 'No Vehicle'),
+          ),
         ],
       ),
       children: [
@@ -218,13 +247,26 @@ class _ReceivingState extends State<Receiving> {
                       }).toList(),
                     ),
                     ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Color(0xFF4CAF4F)),
                       onPressed: () async {
                         // Add inputted weights to inventory and update booking status
                         await addWeightsToInventory(totalWeights,
                             inputControllers, bookingId); // Pass bookingId here
+
+                        // Check for significant differences and create report if necessary
+                        await checkForSignificantDifferenceAndReport(bookingId,
+                            totalWeights, inputControllers, bookingData);
+
                         await updateBookingStatus(bookingId);
                       },
-                      child: Text('Complete Booking and Add to Inventory'),
+                      child: Text(
+                        'Complete Booking and Add to Inventory',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                    SizedBox(
+                      height: 10,
                     ),
                   ],
                 );
@@ -280,13 +322,140 @@ class _ReceivingState extends State<Receiving> {
     );
   }
 
+  // Function to check for significant differences and report if necessary
+  Future<void> checkForSignificantDifferenceAndReport(
+      String bookingId,
+      Map<String, double> totalWeights,
+      Map<String, TextEditingController> inputControllers,
+      Map<String, dynamic> bookingData) async {
+    double significantDifferenceThresholdPercent = 5.0; // 5% difference
+    String driverId = bookingData['driverId'] ?? 'Unknown Driver';
+    String driver = bookingData['driver'] ?? 'Unknown';
+    DateTime bookingDate = bookingData['date'].toDate();
+
+    // Clear the significant differences list for the modal
+    significantDifferences.clear();
+
+    // Loop through totalWeights and compare with input values
+    for (var entry in totalWeights.entries) {
+      String type = entry.key;
+      double totalWeight = entry.value;
+      double inputWeight = double.tryParse(inputControllers[type]!.text) ?? 0;
+
+      double percentDifference =
+          ((inputWeight - totalWeight).abs() / totalWeight) * 100;
+      if (percentDifference > significantDifferenceThresholdPercent) {
+        // Add the significant difference to the list for the modal
+        significantDifferences.add({
+          'type': type,
+          'totalWeight': totalWeight,
+          'inputWeight': inputWeight,
+          'difference': percentDifference,
+          'category': 'recyclables', // Assuming category is recyclables for now
+        });
+
+        // Directly reference the employee using driverId
+        DocumentReference employeeDoc =
+            FirebaseFirestore.instance.collection('employees').doc(driverId);
+
+        // Add a report in the employee's `reports` subcollection
+        DocumentReference reportDoc =
+            await employeeDoc.collection('reports').add({
+          'bookingId': bookingId,
+          'driverId': driverId,
+          'driver': driver,
+          'bookingDate': bookingDate,
+          'category': 'recyclables',
+          'dateChecked': FieldValue.serverTimestamp(),
+        });
+
+        // Add recyclables subcollection with discrepancies
+        for (var diff in significantDifferences) {
+          await reportDoc.collection('recyclables').add({
+            'type': diff['type'],
+            'totalWeight': diff['totalWeight'],
+            'inputWeight': diff['inputWeight'],
+            'difference': diff['difference'],
+          });
+        }
+      }
+    }
+
+    // Show the modal if there are significant differences
+    if (significantDifferences.isNotEmpty) {
+      showModal(context, bookingId, driver, driverId, bookingDate);
+    }
+  }
+
+  // Function to show a modal with the significant differences
+  void showModal(BuildContext context, String bookingId, String driver,
+      String driverId, DateTime bookingDate) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Significant Differences Found'),
+          content: Container(
+            width: double.maxFinite,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Booking ID: $bookingId'),
+                Text('Driver: $driver'),
+                Text('Driver ID: $driverId'),
+                Text(
+                    'Booking Date: ${DateFormat('MMMM d, yyyy').format(bookingDate)}'),
+                SizedBox(height: 20),
+                Container(
+                  width: double.maxFinite,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: significantDifferences.length,
+                    itemBuilder: (BuildContext context, int index) {
+                      var difference = significantDifferences[index];
+                      return Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Type: ${difference['type']}'),
+                            Text(
+                                'Total Weight: ${difference['totalWeight']} kg'),
+                            Text(
+                                'Inputted Weight: ${difference['inputWeight']} kg'),
+                            Text(
+                                'Difference: ${difference['difference'].toStringAsFixed(2)} %'),
+                            Text('Category: ${difference['category']}'),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the modal
+              },
+              child: Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // Function to add inputted weights of all recyclables to inventory
   Future<void> addWeightsToInventory(
       Map<String, double> totalWeights,
       Map<String, TextEditingController> inputControllers,
       String bookingId) async {
-    // Pass the booking ID as a parameter
-
     CollectionReference inventory =
         FirebaseFirestore.instance.collection('inventory');
 
@@ -304,7 +473,6 @@ class _ReceivingState extends State<Receiving> {
           .collection('users')
           .get(); // Get all user documents in the booking
 
-      // Loop through each user document and get the recyclables subcollection
       for (var userDoc in userRecyclables.docs) {
         QuerySnapshot recyclablesSnapshot = await userDoc.reference
             .collection('recyclables')
@@ -315,12 +483,11 @@ class _ReceivingState extends State<Receiving> {
             .get();
 
         if (recyclablesSnapshot.docs.isNotEmpty) {
-          // Get the category from the recyclables document
           var recyclableData =
               recyclablesSnapshot.docs.first.data() as Map<String, dynamic>;
           category = recyclableData['category'] ??
               'recyclables'; // Extract the category
-          break; // Exit the loop once we get the category
+          break;
         }
       }
 
@@ -389,4 +556,26 @@ class _ReceivingState extends State<Receiving> {
         date.contains(normalizedQuery) ||
         vehicle.contains(normalizedQuery);
   }
+}
+
+// Function to create titles for each row in the list view
+Expanded title(String title, int flex) {
+  return Expanded(
+    flex: flex,
+    child: Container(
+      padding: EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        border: Border(
+          right: BorderSide(color: Colors.black),
+          bottom: BorderSide(color: Colors.black),
+        ),
+      ),
+      child: Center(
+        child: Text(
+          title,
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ),
+    ),
+  );
 }
