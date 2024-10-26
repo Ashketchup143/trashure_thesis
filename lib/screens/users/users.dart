@@ -50,6 +50,7 @@ class _UsersState extends State<Users> {
           'profileImage': data['profileImage'] ?? '', // Default profile image
           'landmark': data['landmark'] ?? 'No Landmark', // Default if null
           'location': data['location'] ?? GeoPoint(0, 0), // Default GeoPoint
+          'status': data['status'] ?? 'unbooked', // Adding status with default
         };
       }).toList();
 
@@ -74,7 +75,9 @@ class _UsersState extends State<Users> {
             user['category'].toLowerCase().contains(searchTerm) ||
             user['contact'].toLowerCase().contains(searchTerm) ||
             user['address'].toLowerCase().contains(searchTerm) ||
-            user['status'].toLowerCase().contains(searchTerm);
+            user['status']
+                .toLowerCase()
+                .contains(searchTerm); // Include status in search
       }).toList();
     });
   }
@@ -85,6 +88,17 @@ class _UsersState extends State<Users> {
       '/userinformation',
       arguments: user,
     );
+  }
+
+  // Function to get color based on status
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'scheduled':
+        return Colors.blue;
+      case 'unbooked':
+      default:
+        return Color(0xFFF5D322);
+    }
   }
 
   @override
@@ -180,7 +194,7 @@ class _UsersState extends State<Users> {
                                       user['category'],
                                       user['contact'],
                                       user['address'],
-                                      // user['status'],
+                                      user['status'], // Include status
                                       user,
                                     );
                                   },
@@ -226,13 +240,14 @@ class _UsersState extends State<Users> {
   }
 
   // Custom Checkbox List Tile for each user
+  // Custom Checkbox List Tile for each user
   Widget _buildCustomCheckboxTile(
     String uid,
     String name,
     String category,
     String contact,
     String address,
-    // String status,
+    String status, // Added status here
     Map<String, dynamic> user,
   ) {
     return CheckboxListTile(
@@ -266,15 +281,40 @@ class _UsersState extends State<Users> {
           ),
           Expanded(
             flex: 2,
-            child: Text('unbooked'),
+            child: Container(
+              height: 22.5,
+              width: 50,
+              decoration: BoxDecoration(
+                color: _getStatusColor(status), // Use the status color
+                borderRadius: BorderRadius.circular(25),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    offset: Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Text(
+                  status,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
           ),
           Expanded(
             flex: 1,
-            child: IconButton(
-              icon: Icon(Icons.info_outline),
-              onPressed: () {
-                _showUserInformation(user);
-              },
+            child: Container(
+              width: 50,
+              child: IconButton(
+                icon: Icon(Icons.info_outline),
+                onPressed: () {
+                  _showUserInformation(user);
+                },
+              ),
             ),
           ),
         ],
@@ -283,21 +323,3 @@ class _UsersState extends State<Users> {
     );
   }
 }
-
-
-// Color _getStatusColor(String status) {
-//   switch (status.toLowerCase()) {
-//     case 'booked':
-//       return Color.fromARGB(255, 66, 167, 250);
-//     case 'completed':
-//       return Color.fromARGB(255, 76, 181, 80);
-//     case 'in progress':
-//       return Colors.grey;
-//     case 'delayed':
-//       return Color.fromARGB(255, 249, 81, 70);
-//     case 'unbooked':
-//       return Color(0xFFF5D322);
-//     default:
-//       return Color.fromARGB(255, 150, 141, 61);
-//   }
-// }

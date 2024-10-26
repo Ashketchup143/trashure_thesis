@@ -118,18 +118,23 @@ class _DriverTransactionsState extends State<DriverTransactions> {
                     stream: FirebaseFirestore.instance
                         .collection('bookings')
                         .where('driverId', isEqualTo: id)
-                        .where('status', isEqualTo: 'collected')
                         .snapshots(),
                     builder: (context, snapshot) {
                       if (!snapshot.hasData) {
                         return Center(child: CircularProgressIndicator());
                       }
 
-                      var bookings = snapshot.data?.docs ?? [];
+                      // Filter bookings with 'status' of either 'collected' or 'completed'
+                      var bookings = snapshot.data?.docs.where((doc) {
+                        var status =
+                            (doc['status'] ?? '').toString().toLowerCase();
+                        return status == 'collected' || status == 'completed';
+                      }).toList();
 
-                      if (bookings.isEmpty) {
+                      if (bookings == null || bookings.isEmpty) {
                         return Center(
-                            child: Text('No collected bookings found.'));
+                            child: Text(
+                                'No collected or completed bookings found.'));
                       }
 
                       return ListView.builder(
@@ -139,6 +144,8 @@ class _DriverTransactionsState extends State<DriverTransactions> {
                               bookings[index].data() as Map<String, dynamic>;
                           var bookingId = bookings[index].id;
                           var bookingDate = bookingData['date'] as Timestamp;
+                          var bookingStatus =
+                              bookingData['status'] ?? "Not set";
                           var overallPrice =
                               bookingData['final_overall_price'] ?? 'Not set';
                           var overallWeight =
@@ -156,6 +163,7 @@ class _DriverTransactionsState extends State<DriverTransactions> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text('Booking ID: $bookingId'),
+                                  Text('Status: ${bookingData['status']}'),
                                   Text('Vehicle: ${bookingData['vehicle']}'),
                                   Text(
                                       'Vehicle ID: ${bookingData['vehicleId']}'),
@@ -188,7 +196,7 @@ class _DriverTransactionsState extends State<DriverTransactions> {
                       );
                     },
                   ),
-                ),
+                )
               ],
             ),
           ),

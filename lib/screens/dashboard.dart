@@ -38,6 +38,7 @@ class _DashboardState extends State<Dashboard> {
                       },
                     ),
                     SizedBox(width: 10), // Space between icon and title
+
                     Text(
                       'Dashboard',
                       style: TextStyle(

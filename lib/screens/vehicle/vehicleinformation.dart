@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:trashure_thesis/screens/booking/bookingdetails.dart';
 
 class VehicleInformation extends StatefulWidget {
   @override
@@ -59,9 +60,12 @@ class _VehicleInformationState extends State<VehicleInformation> {
         .where('vehicleId', isEqualTo: vehicleId)
         .get();
 
-    List<Map<String, dynamic>> fetchedBookings = bookingsSnapshot.docs
-        .map((doc) => doc.data() as Map<String, dynamic>)
-        .toList();
+    List<Map<String, dynamic>> fetchedBookings =
+        bookingsSnapshot.docs.map((doc) {
+      Map<String, dynamic> bookingData = doc.data() as Map<String, dynamic>;
+      bookingData['id'] = doc.id; // Add the document ID to the booking data
+      return bookingData;
+    }).toList();
 
     setState(() {
       bookings = fetchedBookings;
@@ -168,6 +172,8 @@ class _VehicleInformationState extends State<VehicleInformation> {
                         border: Border.all(),
                         borderRadius: BorderRadius.circular(10),
                       ),
+                      height: MediaQuery.of(context).size.height *
+                          .32, // Set a fixed height for the scrollable area
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -181,26 +187,65 @@ class _VehicleInformationState extends State<VehicleInformation> {
                             ),
                           ),
                           SizedBox(height: 10),
-                          ...bookings.map((booking) {
-                            return ListTile(
-                              title: Text(
-                                  'Date: ${_formatDate(booking['date']?.toDate() ?? DateTime(1970))}'),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Status: ${booking['status'] ?? 'N/A'}'),
-                                  Text(
-                                      'Driver: ${booking['driver'] ?? 'No Driver Assigned'}'),
-                                  Text(
-                                      'Vehicle: ${booking['vehicle'] ?? 'No Vehicle Assigned'}'),
-                                  Text(
-                                      'Overall Price: ₱${booking['overall_price'] ?? 0}'),
-                                  Text(
-                                      'Overall Weight: ${booking['overall_weight'] ?? 0} kg'),
-                                ],
-                              ),
-                            );
-                          }).toList(),
+                          Expanded(
+                              // Makes the list scrollable
+                              child: ListView.builder(
+                            itemCount: bookings.length,
+                            itemBuilder: (context, index) {
+                              var booking = bookings[index];
+
+                              // Providing fallback values for nullable fields
+                              String bookingId = booking['id'] ?? 'Unknown ID';
+                              String status =
+                                  booking['status'] ?? 'Unknown Status';
+                              String driver =
+                                  booking['driver'] ?? 'No Driver Assigned';
+                              String vehicle =
+                                  booking['vehicle'] ?? 'No Vehicle Assigned';
+                              double overallPrice =
+                                  booking['overall_price'] ?? 0.0;
+                              double overallWeight =
+                                  booking['overall_weight'] ?? 0.0;
+                              String startTime =
+                                  booking['start_time'] ?? 'No Start Time';
+                              String endTime =
+                                  booking['end_time'] ?? 'No End Time';
+
+                              return ListTile(
+                                title: Text(
+                                  'Date: ${_formatDateTime(booking['date']?.toDate() ?? DateTime(1970), startTime, endTime)}',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                subtitle: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text('Status: $status'),
+                                    Text('Driver: $driver'),
+                                    Text('Vehicle: $vehicle'),
+                                    Text('Price: ₱$overallPrice'),
+                                    Text('Weight: $overallWeight kg'),
+                                  ],
+                                ),
+                                trailing: IconButton(
+                                  icon: Icon(Icons.info_outline),
+                                  onPressed: () {
+                                    // Pass the booking ID and navigate to the BookingDetails page
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => BookingDetails(
+                                          bookingId: booking['id'] ??
+                                              'Unknown ID', // Correctly pass the bookingId
+                                          bookingData: booking,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              );
+                            },
+                          )),
                         ],
                       ),
                     )
@@ -208,7 +253,7 @@ class _VehicleInformationState extends State<VehicleInformation> {
                       child: Padding(
                       padding: const EdgeInsets.only(top: 50),
                       child: Text('No bookings related to this vehicle'),
-                    )),
+                    ))
             ],
           ),
         ),
@@ -216,9 +261,13 @@ class _VehicleInformationState extends State<VehicleInformation> {
     );
   }
 
-  // Helper to format date
-  String _formatDate(DateTime date) {
-    return DateFormat('MMMM d, yyyy').format(date);
+  // Helper to format date and time (including start and end time)
+  String _formatDateTime(DateTime date, String? startTime, String? endTime) {
+    String formattedDate = DateFormat('MMMM d, yyyy').format(date);
+    String timeRange = (startTime != null && endTime != null)
+        ? "$startTime - $endTime"
+        : "No Time";
+    return "$formattedDate ($timeRange)";
   }
 
   // Build editable fields

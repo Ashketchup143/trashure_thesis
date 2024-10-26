@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:trashure_thesis/screens/booking/booking.dart';
 import 'package:trashure_thesis/screens/booking/collectedbookings.dart';
+import 'package:trashure_thesis/screens/booking/completedbookings.dart';
 import 'package:trashure_thesis/screens/dashboard.dart';
 import 'package:trashure_thesis/screens/driver/driver.dart';
 import 'package:trashure_thesis/screens/driver/driverbookingdetails.dart';
@@ -78,6 +79,7 @@ class MyApp extends StatelessWidget {
           '/drivertransactiondetails': (context) => DriverTransactionDetails(),
           '/receiving': (context) => Receiving(),
           '/collectedbookings': (context) => CollectedBookings(),
+          '/completedbookings': (context) => CompletedBookings(),
         },
       ),
     );

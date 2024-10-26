@@ -123,7 +123,8 @@ class _ReceivingState extends State<Receiving> {
                               }).toList();
 
                               if (collectedBookings.isEmpty) {
-                                return Center(child: Text('No bookings found'));
+                                return Center(
+                                    child: Text('No collected bookings found'));
                               }
 
                               return ListView(
@@ -180,7 +181,7 @@ class _ReceivingState extends State<Receiving> {
         ],
       ),
       children: [
-        // Fetch and display users' recyclables within this booking
+        // Reset the total weights and differences when the tile is expanded
         StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
               .collection('bookings')
@@ -194,6 +195,10 @@ class _ReceivingState extends State<Receiving> {
 
             var users = userSnapshot.data?.docs ?? [];
 
+            // Reset totalWeights and differences here
+            totalWeights.clear();
+            differences.clear();
+
             // Fetch recyclables for each user and accumulate the weights
             List<Future<void>> userRecyclablesFutures =
                 users.map((userDoc) async {
@@ -201,7 +206,6 @@ class _ReceivingState extends State<Receiving> {
                   await userDoc.reference.collection('recyclables').get();
               var recyclables = recyclableSnapshot.docs;
 
-              // Calculate total weight for each recyclable type (case-insensitive)
               recyclables.forEach((recyclableDoc) {
                 var recyclableData =
                     recyclableDoc.data() as Map<String, dynamic>;
@@ -249,16 +253,23 @@ class _ReceivingState extends State<Receiving> {
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                           backgroundColor: Color(0xFF4CAF4F)),
-                      onPressed: () async {
-                        // Add inputted weights to inventory and update booking status
-                        await addWeightsToInventory(totalWeights,
-                            inputControllers, bookingId); // Pass bookingId here
+                      onPressed: () {
+                        // Show modal before actually transferring to the inventory
+                        showInventoryTransferModal(context, totalWeights,
+                            () async {
+                          // The logic that transfers the weights to the inventory
+                          await addWeightsToInventory(
+                              totalWeights, inputControllers, bookingId);
 
-                        // Check for significant differences and create report if necessary
-                        await checkForSignificantDifferenceAndReport(bookingId,
-                            totalWeights, inputControllers, bookingData);
+                          // Check for significant differences and create report if necessary
+                          await checkForSignificantDifferenceAndReport(
+                              bookingId,
+                              totalWeights,
+                              inputControllers,
+                              bookingData);
 
-                        await updateBookingStatus(bookingId);
+                          await updateBookingStatus(bookingId);
+                        });
                       },
                       child: Text(
                         'Complete Booking and Add to Inventory',
@@ -275,6 +286,52 @@ class _ReceivingState extends State<Receiving> {
           },
         ),
       ],
+    );
+  }
+
+  void showInventoryTransferModal(BuildContext context,
+      Map<String, double> totalWeights, VoidCallback onConfirm) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Items to be Transferred to Inventory'),
+          content: Container(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // List the items and their respective weights
+                ...totalWeights.entries.map((entry) {
+                  return ListTile(
+                    title: Text('Type: ${entry.key}'),
+                    subtitle:
+                        Text('Weight: ${entry.value.toStringAsFixed(2)} kg'),
+                  );
+                }).toList(),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the modal
+              },
+              child: Text('Cancel'),
+            ),
+            ElevatedButton(
+              style:
+                  ElevatedButton.styleFrom(backgroundColor: Color(0xFF4CAF4F)),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the modal
+                onConfirm(); // Execute the action to transfer to inventory
+              },
+              child: Text('Confirm Transfer'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -396,7 +453,8 @@ class _ReceivingState extends State<Receiving> {
         return AlertDialog(
           title: Text('Significant Differences Found'),
           content: Container(
-            width: double.maxFinite,
+            height: MediaQuery.of(context).size.height * .5,
+            width: MediaQuery.of(context).size.width * .5,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

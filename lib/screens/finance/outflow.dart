@@ -122,7 +122,8 @@ class _OutflowState extends State<Outflow> {
                             Expanded(
                               child: StreamBuilder<QuerySnapshot>(
                                 stream: _firestore
-                                    .collection('outflow')
+                                    .collection("outflow")
+                                    .orderBy("date", descending: true)
                                     .snapshots(),
                                 builder: (context, snapshot) {
                                   if (!snapshot.hasData) {

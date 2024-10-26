@@ -18,6 +18,7 @@ class _SidebarState extends State<Sidebar> {
   bool _isBookingsExpanded = false; // Track the Bookings tile's expansion
   bool _isFinanceExpanded = false; // Track the Finance tile's expansion
   bool _isInventoryExpanded = false; // Track the Inventory tile's expansion
+  bool _isEmployeeExpanded = false;
 
   // Function to handle user logout
   Future<void> _handleLogout() async {
@@ -258,11 +259,11 @@ class _SidebarState extends State<Sidebar> {
         ),
         if (_isBookingsExpanded) ...[
           _buildsecondHoverableListTile(
-              2, Icons.list_alt_outlined, 'All Bookings', '/bookings'),
-          _buildsecondHoverableListTile(3, Icons.check_circle_outline,
-              'Collected Bookings', '/collectedbookings'),
-          _buildsecondHoverableListTile(4, Icons.done_all_outlined,
-              'Completed Bookings', '/completedbookings'),
+              24, Icons.list_alt_outlined, 'Pending', '/bookings'),
+          _buildsecondHoverableListTile(25, Icons.check_circle_outline,
+              'Collected', '/collectedbookings'),
+          _buildsecondHoverableListTile(
+              26, Icons.done_all_outlined, 'Completed', '/completedbookings'),
         ],
       ],
     );
@@ -456,18 +457,18 @@ class _SidebarState extends State<Sidebar> {
       children: [
         // Main Employees tile with dropdown toggle, but no navigation on tap
         MouseRegion(
-          onEnter: (_) => setState(() => _hoveredIndex = 7),
+          onEnter: (_) => setState(() => _hoveredIndex = 30),
           onExit: (_) => setState(() => _hoveredIndex = -1),
           child: Container(
             height: 70,
-            color: _hoveredIndex == 7
+            color: _hoveredIndex == 30
                 ? Color(0xFF4CAF4F)
                 : Colors.transparent, // Changes color on hover
             child: Center(
               child: ListTile(
                 leading: Icon(
                   Icons.groups_outlined,
-                  color: _hoveredIndex == 7 ? Colors.white : Color(0xFF4CAF4F),
+                  color: _hoveredIndex == 30 ? Colors.white : Color(0xFF4CAF4F),
                 ),
                 title: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -476,7 +477,7 @@ class _SidebarState extends State<Sidebar> {
                       'Employee',
                       style: GoogleFonts.poppins(
                         textStyle: TextStyle(
-                          color: _hoveredIndex == 7
+                          color: _hoveredIndex == 30
                               ? Colors.white
                               : Color(0xFF4CAF4F),
                           fontWeight: FontWeight.w600,
@@ -487,8 +488,8 @@ class _SidebarState extends State<Sidebar> {
                     GestureDetector(
                       onTap: () {
                         setState(() {
-                          _isFinanceExpanded =
-                              !_isFinanceExpanded; // Toggle dropdown
+                          _isEmployeeExpanded =
+                              !_isEmployeeExpanded; // Toggle dropdown
                         });
                       },
                       child: Container(
@@ -497,10 +498,10 @@ class _SidebarState extends State<Sidebar> {
                         color: Colors.transparent,
                         child: Center(
                           child: Icon(
-                            _isFinanceExpanded
+                            _isEmployeeExpanded
                                 ? Icons.expand_less
                                 : Icons.expand_more,
-                            color: _hoveredIndex == 7
+                            color: _hoveredIndex == 30
                                 ? Colors.white
                                 : Color(0xFF4CAF4F),
                           ),
@@ -514,11 +515,11 @@ class _SidebarState extends State<Sidebar> {
           ),
         ),
         // Dropdown options
-        if (_isFinanceExpanded) ...[
+        if (_isEmployeeExpanded) ...[
           _buildsecondHoverableListTile(
               8, Icons.group_outlined, 'All Employees', '/employee'),
           _buildsecondHoverableListTile(
-              9, Icons.payment_outlined, 'Payroll', '/payroll'),
+              31, Icons.payment_outlined, 'Payroll', '/payroll'),
         ],
       ],
     );

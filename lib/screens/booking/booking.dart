@@ -194,8 +194,8 @@ class _BookingState extends State<Booking> {
                                 children: [
                                   Row(
                                     children: [
-                                      title('Schedule ID', 3),
-                                      title('Date', 3),
+                                      title('Schedule ID', 2),
+                                      title('Date', 4),
                                       title('Driver', 2),
                                       title('Vehicle', 2),
                                       title('Overall Price', 1),
@@ -206,50 +206,54 @@ class _BookingState extends State<Booking> {
                                   ),
                                   Expanded(
                                     child: Container(
-                                        child: StreamBuilder<QuerySnapshot>(
-                                      stream: FirebaseFirestore.instance
-                                          .collection('bookings')
-                                          .orderBy('date',
-                                              descending:
-                                                  false) // Fetch all bookings ordered by date
-                                          .snapshots(),
-                                      builder: (context, snapshot) {
-                                        if (!snapshot.hasData) {
-                                          return Center(
-                                              child:
-                                                  CircularProgressIndicator());
-                                        }
-                                        var bookings =
-                                            snapshot.data?.docs ?? [];
-
-                                        // Ensure safe handling of null data and filter out 'collected' bookings
-                                        var filteredBookings =
-                                            bookings.where((doc) {
-                                          var data = doc.data()
-                                              as Map<String, dynamic>?;
-
-                                          // Exclude bookings with 'collected' status
-                                          if (data == null ||
-                                              data['status'] == 'collected') {
-                                            return false;
+                                      child: StreamBuilder<QuerySnapshot>(
+                                        stream: FirebaseFirestore.instance
+                                            .collection('bookings')
+                                            .orderBy('date',
+                                                descending:
+                                                    false) // Order by date
+                                            .snapshots(),
+                                        builder: (context, snapshot) {
+                                          if (!snapshot.hasData) {
+                                            return Center(
+                                                child:
+                                                    CircularProgressIndicator());
                                           }
 
-                                          // Apply your custom search query logic here (if necessary)
-                                          return _matchesSearchQuery(
-                                              data); // Continue with other filtering if needed
-                                        }).toList();
+                                          var bookings = snapshot
+                                              .data!.docs; // Safely access docs
 
-                                        return ListView(
-                                          children: filteredBookings.map((doc) {
-                                            var bookingData = doc.data()
+                                          // Filter out 'collected' and 'completed' bookings and apply search query
+                                          var filteredBookings =
+                                              bookings.where((doc) {
+                                            var data = doc.data()
                                                 as Map<String, dynamic>;
-                                            var scheduleId = doc.id;
-                                            return _buildCustomCheckboxTile(
-                                                scheduleId, bookingData);
-                                          }).toList(),
-                                        );
-                                      },
-                                    )),
+
+                                            // Exclude bookings with 'collected' or 'completed' status
+                                            if (data['status'] == 'collected' ||
+                                                data['status'] == 'completed') {
+                                              return false;
+                                            }
+
+                                            // Use the document ID (doc.id) in the search logic
+                                            return _matchesSearchQuery(data,
+                                                doc.id); // Pass doc.id to search function
+                                          }).toList();
+
+                                          return ListView(
+                                            children:
+                                                filteredBookings.map((doc) {
+                                              var bookingData = doc.data()
+                                                  as Map<String, dynamic>;
+                                              var scheduleId = doc
+                                                  .id; // Properly use doc.id here
+                                              return _buildCustomCheckboxTile(
+                                                  scheduleId, bookingData);
+                                            }).toList(),
+                                          );
+                                        },
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -279,28 +283,38 @@ class _BookingState extends State<Booking> {
   }
 
   // Function to check if a booking matches the search query
-  bool _matchesSearchQuery(Map<String, dynamic>? data) {
-    if (data == null) return false; // Handle null data
+  bool _matchesSearchQuery(Map<String, dynamic> data, String scheduleId) {
+    // Exclude bookings with 'collected' or 'completed' status
+    if (data['status'] == 'collected' || data['status'] == 'completed') {
+      return false;
+    }
 
     // Handle potential null values for fields
-    String id = (data['id']?.toString() ?? '').toLowerCase();
+    String id =
+        scheduleId.toLowerCase(); // Use scheduleId passed to the function
     String driver =
         (data['driver']?.toString() ?? 'no driver assigned').toLowerCase();
     String vehicle =
         (data['vehicle']?.toString() ?? 'no vehicle assigned').toLowerCase();
     String status = (data['status']?.toString() ?? '').toLowerCase();
-    String date = _formatDate(data['date']?.toDate() ?? DateTime(1970))
-        .toLowerCase(); // Default date if null
+    String date =
+        _formatDate(data['date']?.toDate() ?? DateTime(1970)).toLowerCase();
+    String startTime =
+        (data['start_time']?.toString() ?? 'no start time').toLowerCase();
+    String endTime =
+        (data['end_time']?.toString() ?? 'no end time').toLowerCase();
 
-    // Normalize searchQuery (e.g., search for 'no driver', 'no vehicle')
+    // Normalize searchQuery
     String normalizedQuery = searchQuery.toLowerCase();
 
-    // Search logic
+    // Search logic (including scheduleId, start_time, and end_time)
     return id.contains(normalizedQuery) ||
         driver.contains(normalizedQuery) ||
         vehicle.contains(normalizedQuery) ||
         status.contains(normalizedQuery) ||
-        date.contains(normalizedQuery);
+        date.contains(normalizedQuery) ||
+        startTime.contains(normalizedQuery) ||
+        endTime.contains(normalizedQuery);
   }
 
   // Show modal for adding schedule
@@ -308,103 +322,143 @@ class _BookingState extends State<Booking> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Add Schedule'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Date picker input
-              TextFormField(
-                controller: dateController,
-                decoration: InputDecoration(
-                  labelText: "Select Date",
-                  border: OutlineInputBorder(),
-                ),
-                readOnly: true,
-                onTap: () async {
-                  DateTime? pickedDate = await showDatePicker(
-                    context: context,
-                    initialDate: selectedDate,
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2030),
-                  );
-                  if (pickedDate != null) {
-                    setState(() {
-                      selectedDate = pickedDate;
-                      dateController.text =
-                          "${pickedDate.year}-${pickedDate.month}-${pickedDate.day}";
-                    });
-                  }
-                },
+        return StatefulBuilder(
+          builder: (context, setState) {
+            String? errorMessage; // To display error messages
+            return AlertDialog(
+              title: Text('Add Schedule'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Date picker input
+                  TextFormField(
+                    controller: dateController,
+                    decoration: InputDecoration(
+                      labelText: "Select Date",
+                      border: OutlineInputBorder(),
+                    ),
+                    readOnly: true,
+                    onTap: () async {
+                      DateTime? pickedDate = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2030),
+                      );
+                      if (pickedDate != null) {
+                        setState(() {
+                          selectedDate = pickedDate;
+                          dateController.text =
+                              "${pickedDate.year}-${pickedDate.month}-${pickedDate.day}";
+                        });
+                      }
+                    },
+                  ),
+                  SizedBox(height: 20),
+                  // Start time picker input
+                  TextFormField(
+                    controller: startTimeController,
+                    decoration: InputDecoration(
+                      labelText: "Start Time",
+                      border: OutlineInputBorder(),
+                    ),
+                    readOnly: true,
+                    onTap: () async {
+                      TimeOfDay? pickedTime = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.now(),
+                      );
+                      if (pickedTime != null) {
+                        setState(() {
+                          selectedStartTime = pickedTime;
+                          startTimeController.text = pickedTime.format(context);
+                        });
+                      }
+                    },
+                  ),
+                  SizedBox(height: 10),
+                  // End time picker input
+                  TextFormField(
+                    controller: endTimeController,
+                    decoration: InputDecoration(
+                      labelText: "End Time",
+                      border: OutlineInputBorder(),
+                    ),
+                    readOnly: true,
+                    onTap: () async {
+                      TimeOfDay? pickedTime = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.now(),
+                      );
+                      if (pickedTime != null) {
+                        setState(() {
+                          selectedEndTime = pickedTime;
+                          endTimeController.text = pickedTime.format(context);
+                        });
+                      }
+                    },
+                  ),
+                  SizedBox(height: 10),
+                  // Display error message if any
+                  if (errorMessage != null)
+                    Text(
+                      errorMessage!,
+                      style: TextStyle(color: Colors.red),
+                    ),
+                ],
               ),
-              SizedBox(height: 20),
-              // Start time picker input
-              TextFormField(
-                controller: startTimeController,
-                decoration: InputDecoration(
-                  labelText: "Start Time",
-                  border: OutlineInputBorder(),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    if (startTimeController.text.isEmpty ||
+                        endTimeController.text.isEmpty) {
+                      setState(() {
+                        errorMessage =
+                            'Please select both start and end times.';
+                      });
+                      return;
+                    }
+
+                    // Convert TimeOfDay to DateTime for comparison
+                    DateTime startDateTime = DateTime(
+                      selectedDate.year,
+                      selectedDate.month,
+                      selectedDate.day,
+                      selectedStartTime!.hour,
+                      selectedStartTime!.minute,
+                    );
+
+                    DateTime endDateTime = DateTime(
+                      selectedDate.year,
+                      selectedDate.month,
+                      selectedDate.day,
+                      selectedEndTime!.hour,
+                      selectedEndTime!.minute,
+                    );
+
+                    // Check if end_time is after start_time
+                    if (endDateTime.isBefore(startDateTime)) {
+                      setState(() {
+                        errorMessage =
+                            'End time must be later than the start time.';
+                      });
+                      return;
+                    }
+
+                    Navigator.of(context).pop();
+                    _addSchedule(); // Add schedule
+                  },
+                  child: Text('Add'),
                 ),
-                readOnly: true,
-                onTap: () async {
-                  TimeOfDay? pickedTime = await showTimePicker(
-                    context: context,
-                    initialTime: TimeOfDay.now(),
-                  );
-                  if (pickedTime != null) {
-                    setState(() {
-                      selectedStartTime = pickedTime;
-                      startTimeController.text = pickedTime.format(context);
-                    });
-                  }
-                },
-              ),
-              SizedBox(height: 10),
-              // End time picker input
-              TextFormField(
-                controller: endTimeController,
-                decoration: InputDecoration(
-                  labelText: "End Time",
-                  border: OutlineInputBorder(),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text('Cancel'),
                 ),
-                readOnly: true,
-                onTap: () async {
-                  TimeOfDay? pickedTime = await showTimePicker(
-                    context: context,
-                    initialTime: TimeOfDay.now(),
-                  );
-                  if (pickedTime != null) {
-                    setState(() {
-                      selectedEndTime = pickedTime;
-                      endTimeController.text = pickedTime.format(context);
-                    });
-                  }
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                if (startTimeController.text.isEmpty ||
-                    endTimeController.text.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Please select a time range.')),
-                  );
-                  return;
-                }
-                Navigator.of(context).pop();
-                _addSchedule(); // Add schedule
-              },
-              child: Text('Add'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text('Cancel'),
-            ),
-          ],
+              ],
+            );
+          },
         );
       },
     );
@@ -606,13 +660,6 @@ class _BookingState extends State<Booking> {
   // Function to add a document to Firestore (just the schedule)
   Future<void> _addSchedule() async {
     try {
-      if (startTimeController.text.isEmpty || endTimeController.text.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please select a time range.')),
-        );
-        return;
-      }
-
       await FirebaseFirestore.instance.collection('bookings').add({
         'date': Timestamp.fromDate(selectedDate),
         'start_time': startTimeController.text,
@@ -661,14 +708,15 @@ class _BookingState extends State<Booking> {
       title: Row(
         children: [
           Expanded(
-            flex: 3,
+            flex: 2,
             child: Text(scheduleId),
           ),
           Expanded(
-            flex: 3,
+            flex: 4,
             child: Text(
               bookingData['date'] != null
-                  ? _formatDate(bookingData['date'].toDate()).toString()
+                  ? "${_formatDate(bookingData['date'].toDate())}, "
+                      "${bookingData['start_time'] ?? 'N/A'} - ${bookingData['end_time'] ?? 'N/A'}"
                   : 'No Date',
             ),
           ),
@@ -688,7 +736,7 @@ class _BookingState extends State<Booking> {
             flex: 1,
             child: Text(
               bookingData['overall_price'] != null
-                  ? '₱${bookingData['overall_price'].toString()}' // Add the peso sign ₱
+                  ? '₱${bookingData['overall_price'].toStringAsFixed(2)}' // Add the peso sign ₱
                   : '₱0', // Default to ₱0 if the price is null
               style: GoogleFonts.poppins(),
             ),
@@ -696,7 +744,7 @@ class _BookingState extends State<Booking> {
           Expanded(
             flex: 1,
             child: Text(
-              bookingData['overall_weight']?.toString() ??
+              bookingData['overall_weight']?.toStringAsFixed(2) ??
                   'N/A', // Added this line to display the overall price
               style: GoogleFonts.poppins(),
             ),

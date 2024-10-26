@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:typed_data'; // For web
+import 'package:firebase_storage/firebase_storage.dart'; // For Firebase Storage
 
 class ProductInformation extends StatefulWidget {
   final String productId;
@@ -28,6 +31,11 @@ class _ProductInformationState extends State<ProductInformation> {
   TextEditingController _categoryController = TextEditingController();
   TextEditingController _imageUrlController = TextEditingController();
   double _currentPrice = 0.0;
+  String? _imageFileName; // For image file name
+  bool _isUploading = false;
+  List<DocumentSnapshot> _allCategories = []; // For category dropdown
+  String _selectedCategory = ""; // Selected category from dropdown
+  Uint8List? _imageBytes; // To store the selected image bytes
 
   @override
   void initState() {
@@ -35,8 +43,17 @@ class _ProductInformationState extends State<ProductInformation> {
     _detailsController.text = widget.details;
     _categoryController.text = widget.category;
     _imageUrlController.text = widget.imageUrl;
-
+    _selectedCategory = widget.category; // Set default category
     _fetchLatestPrice(); // Fetch the most recent price
+    _fetchCategories(); // Fetch the categories for dropdown
+  }
+
+  Future<void> _fetchCategories() async {
+    QuerySnapshot snapshot =
+        await FirebaseFirestore.instance.collection('category').get();
+    setState(() {
+      _allCategories = snapshot.docs;
+    });
   }
 
   void _toggleEditMode() {
@@ -69,16 +86,23 @@ class _ProductInformationState extends State<ProductInformation> {
 
   Future<void> _updateProductDetails() async {
     if (_detailsController.text.trim().isNotEmpty &&
-        _categoryController.text.trim().isNotEmpty &&
+        _selectedCategory.isNotEmpty &&
         _priceController.text.trim().isNotEmpty) {
       double newPrice = double.tryParse(_priceController.text.trim()) ?? 0.0;
+
+      // Upload image if there's a new one selected
+      if (_imageFileName != null && _imageBytes != null) {
+        await _uploadImage(widget.productId);
+      }
+
+      // Update product details in Firestore
       await FirebaseFirestore.instance
           .collection('products')
           .doc(widget.productId)
           .update({
         'details': _detailsController.text.trim(),
-        'category': _categoryController.text.trim(),
-        'picture': _imageUrlController.text.trim(),
+        'category': _selectedCategory,
+        'picture': _imageFileName ?? widget.imageUrl,
       });
 
       // If the price has changed, add the new price to the prices subcollection
@@ -89,6 +113,10 @@ class _ProductInformationState extends State<ProductInformation> {
             .collection('prices')
             .add({
           'price': newPrice,
+          'original_price':
+              newPrice, // Assuming the original price is entered manually
+          'percentage_profit':
+              20.0, // You can replace this with fetched value from your settings
           'time': FieldValue.serverTimestamp(),
         });
         setState(() {
@@ -106,11 +134,105 @@ class _ProductInformationState extends State<ProductInformation> {
     }
   }
 
+  Future<void> _uploadImage(String productId) async {
+    if (_imageFileName != null && _imageBytes != null) {
+      try {
+        setState(() {
+          _isUploading = true;
+        });
+
+        // Upload to Firebase Storage
+        final storageRef = FirebaseStorage.instance
+            .ref()
+            .child('product_images/$_imageFileName');
+        await storageRef.putData(_imageBytes!);
+
+        // Get the download URL for the uploaded image
+        String downloadUrl = await storageRef.getDownloadURL();
+
+        // Update the image URL in Firestore
+        await FirebaseFirestore.instance
+            .collection('products')
+            .doc(productId)
+            .update({'picture': downloadUrl});
+
+        setState(() {
+          _isUploading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Image uploaded successfully!')),
+        );
+      } catch (e) {
+        setState(() {
+          _isUploading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to upload image: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickAndDisplayImage() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false, // Single image
+    );
+
+    if (result != null) {
+      setState(() {
+        _isUploading = true;
+      });
+
+      try {
+        Uint8List? fileBytes = result.files.first.bytes;
+        String filename = result.files.first.name;
+
+        // Store the image filename in state, to display the file name
+        setState(() {
+          _imageFileName = filename;
+        });
+
+        // Now the image file is stored, but we delay the upload until the user confirms
+        _imageBytes = fileBytes;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Image selected successfully!')),
+        );
+      } catch (e) {
+        setState(() {
+          _isUploading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to select image: $e')),
+        );
+      }
+    }
+  }
+
+// Modify this function to get the image download URL using the filename
+  Future<String> _getImageDownloadUrl(String fileName) async {
+    try {
+      String downloadUrl = await FirebaseStorage.instance
+          .ref()
+          .child('product_images/$fileName')
+          .getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      throw Exception("Error fetching image URL: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Product Details - ${widget.productName}'),
+        iconTheme: IconThemeData(color: Colors.white),
+        title: Text(
+          'Product Details - ${widget.productName}',
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: Colors.green,
         actions: [
           IconButton(
@@ -129,15 +251,24 @@ class _ProductInformationState extends State<ProductInformation> {
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 10),
-            if (widget.imageUrl.isNotEmpty)
-              Center(
-                child: Image.network(
-                  widget.imageUrl,
-                  width: 150,
-                  height: 150,
-                  fit: BoxFit.cover,
-                ),
-              ),
+
+            // Check if there's an image URL, and fetch it from Firebase if necessary
+            FutureBuilder<String>(
+              future: _getImageDownloadUrl(widget.imageUrl),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return CircularProgressIndicator();
+                }
+                if (snapshot.hasError) {
+                  return Text('Error fetching image: ${snapshot.error}');
+                }
+                if (snapshot.hasData) {
+                  return Image.network(snapshot.data!, width: 200, height: 200);
+                }
+                return Text('No Image Available');
+              },
+            ),
+
             SizedBox(height: 10),
             Text(
               'Name: ${widget.productName}',
@@ -159,28 +290,45 @@ class _ProductInformationState extends State<ProductInformation> {
                   ),
             SizedBox(height: 10),
             _isEditing
-                ? TextFormField(
-                    controller: _categoryController,
+                ? DropdownButtonFormField<String>(
+                    value: _selectedCategory,
+                    onChanged: (newValue) {
+                      setState(() {
+                        _selectedCategory = newValue!;
+                      });
+                    },
+                    items: _allCategories.map((categoryDoc) {
+                      return DropdownMenuItem<String>(
+                        value: categoryDoc['category_name'],
+                        child: Text(categoryDoc['category_name']),
+                      );
+                    }).toList(),
                     decoration: InputDecoration(
                       labelText: 'Edit Category',
                       border: OutlineInputBorder(),
                     ),
                   )
                 : Text(
-                    'Category: ${_categoryController.text}',
+                    'Category: ${_selectedCategory}',
                     style: TextStyle(fontSize: 18),
                   ),
             SizedBox(height: 10),
             _isEditing
-                ? TextFormField(
-                    controller: _imageUrlController,
-                    decoration: InputDecoration(
-                      labelText: 'Edit Image URL',
-                      border: OutlineInputBorder(),
-                    ),
+                ? Row(
+                    children: [
+                      ElevatedButton(
+                        onPressed: _pickAndDisplayImage,
+                        child: _isUploading
+                            ? CircularProgressIndicator()
+                            : Text('Choose Image'),
+                      ),
+                      SizedBox(width: 10),
+                      if (_imageFileName != null)
+                        Text('Image Selected: $_imageFileName'),
+                    ],
                   )
                 : Text(
-                    'Image URL: ${_imageUrlController.text}',
+                    'Image URL: ${_imageFileName ?? widget.imageUrl}',
                     style: TextStyle(fontSize: 18),
                   ),
             SizedBox(height: 10),
@@ -204,7 +352,8 @@ class _ProductInformationState extends State<ProductInformation> {
             ),
             SizedBox(height: 10),
             Container(
-              height: 200, // Set a fixed height for the scrollable container
+              height: MediaQuery.of(context).size.height *
+                  .32, // Set a fixed height for the scrollable container
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.grey),
                 borderRadius: BorderRadius.circular(10),
@@ -234,6 +383,9 @@ class _ProductInformationState extends State<ProductInformation> {
                       var priceData =
                           priceHistory[index].data() as Map<String, dynamic>;
                       double price = priceData['price'] ?? 0.0;
+                      double originalPrice = priceData['original_price'] ?? 0.0;
+                      double percentageProfit =
+                          priceData['percentage_profit'] ?? 20.0;
                       Timestamp? timestamp = priceData['time'] as Timestamp?;
                       String formattedTime = timestamp != null
                           ? DateFormat('MM/dd/yyyy, hh:mm a')
@@ -243,7 +395,15 @@ class _ProductInformationState extends State<ProductInformation> {
                       return ListTile(
                         leading: Icon(Icons.monetization_on),
                         title: Text('₱${price.toStringAsFixed(2)}'),
-                        subtitle: Text('Time: $formattedTime'),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                                'Original Price: ₱${originalPrice.toStringAsFixed(2)}'),
+                            Text('Percentage Profit: $percentageProfit%'),
+                            Text('Time: $formattedTime'),
+                          ],
+                        ),
                       );
                     },
                   );

@@ -69,7 +69,10 @@ class _InflowState extends State<Inflow> {
                     height: MediaQuery.of(context).size.height * .825,
                     decoration: BoxDecoration(border: Border.all()),
                     child: StreamBuilder<QuerySnapshot>(
-                      stream: _firestore.collection('inflow').snapshots(),
+                      stream: _firestore
+                          .collection('inflow')
+                          .orderBy('date', descending: true)
+                          .snapshots(),
                       builder: (context, snapshot) {
                         if (!snapshot.hasData) {
                           return Center(child: CircularProgressIndicator());
@@ -104,10 +107,15 @@ class _InflowState extends State<Inflow> {
 
   // This method builds each row in the list
   Widget _buildInflowRow(DocumentSnapshot inflowData, int index) {
-    Timestamp timestamp = inflowData['date']; // Get the Firestore Timestamp
-    DateTime date = timestamp.toDate(); // Convert to DateTime
-    String formattedDate =
-        DateFormat('yyyy-MM-dd').format(date); // Format the DateTime
+    Map<String, dynamic>? data = inflowData.data()
+        as Map<String, dynamic>?; // Extract data from DocumentSnapshot
+
+    // Check if the 'date' field exists before using it
+    Timestamp? timestamp = data?['date'] as Timestamp?;
+    DateTime? date = timestamp?.toDate();
+    String formattedDate = date != null
+        ? DateFormat('yyyy-MM-dd').format(date)
+        : 'N/A'; // Format date
 
     return Column(
       children: [
@@ -132,30 +140,55 @@ class _InflowState extends State<Inflow> {
                 title: Row(
                   children: [
                     Expanded(
-                        flex: 2,
-                        child: Text(inflowData['authorized_by'] ?? 'N/A',
-                            style: TextStyle(fontSize: 14))),
+                      flex: 2,
+                      child: Text(
+                        data != null && data.containsKey('authorized_by')
+                            ? data['authorized_by'] ?? 'N/A'
+                            : 'N/A',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ),
                     Expanded(
-                        flex: 2,
-                        child: Text(inflowData['customer_name'] ?? 'N/A',
-                            style: TextStyle(fontSize: 14))),
+                      flex: 2,
+                      child: Text(
+                        data != null && data.containsKey('customer_name')
+                            ? data['customer_name'] ?? 'N/A'
+                            : 'N/A',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ),
                     Expanded(
-                        flex: 2,
-                        child: Text(formattedDate,
-                            style: TextStyle(fontSize: 14))),
+                      flex: 2,
+                      child:
+                          Text(formattedDate, style: TextStyle(fontSize: 14)),
+                    ),
                     Expanded(
-                        flex: 3,
-                        child: Text(inflowData['description'] ?? 'N/A',
-                            style: TextStyle(fontSize: 14))),
+                      flex: 3,
+                      child: Text(
+                        data != null && data.containsKey('description')
+                            ? data['description'] ?? 'N/A'
+                            : 'N/A',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ),
                     Expanded(
-                        flex: 2,
-                        child: Text(
-                            inflowData['overall_total']?.toString() ?? 'N/A',
-                            style: TextStyle(fontSize: 14))),
+                      flex: 2,
+                      child: Text(
+                        data != null && data.containsKey('overall_total')
+                            ? data['overall_total']?.toString() ?? 'N/A'
+                            : 'N/A',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ),
                     Expanded(
-                        flex: 2,
-                        child: Text(inflowData['payment_method'] ?? 'N/A',
-                            style: TextStyle(fontSize: 14))),
+                      flex: 2,
+                      child: Text(
+                        data != null && data.containsKey('payment_method')
+                            ? data['payment_method'] ?? 'N/A'
+                            : 'N/A',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ),
                   ],
                 ),
                 children: [

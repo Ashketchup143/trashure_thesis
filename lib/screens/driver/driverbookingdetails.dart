@@ -22,7 +22,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
 
     String bookingId = args?['bookingId'] ?? 'Unknown';
-    String status = args?['status'] ?? 'Unknown';
+    String status = (args?['status'] ?? 'unknown').trim().toLowerCase();
     String vehicle = args?['vehicle'] ?? 'Unknown';
     String vehicleId = args?['vehicleId'] ?? 'Unknown';
     double overallPrice = args?['overall_price']?.toDouble() ?? 0.0;
@@ -33,7 +33,8 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
     String formattedDate = date != null
         ? DateFormat('MM/dd/yyyy, EEEE').format(date)
         : 'Unknown Date';
-
+    print(
+        'Booking status: $status'); // Add this to check if status is correctly being passed
     return Scaffold(
       appBar: AppBar(
         iconTheme: IconThemeData(color: Colors.white),
@@ -78,19 +79,20 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                             fontSize: 24,
                             fontWeight: FontWeight.bold)),
                     Spacer(),
-                    ElevatedButton(
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (BuildContext context) {
-                            return AddUserModal(bookingId: bookingId);
-                          },
-                        );
-                      },
-                      child: Text('Add Guest User'),
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green),
-                    ),
+                    if (status == 'collecting') // Show only if collecting
+                      ElevatedButton(
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (BuildContext context) {
+                              return AddUserModal(bookingId: bookingId);
+                            },
+                          );
+                        },
+                        child: Text('Add Guest User'),
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green),
+                      ),
                   ],
                 ),
                 SizedBox(height: 10),
@@ -253,7 +255,9 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                               Text('Type: $type'),
                                               Row(
                                                 children: [
-                                                  if (!isCollected)
+                                                  if (!isCollected &&
+                                                      status ==
+                                                          'collecting') // Allow editing only if collecting and not yet collected
                                                     isEditing
                                                         ? Expanded(
                                                             child:
@@ -275,7 +279,9 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                                           )
                                                         : Text(
                                                             'Weight: ${updatedWeights[recyclableId]!.toStringAsFixed(2)} kg'),
-                                                  if (!isCollected)
+                                                  if (!isCollected &&
+                                                      status ==
+                                                          'collecting') // Show edit icon only if status is collecting
                                                     IconButton(
                                                       icon: Icon(isEditing
                                                           ? Icons.check
@@ -317,7 +323,25 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                     );
                                   },
                                 ),
-                                if (!isCollected)
+                                if (!isCollected &&
+                                    status ==
+                                        'collecting') // Allow adding products only if collecting
+                                  Row(
+                                    children: [
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          _showAddProductModal(userId,
+                                              bookingId); // Function to open modal for adding a product
+                                        },
+                                        child: Text('Add Product'),
+                                        style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.blue),
+                                      ),
+                                    ],
+                                  ),
+                                if (!isCollected &&
+                                    status ==
+                                        'collecting') // Allow collecting only if status is collecting
                                   ElevatedButton(
                                     onPressed: () async {
                                       _showCollectedConfirmation(
@@ -339,14 +363,16 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                     },
                   ),
                 ),
-                ElevatedButton(
-                  onPressed: () async {
-                    await _showFinalCollectedConfirmation(bookingId);
-                  },
-                  child: Text('Mark Booking as Collected'),
-                  style:
-                      ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                ),
+                if (status ==
+                    'collecting') // Show "Mark Booking as Collected" only if status is collecting
+                  ElevatedButton(
+                    onPressed: () async {
+                      await _showFinalCollectedConfirmation(bookingId);
+                    },
+                    child: Text('Mark Booking as Collected'),
+                    style:
+                        ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                  ),
               ],
             ),
           ),
@@ -606,5 +632,190 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
         Navigator.of(context).pop();
       }
     }
+  }
+
+  void _showAddProductModal(String userId, String bookingId) async {
+    final TextEditingController weightController = TextEditingController();
+    String selectedProductName = 'Unknown';
+    double? recentPrice;
+
+    // Fetch existing product names in user's recyclables
+    List<String> existingProductNames =
+        await _fetchUserRecyclableProductNames(userId, bookingId);
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('Add Product'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Dropdown to select product name
+                  StreamBuilder(
+                    stream: FirebaseFirestore.instance
+                        .collection('products')
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return CircularProgressIndicator();
+                      }
+
+                      var products = snapshot.data!.docs.where((doc) {
+                        String productName =
+                            doc['product_name'].toString().toLowerCase();
+                        return !existingProductNames
+                            .contains(productName); // Exclude existing products
+                      }).toList();
+
+                      if (products.isEmpty) {
+                        return Text("No new products available to add.");
+                      }
+
+                      if (selectedProductName == 'Unknown' &&
+                          products.isNotEmpty) {
+                        selectedProductName = products.first['product_name'];
+                      }
+
+                      return DropdownButton<String>(
+                        value: selectedProductName,
+                        onChanged: (value) {
+                          setState(() {
+                            selectedProductName = value!;
+                            _fetchLatestPrice(selectedProductName)
+                                .then((price) {
+                              setState(() {
+                                recentPrice = price;
+                              });
+                            });
+                          });
+                        },
+                        items: products.map<DropdownMenuItem<String>>((doc) {
+                          return DropdownMenuItem<String>(
+                            value: doc['product_name'],
+                            child: Text(doc['product_name']),
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
+                  SizedBox(height: 10),
+                  // Display the most recent price
+                  recentPrice != null
+                      ? Text(
+                          'Recent Price: ₱${recentPrice!.toStringAsFixed(2)} per kg')
+                      : Text("no product chosen"),
+                  SizedBox(height: 10),
+                  // Input for weight
+                  TextField(
+                    controller: weightController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Weight (kg)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    double weight =
+                        double.tryParse(weightController.text) ?? 0.0;
+                    if (recentPrice != null && weight > 0) {
+                      await _addProductToUser(userId, bookingId,
+                          selectedProductName, weight, recentPrice!);
+                      Navigator.of(context).pop();
+                    }
+                  },
+                  child: Text('Add'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+// Helper function to fetch existing product names in user's recyclables
+  Future<List<String>> _fetchUserRecyclableProductNames(
+      String userId, String bookingId) async {
+    var recyclablesSnapshot = await FirebaseFirestore.instance
+        .collection('bookings')
+        .doc(bookingId)
+        .collection('users')
+        .doc(userId)
+        .collection('recyclables')
+        .get();
+
+    // Convert all product names to lowercase to ensure case-insensitive comparison
+    return recyclablesSnapshot.docs.map((doc) {
+      return (doc['type'] as String).toLowerCase();
+    }).toList();
+  }
+
+// Function to fetch the latest price for a product based on product_name
+  Future<double> _fetchLatestPrice(String productName) async {
+    try {
+      // Find the product document by product_name
+      var productSnapshot = await FirebaseFirestore.instance
+          .collection('products')
+          .where('product_name', isEqualTo: productName)
+          .limit(1)
+          .get();
+
+      if (productSnapshot.docs.isNotEmpty) {
+        var productId = productSnapshot.docs.first.id;
+
+        // Fetch the latest price from the 'prices' subcollection
+        var priceSnapshot = await FirebaseFirestore.instance
+            .collection('products')
+            .doc(productId)
+            .collection('prices')
+            .orderBy('time', descending: true)
+            .limit(1)
+            .get();
+
+        if (priceSnapshot.docs.isNotEmpty) {
+          return priceSnapshot.docs.first['price']?.toDouble() ?? 0.0;
+        }
+      }
+    } catch (e) {
+      print('Error fetching latest price: $e');
+    }
+    return 0.0; // Default if no price is found
+  }
+
+// Add the product to user's recyclables
+  Future<void> _addProductToUser(String userId, String bookingId,
+      String productName, double weight, double price) async {
+    double totalPrice = weight * price;
+
+    await FirebaseFirestore.instance
+        .collection('bookings')
+        .doc(bookingId)
+        .collection('users')
+        .doc(userId)
+        .collection('recyclables')
+        .add({
+      'type': productName, // Changed to productName
+      'weight': weight,
+      'price': price,
+      'item_total': totalPrice,
+      'added_timestamp': Timestamp.now(),
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Product added successfully.')),
+    );
   }
 }

@@ -215,18 +215,29 @@ class _DriverState extends State<Driver> {
                     stream: FirebaseFirestore.instance
                         .collection('bookings')
                         .where('driverId', isEqualTo: id)
-                        .where('status', isNotEqualTo: 'collected')
-                        .orderBy('status')
-                        // .orderBy('status')
                         .snapshots(),
                     builder: (context, snapshot) {
                       if (!snapshot.hasData) {
                         return Center(child: CircularProgressIndicator());
                       }
 
-                      var bookings = snapshot.data?.docs ?? [];
+                      // Filter bookings for 'pending' and 'collecting' statuses and sort by date in descending order
+                      var bookings = snapshot.data?.docs.where((doc) {
+                        var status =
+                            (doc['status'] ?? '').toString().toLowerCase();
+                        return status == 'pending' || status == 'collecting';
+                      }).toList();
 
-                      if (bookings.isEmpty) {
+                      // Sort by 'date' field in descending order
+                      bookings?.sort((a, b) {
+                        var dateA = (a['date'] as Timestamp?)?.toDate() ??
+                            DateTime.now();
+                        var dateB = (b['date'] as Timestamp?)?.toDate() ??
+                            DateTime.now();
+                        return dateB.compareTo(dateA);
+                      });
+
+                      if (bookings == null || bookings.isEmpty) {
                         return Center(child: Text('No bookings found.'));
                       }
 
@@ -333,7 +344,7 @@ class _DriverState extends State<Driver> {
                       );
                     },
                   ),
-                ),
+                )
               ],
             ),
           ),

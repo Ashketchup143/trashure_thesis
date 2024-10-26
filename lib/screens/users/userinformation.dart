@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 
 class UserInformation extends StatefulWidget {
   @override
@@ -15,14 +16,13 @@ class _UserInformationState extends State<UserInformation> {
   late TextEditingController _addressController;
   late TextEditingController _balanceController;
   late TextEditingController _landmarkController;
-  late GeoPoint _location; // For storing GeoPoint
+  late GeoPoint _location;
   late String _selectedStatus;
   bool _isLoading = false;
   bool _isEditing = false;
   Map<String, dynamic>? user;
   Map<String, dynamic>? originalUserData;
 
-  // Define status options
   final List<String> _statusOptions = [
     'Booked',
     'Completed',
@@ -41,7 +41,7 @@ class _UserInformationState extends State<UserInformation> {
     _addressController = TextEditingController();
     _balanceController = TextEditingController();
     _landmarkController = TextEditingController();
-    _selectedStatus = 'Unbooked'; // Default status
+    _selectedStatus = 'Unbooked';
   }
 
   @override
@@ -53,36 +53,27 @@ class _UserInformationState extends State<UserInformation> {
 
       if (user != null) {
         originalUserData = Map<String, dynamic>.from(user!);
-
-        // Safely assign the values or provide defaults if they are null
         String firstName = user!['firstName'] ?? 'No First Name';
         String lastName = user!['lastName'] ?? 'No Last Name';
-
-        // Combine firstName and lastName to create the name
         _nameController.text = '$firstName $lastName';
         _categoryController.text = user!['category'] ?? 'No Category';
         _contactController.text = user!['contact'] ?? 'No Contact';
         _emailController.text = user!['email'] ?? 'No Email';
         _addressController.text = user!['address'] ?? 'No Address';
-        _balanceController.text =
-            user!['balance']?.toString() ?? '0.0'; // Handle balance
-        _landmarkController.text =
-            user!['landmark'] ?? 'No Landmark'; // Handle landmark
-        _location =
-            user!['location'] ?? GeoPoint(0, 0); // Handle GeoPoint for location
+        _balanceController.text = user!['balance']?.toString() ?? '0.0';
+        _landmarkController.text = user!['landmark'] ?? 'No Landmark';
+        _location = user!['location'] ?? GeoPoint(0, 0);
         _selectedStatus = user!['status'] ?? 'Unbooked';
       }
     }
   }
 
-  // Toggle the edit mode
   void _toggleEdit() {
     setState(() {
       _isEditing = !_isEditing;
     });
   }
 
-  // Compare values to determine if data has changed
   bool _hasChanged() {
     return _nameController.text != originalUserData!['name'] ||
         _categoryController.text != originalUserData!['category'] ||
@@ -96,7 +87,6 @@ class _UserInformationState extends State<UserInformation> {
         _selectedStatus != originalUserData!['status'];
   }
 
-  // Save updated user information to Firestore
   void _saveChanges(String userId) async {
     if (!_hasChanged()) {
       _showDialog('No changes', 'No information has been changed.');
@@ -110,18 +100,17 @@ class _UserInformationState extends State<UserInformation> {
 
     try {
       await FirebaseFirestore.instance.collection('users').doc(userId).update({
-        'firstName': _nameController.text.split(' ')[0], // Update firstName
+        'firstName': _nameController.text.split(' ')[0],
         'lastName': _nameController.text.split(' ').length > 1
             ? _nameController.text.split(' ').sublist(1).join(' ')
-            : '', // Update lastName
+            : '',
         'category': _categoryController.text,
         'contact': _contactController.text,
         'email': _emailController.text,
         'address': _addressController.text,
-        'balance':
-            double.tryParse(_balanceController.text) ?? 0.0, // Save balance
-        'landmark': _landmarkController.text, // Save landmark
-        'location': _location, // Save GeoPoint location
+        'balance': double.tryParse(_balanceController.text) ?? 0.0,
+        'landmark': _landmarkController.text,
+        'location': _location,
         'status': _selectedStatus,
       });
 
@@ -152,7 +141,6 @@ class _UserInformationState extends State<UserInformation> {
     }
   }
 
-  // Display dialog
   void _showDialog(String title, String content) {
     showDialog(
       context: context,
@@ -173,31 +161,11 @@ class _UserInformationState extends State<UserInformation> {
     );
   }
 
-  // Get status color, return default color if empty or null
-  Color _getStatusColor(String? status) {
-    if (status == null || status.isEmpty) {
-      return Color(0xFFF5D322); // Default color for "Unbooked"
-    }
-    switch (status.toLowerCase()) {
-      case 'booked':
-        return Color.fromARGB(255, 66, 167, 250);
-      case 'completed':
-        return Color.fromARGB(255, 76, 181, 80);
-      case 'in progress':
-        return Colors.grey;
-      case 'delayed':
-        return Color.fromARGB(255, 249, 81, 70);
-      case 'unbooked':
-        return Color(0xFFF5D322);
-      default:
-        return Color.fromARGB(255, 150, 141, 61);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        iconTheme: IconThemeData(color: Colors.white),
         title: Text(
           'User Information',
           style: GoogleFonts.poppins(textStyle: TextStyle(color: Colors.white)),
@@ -206,10 +174,13 @@ class _UserInformationState extends State<UserInformation> {
         actions: [
           if (user != null)
             IconButton(
-              icon: Icon(_isEditing ? Icons.save : Icons.edit),
+              icon: Icon(
+                _isEditing ? Icons.save : Icons.edit,
+                color: Colors.white,
+              ),
               onPressed: () {
                 if (_isEditing && user != null) {
-                  _saveChanges(user!['id']); // Use document ID for user ID
+                  _saveChanges(user!['id']);
                 } else {
                   _toggleEdit();
                 }
@@ -230,7 +201,7 @@ class _UserInformationState extends State<UserInformation> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildProfileField('User ID', user!['id'] ?? 'N/A',
-                              isEditable: false), // Use document ID here
+                              isEditable: false),
                           SizedBox(height: 16),
                           _buildProfileField('Name', _nameController.text,
                               controller: _nameController),
@@ -249,17 +220,27 @@ class _UserInformationState extends State<UserInformation> {
                               controller: _addressController),
                           SizedBox(height: 16),
                           _buildProfileField('Balance', _balanceController.text,
-                              controller: _balanceController), // Balance field
+                              controller: _balanceController),
                           SizedBox(height: 16),
                           _buildProfileField(
                               'Landmark', _landmarkController.text,
-                              controller:
-                                  _landmarkController), // Landmark field
+                              controller: _landmarkController),
                           SizedBox(height: 16),
-                          _buildLocationField(
-                              'Location', _location), // Location field
+                          _buildLocationField('Location', _location),
                           SizedBox(height: 16),
                           _buildStatusField('Status', _selectedStatus),
+                          SizedBox(height: 16),
+                          Text(
+                            'Bookings:',
+                            style: GoogleFonts.poppins(
+                              textStyle: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ),
+                          _buildBookingsList(user!['id']),
                         ],
                       ),
                   ],
@@ -269,7 +250,236 @@ class _UserInformationState extends State<UserInformation> {
     );
   }
 
-  // Helper widget to build each profile field with optional editing
+  Widget _buildBookingsList(String userId) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('bookings').snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return Center(child: CircularProgressIndicator());
+        }
+
+        var allBookings = snapshot.data!.docs;
+
+        return FutureBuilder<List<Map<String, dynamic>>>(
+          future: _filterBookingsByUser(allBookings, userId),
+          builder: (context, futureSnapshot) {
+            if (!futureSnapshot.hasData) {
+              return Center(child: CircularProgressIndicator());
+            }
+
+            var userBookings = futureSnapshot.data!;
+
+            if (userBookings.isEmpty) {
+              return Text(
+                'No bookings found for this user.',
+                style: GoogleFonts.poppins(
+                  textStyle: TextStyle(fontSize: 16),
+                ),
+              );
+            }
+
+            return ListView.builder(
+              shrinkWrap: true,
+              physics: NeverScrollableScrollPhysics(),
+              itemCount: userBookings.length,
+              itemBuilder: (context, index) {
+                var bookingData = userBookings[index];
+                var bookingId = bookingData['bookingId'];
+                var driver = bookingData['driver'] ?? 'Unknown Driver';
+                var vehicle = bookingData['vehicle'] ?? 'Unknown Vehicle';
+                var date = (bookingData['date'] as Timestamp).toDate();
+                var formattedDate = DateFormat('MM/dd/yyyy').format(date);
+                var status = bookingData['status'] ?? 'Unknown';
+
+                // Show the appropriate total price and weight based on the status
+                var totalAmount =
+                    (status == 'collected' || status == 'completed')
+                        ? bookingData['final_overall_price'] ?? 0.0
+                        : bookingData['overall_price'] ?? 0.0;
+                var totalWeight =
+                    (status == 'collected' || status == 'completed')
+                        ? bookingData['final_overall_weight'] ?? 0.0
+                        : bookingData['overall_weight'] ?? 0.0;
+
+                return Container(
+                  margin: EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                  padding: EdgeInsets.all(8.0),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Row of titles
+                      Row(
+                        children: [
+                          Expanded(
+                              child: Text('Date', style: _headerTextStyle())),
+                          Expanded(
+                              child: Text('Booking ID',
+                                  style: _headerTextStyle())),
+                          Expanded(
+                              child: Text('Driver', style: _headerTextStyle())),
+                          Expanded(
+                              child:
+                                  Text('Vehicle', style: _headerTextStyle())),
+                          Expanded(
+                              child: Text('Total Amount',
+                                  style: _headerTextStyle())),
+                          Expanded(
+                              child: Text('Total Weight',
+                                  style: _headerTextStyle())),
+                          Expanded(
+                              child: Text('Status', style: _headerTextStyle())),
+                        ],
+                      ),
+                      Divider(),
+                      // Row of data
+                      Row(
+                        children: [
+                          Expanded(child: Text(formattedDate)),
+                          Expanded(child: Text(bookingId)),
+                          Expanded(child: Text(driver)),
+                          Expanded(child: Text(vehicle)),
+                          Expanded(
+                              child:
+                                  Text('₱${totalAmount.toStringAsFixed(2)}')),
+                          Expanded(
+                              child:
+                                  Text('${totalWeight.toStringAsFixed(2)} kg')),
+                          Expanded(
+                              child: Text(status,
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold))),
+                        ],
+                      ),
+                      SizedBox(height: 10),
+                      // Display recyclables in an expansion tile in horizontal row format
+                      ExpansionTile(
+                        title: Text(
+                          'Recyclables',
+                          style:
+                              GoogleFonts.poppins(fontWeight: FontWeight.bold),
+                        ),
+                        children: [
+                          Padding(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 8.0),
+                            child: _buildRecyclablesList(
+                                bookingId, userId, status),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+// Helper function to filter bookings based on userId locally
+  Future<List<Map<String, dynamic>>> _filterBookingsByUser(
+      List<DocumentSnapshot> bookings, String userId) async {
+    List<Map<String, dynamic>> userBookings = [];
+
+    for (var booking in bookings) {
+      var userDoc =
+          await booking.reference.collection('users').doc(userId).get();
+
+      if (userDoc.exists) {
+        var bookingData = booking.data() as Map<String, dynamic>;
+        bookingData['bookingId'] = booking.id;
+        userBookings.add(bookingData);
+      }
+    }
+
+    return userBookings;
+  }
+
+// Helper function for header text style
+  TextStyle _headerTextStyle() {
+    return TextStyle(
+      fontWeight: FontWeight.bold,
+      fontSize: 14,
+      color: Colors.black87,
+    );
+  }
+
+// Method to build list of recyclables within a user's document in a booking in horizontal row format
+  Widget _buildRecyclablesList(String bookingId, String userId, String status) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .collection('users')
+          .doc(userId)
+          .collection('recyclables')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return Center(child: CircularProgressIndicator());
+        }
+
+        var recyclables = snapshot.data!.docs;
+
+        if (recyclables.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text('No recyclables found for this booking.'),
+          );
+        }
+
+        return Column(
+          children: [
+            // Header row for recyclables
+            Row(
+              children: [
+                Expanded(child: Text('Type', style: _headerTextStyle())),
+                Expanded(child: Text('Weight', style: _headerTextStyle())),
+                Expanded(
+                    child: Text('Price per kg', style: _headerTextStyle())),
+                Expanded(child: Text('Total', style: _headerTextStyle())),
+              ],
+            ),
+            Divider(),
+            // Each recyclable item in a horizontal row
+            ...recyclables.map((recyclable) {
+              var recyclableData = recyclable.data() as Map<String, dynamic>;
+              var type = recyclableData['type'] ?? 'Unknown';
+
+              // Show appropriate weight, price, and item price based on the status
+              var weight = (status == 'collected' || status == 'completed')
+                  ? recyclableData['final_weight'] ?? recyclableData['weight']
+                  : recyclableData['weight'];
+              var price = recyclableData['price'] ?? 0.0;
+              var itemPrice = (status == 'collected' || status == 'completed')
+                  ? recyclableData['final_item_price'] ?? (weight * price)
+                  : weight * price;
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(type)),
+                    Expanded(child: Text('${weight.toStringAsFixed(2)} kg')),
+                    Expanded(child: Text('₱${price.toStringAsFixed(2)}')),
+                    Expanded(child: Text('₱${itemPrice.toStringAsFixed(2)}')),
+                  ],
+                ),
+              );
+            }).toList(),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildProfileField(String fieldName, String fieldValue,
       {TextEditingController? controller, bool isEditable = true}) {
     return Row(
@@ -312,7 +522,6 @@ class _UserInformationState extends State<UserInformation> {
     );
   }
 
-  // Widget for displaying location (GeoPoint) with latitude and longitude
   Widget _buildLocationField(String fieldName, GeoPoint location) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -342,7 +551,6 @@ class _UserInformationState extends State<UserInformation> {
     );
   }
 
-  // Widget for status field with dropdown and colored container
   Widget _buildStatusField(String fieldName, String selectedStatus) {
     String status = selectedStatus.isEmpty ? 'Unbooked' : selectedStatus;
     return Row(
@@ -368,7 +576,7 @@ class _UserInformationState extends State<UserInformation> {
                   ? DropdownButton<String>(
                       value: _statusOptions.contains(_selectedStatus)
                           ? _selectedStatus
-                          : _statusOptions[0], // Ensure a valid selection
+                          : _statusOptions[0],
                       items: _statusOptions.map((String status) {
                         return DropdownMenuItem<String>(
                           value: status,
@@ -384,8 +592,7 @@ class _UserInformationState extends State<UserInformation> {
                       }).toList(),
                       onChanged: (newValue) {
                         setState(() {
-                          _selectedStatus = newValue ??
-                              'Unbooked'; // Default to 'Unbooked' if null
+                          _selectedStatus = newValue ?? 'Unbooked';
                         });
                       },
                     )
@@ -411,5 +618,20 @@ class _UserInformationState extends State<UserInformation> {
         ),
       ],
     );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'booked':
+        return Colors.blue;
+      case 'completed':
+        return Colors.green;
+      case 'in progress':
+        return Colors.grey;
+      case 'delayed':
+        return Colors.red;
+      default:
+        return Colors.orange;
+    }
   }
 }

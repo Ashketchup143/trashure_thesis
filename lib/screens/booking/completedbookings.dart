@@ -6,14 +6,14 @@ import 'package:intl/intl.dart';
 import 'package:trashure_thesis/screens/map.dart';
 import 'package:trashure_thesis/sidebar.dart';
 
-class CollectedBookings extends StatefulWidget {
-  const CollectedBookings({super.key});
+class CompletedBookings extends StatefulWidget {
+  const CompletedBookings({super.key});
 
   @override
-  State<CollectedBookings> createState() => _CollectedBookingsState();
+  State<CompletedBookings> createState() => _CompletedBookingsState();
 }
 
-class _CollectedBookingsState extends State<CollectedBookings> {
+class _CompletedBookingsState extends State<CompletedBookings> {
   final _formKey = GlobalKey<FormState>();
   DateTime selectedDate = DateTime.now();
   TextEditingController dateController = TextEditingController();
@@ -72,7 +72,7 @@ class _CollectedBookingsState extends State<CollectedBookings> {
                                   },
                                 ),
                                 Text(
-                                  'Collected Bookings',
+                                  'Completed Bookings',
                                   textAlign: TextAlign.left,
                                   style: GoogleFonts.poppins(
                                     textStyle: TextStyle(
@@ -158,7 +158,7 @@ class _CollectedBookingsState extends State<CollectedBookings> {
                                                 as Map<String, dynamic>?;
 
                                             if (data == null ||
-                                                data['status'] != 'collected') {
+                                                data['status'] != 'completed') {
                                               return false;
                                             }
 

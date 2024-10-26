@@ -68,39 +68,6 @@ class _InventoryState extends State<Inventory> {
     });
   }
 
-  // Function to handle the sell product modal
-  void _openSellProductModal() {
-    final selectedItems = filteredInventory
-        .where((item) => _selectedOptions[item['id']] == true)
-        .toList();
-
-    if (selectedItems.isEmpty) {
-      // Show a dialog if no items are selected
-      showDialog(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: Text('No Items Selected'),
-            content: Text('Please select at least one item to sell.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text('OK'),
-              ),
-            ],
-          );
-        },
-      );
-    } else {
-      showDialog(
-        context: context,
-        builder: (context) {
-          return SellProductModal(selectedItems: selectedItems);
-        },
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -195,29 +162,69 @@ class _InventoryState extends State<Inventory> {
                       ),
                       Divider(height: 1, color: Colors.black), // Separator line
                       SizedBox(height: 10),
-                      // Filtered Inventory List
-                      filteredInventory.isEmpty
-                          ? Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Text(
-                                'No items found',
-                                style: GoogleFonts.poppins(
-                                  textStyle: TextStyle(
-                                    fontWeight: FontWeight.w400,
-                                    fontSize: 16,
+                      // Use StreamBuilder to dynamically display inventory list
+                      Expanded(
+                        child: StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('inventory')
+                              .snapshots(),
+                          builder: (context, snapshot) {
+                            if (!snapshot.hasData) {
+                              return Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+
+                            var fetchedInventory =
+                                snapshot.data?.docs.map((doc) {
+                              return {
+                                'id': doc.id,
+                                'category': doc['category'] ?? 'N/A',
+                                'type': doc['type'] ?? 'N/A',
+                                'weight': doc['weight'] ?? 0.0,
+                              };
+                            }).toList();
+
+                            filteredInventory = fetchedInventory ?? [];
+
+                            if (_searchController.text.isNotEmpty) {
+                              filteredInventory =
+                                  filteredInventory.where((item) {
+                                final category =
+                                    item['category']?.toLowerCase() ?? '';
+                                final type = item['type']?.toLowerCase() ?? '';
+                                final query =
+                                    _searchController.text.toLowerCase();
+                                return category.contains(query) ||
+                                    type.contains(query);
+                              }).toList();
+                            }
+
+                            if (filteredInventory.isEmpty) {
+                              return Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Text(
+                                  'No items found',
+                                  style: GoogleFonts.poppins(
+                                    textStyle: TextStyle(
+                                      fontWeight: FontWeight.w400,
+                                      fontSize: 16,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            )
-                          : ListView.builder(
-                              shrinkWrap: true, // Required for Column to work
-                              physics: NeverScrollableScrollPhysics(),
+                              );
+                            }
+
+                            return ListView.builder(
                               itemCount: filteredInventory.length,
                               itemBuilder: (context, index) {
                                 final item = filteredInventory[index];
                                 return _buildCustomCheckboxTile(item);
                               },
-                            ),
+                            );
+                          },
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -305,46 +312,293 @@ class _InventoryState extends State<Inventory> {
       ),
     );
   }
-}
 
-// Modal for selling products
-class SellProductModal extends StatefulWidget {
-  final List<Map<String, dynamic>> selectedItems;
+  void _openSellProductModal() async {
+    final selectedItems = filteredInventory
+        .where((item) => _selectedOptions[item['id']] == true)
+        .toList();
 
-  const SellProductModal({required this.selectedItems});
+    if (selectedItems.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: Text('No Items Selected'),
+            content: Text('Please select at least one item to sell.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
+    } else {
+      final TextEditingController customerNameController =
+          TextEditingController();
+      final TextEditingController descriptionController =
+          TextEditingController();
+      final TextEditingController paymentMethodController =
+          TextEditingController();
+      final Map<String, TextEditingController> weightControllers = {};
+      final Map<String, TextEditingController> priceControllers = {};
+      final Map<String, double?> originalPrices = {}; // Store original prices
+      final Map<String, double?> percentageProfits =
+          {}; // Store percentage profits
+      final Map<String, double?> suggestedPrices = {}; // Store final prices
+      final Map<String, String?> errorMessages = {}; // To hold error messages
 
-  @override
-  _SellProductModalState createState() => _SellProductModalState();
-}
+      // Initialize the controllers for each selected item and fetch the most recent prices
+      for (var item in selectedItems) {
+        weightControllers[item['id']] = TextEditingController();
+        priceControllers[item['id']] = TextEditingController();
+        errorMessages[item['id']] = null; // Initialize empty error messages
 
-class _SellProductModalState extends State<SellProductModal> {
-  final Map<String, TextEditingController> weightControllers = {};
-  final Map<String, TextEditingController> priceControllers =
-      {}; // Added for price input
+        // Fetch the most recent price from Firestore subcollection 'prices'
+        final recentPriceSnapshot = await FirebaseFirestore.instance
+            .collection('products')
+            .doc(item['id']) // Assuming the item ID matches the product ID
+            .collection('prices')
+            .orderBy('time', descending: true)
+            .limit(1) // Get the most recent price based on the 'time' field
+            .get();
 
-  @override
-  void initState() {
-    super.initState();
-    // Initialize text controllers for each selected item
-    widget.selectedItems.forEach((item) {
-      weightControllers[item['id']] = TextEditingController();
-      priceControllers[item['id']] =
-          TextEditingController(); // Initialize price controllers
-    });
+        // Store the most recent price details if found
+        if (recentPriceSnapshot.docs.isNotEmpty) {
+          final recentPriceData = recentPriceSnapshot.docs.first.data();
+          originalPrices[item['id']] =
+              recentPriceData['original_price']?.toDouble();
+          percentageProfits[item['id']] =
+              recentPriceData['percentage_profit']?.toDouble();
+          suggestedPrices[item['id']] = recentPriceData['price']?.toDouble();
+        } else {
+          originalPrices[item['id']] = null; // If no price found, set to null
+          percentageProfits[item['id']] = null;
+          suggestedPrices[item['id']] = null;
+        }
+      }
+
+      showDialog(
+        context: context,
+        builder: (context) {
+          return StatefulBuilder(
+            builder: (context, setState) {
+              return Dialog(
+                insetPadding:
+                    EdgeInsets.symmetric(horizontal: 50), // Make it wider
+                child: Container(
+                  width: MediaQuery.of(context).size.width *
+                      0.8, // Set modal width
+                  padding: EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Sell Products',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 24,
+                        ),
+                      ),
+                      SizedBox(height: 20),
+                      // Additional fields for customer name, description, and payment method
+                      TextField(
+                        controller: customerNameController,
+                        decoration: InputDecoration(
+                          labelText: 'Customer Name (Optional)',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      TextField(
+                        controller: descriptionController,
+                        decoration: InputDecoration(
+                          labelText: 'Description (Optional)',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      TextField(
+                        controller: paymentMethodController,
+                        decoration: InputDecoration(
+                          labelText: 'Payment Method',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      SizedBox(height: 20),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: selectedItems.map((item) {
+                              String itemId = item['id'];
+                              String category = item['category'];
+                              String type = item['type'];
+                              double currentWeight = item['weight'];
+                              double? originalPrice = originalPrices[itemId];
+                              double? percentageProfit =
+                                  percentageProfits[itemId];
+                              double? suggestedPrice = suggestedPrices[itemId];
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                      '$category - $type (Available: $currentWeight kg)'),
+                                  SizedBox(height: 10),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 1,
+                                        child: TextField(
+                                          controller: weightControllers[itemId],
+                                          keyboardType: TextInputType.number,
+                                          decoration: InputDecoration(
+                                            labelText: 'Weight to sell (kg)',
+                                            border: OutlineInputBorder(),
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(width: 10),
+                                      Expanded(
+                                        flex: 1,
+                                        child: TextField(
+                                          controller: priceControllers[itemId],
+                                          keyboardType: TextInputType.number,
+                                          decoration: InputDecoration(
+                                            labelText: originalPrice != null
+                                                ? 'Original Price: ₱$originalPrice'
+                                                : 'Enter Price per kg',
+                                            border: OutlineInputBorder(),
+                                            // Suggest original_price in price field if available
+                                          ),
+                                          // Prefill the original price in the text field if available
+                                          onTap: () {
+                                            if (originalPrice != null) {
+                                              priceControllers[itemId]!.text =
+                                                  originalPrice.toString();
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: 10),
+                                  if (percentageProfit != null &&
+                                      suggestedPrice != null)
+                                    Text(
+                                      'Profit: ${percentageProfit.toStringAsFixed(2)}%, Suggested Price: ₱$suggestedPrice',
+                                      style: TextStyle(color: Colors.grey),
+                                    ),
+                                  if (errorMessages[itemId] != null &&
+                                      errorMessages[itemId]!.isNotEmpty)
+                                    Text(
+                                      errorMessages[itemId]!,
+                                      style: TextStyle(color: Colors.red),
+                                    ),
+                                  SizedBox(height: 20),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 20),
+                      // Buttons for Cancel and Confirm actions, directly added within the dialog content
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: Text('Cancel'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () {
+                              // Validate input before proceeding to sell the product
+                              bool isValid = _validateSellProductInput(
+                                  selectedItems,
+                                  weightControllers,
+                                  priceControllers,
+                                  errorMessages,
+                                  setState);
+
+                              if (isValid) {
+                                _sellProduct(
+                                    selectedItems,
+                                    weightControllers,
+                                    priceControllers,
+                                    customerNameController,
+                                    descriptionController,
+                                    paymentMethodController);
+                                Navigator.of(context)
+                                    .pop(); // Close the modal after processing
+                              }
+                            },
+                            child: Text('Confirm Sell'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      );
+    }
   }
 
-  @override
-  void dispose() {
-    // Dispose all controllers
-    weightControllers.forEach((key, controller) => controller.dispose());
-    priceControllers.forEach(
-        (key, controller) => controller.dispose()); // Dispose price controllers
-    super.dispose();
+// Function to validate sell product input
+  bool _validateSellProductInput(
+      List<Map<String, dynamic>> selectedItems,
+      Map<String, TextEditingController> weightControllers,
+      Map<String, TextEditingController> priceControllers,
+      Map<String, String?> errorMessages,
+      Function(void Function()) setState) {
+    bool isValid = true;
+
+    for (var item in selectedItems) {
+      String itemId = item['id'];
+      double currentWeight = item['weight'];
+      double? inputWeight =
+          double.tryParse(weightControllers[itemId]?.text ?? '');
+      double? inputPrice =
+          double.tryParse(priceControllers[itemId]?.text ?? '');
+
+      if (inputWeight == null ||
+          inputWeight <= 0 ||
+          inputWeight > currentWeight) {
+        setState(() {
+          errorMessages[itemId] = 'Invalid weight. Check available inventory.';
+        });
+        isValid = false;
+      } else if (inputPrice == null || inputPrice <= 0) {
+        setState(() {
+          errorMessages[itemId] = 'Invalid price. Please enter a valid number.';
+        });
+        isValid = false;
+      } else {
+        setState(() {
+          errorMessages[itemId] = ''; // Clear the error if validation passes
+        });
+      }
+    }
+
+    return isValid;
   }
 
-  // Function to handle selling the product
-  Future<void> _sellProduct() async {
-    for (var item in widget.selectedItems) {
+  Future<void> _sellProduct(
+      List<Map<String, dynamic>> selectedItems,
+      Map<String, TextEditingController> weightControllers,
+      Map<String, TextEditingController> priceControllers,
+      TextEditingController customerNameController,
+      TextEditingController descriptionController,
+      TextEditingController paymentMethodController) async {
+    double overallTotal = 0.0;
+    List<Map<String, dynamic>> soldItems = [];
+
+    for (var item in selectedItems) {
       String itemId = item['id'];
       double currentWeight = item['weight'];
       double inputWeight =
@@ -352,26 +606,8 @@ class _SellProductModalState extends State<SellProductModal> {
       double inputPrice =
           double.tryParse(priceControllers[itemId]?.text ?? '0') ?? 0;
 
-      if (inputWeight <= 0 || inputWeight > currentWeight) {
-        // Show an error dialog if the input weight is invalid
-        showDialog(
-          context: context,
-          builder: (context) {
-            return AlertDialog(
-              title: Text('Invalid Input'),
-              content: Text(
-                  'The weight entered exceeds the available inventory or is invalid.'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text('OK'),
-                ),
-              ],
-            );
-          },
-        );
-        continue;
-      }
+      double itemTotal = inputWeight * inputPrice;
+      overallTotal += itemTotal;
 
       // Update the inventory in Firestore
       DocumentReference itemDoc =
@@ -385,64 +621,38 @@ class _SellProductModalState extends State<SellProductModal> {
       await itemDoc.collection('weight_history').add({
         'weight': inputWeight,
         'operation': 'minus',
-        'price': inputPrice, // Record the price
+        'price': inputPrice,
         'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      // Add sold item details
+      soldItems.add({
+        'type': item['type'],
+        'weight': inputWeight,
+        'price': inputPrice,
+        'item_total': itemTotal,
       });
     }
 
-    Navigator.of(context).pop(); // Close the modal after processing
-  }
+    // Add inflow entry without 'authorized_by'
+    DocumentReference inflowRef =
+        await FirebaseFirestore.instance.collection('inflow').add({
+      'customer_name': customerNameController.text.isNotEmpty
+          ? customerNameController.text
+          : 'N/A',
+      'date': FieldValue.serverTimestamp(),
+      'description': descriptionController.text.isNotEmpty
+          ? descriptionController.text
+          : 'N/A',
+      'overall_total': overallTotal,
+      'payment_method': paymentMethodController.text.isNotEmpty
+          ? paymentMethodController.text
+          : 'N/A',
+    });
 
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('Sell Products'),
-      content: SingleChildScrollView(
-        child: Column(
-          children: widget.selectedItems.map((item) {
-            String itemId = item['id'];
-            String category = item['category'];
-            String type = item['type'];
-            double currentWeight = item['weight'];
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('$category - $type (Available: $currentWeight kg)'),
-                SizedBox(height: 10),
-                TextField(
-                  controller: weightControllers[itemId],
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Enter weight to sell (kg)',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                SizedBox(height: 10),
-                TextField(
-                  controller: priceControllers[itemId], // Input field for price
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Enter price per kg',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                SizedBox(height: 20),
-              ],
-            );
-          }).toList(),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(), // Close modal
-          child: Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: _sellProduct,
-          child: Text('Confirm Sell'),
-        ),
-      ],
-    );
+    // Add sold items to the subcollection 'sold'
+    for (var soldItem in soldItems) {
+      await inflowRef.collection('sold').add(soldItem);
+    }
   }
 }
