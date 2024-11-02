@@ -3,9 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:trashure_thesis/sidebar.dart';
 
-//if you want to restructure the date format
-//String formattedDate = DateFormat('MM/dd/yyyy').format(assignedTime);
-
 class Vehicle extends StatefulWidget {
   const Vehicle({super.key});
 
@@ -118,166 +115,158 @@ class _VehicleState extends State<Vehicle> {
     return Scaffold(
       drawer: Sidebar(),
       body: Builder(
-        builder: (context) => Container(
-            height: MediaQuery.of(context).size.height,
-            width: MediaQuery.of(context).size.width,
-            child: Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 20, left: 40, right: 40),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(height: 5),
-                    Row(
+        builder: (context) => Padding(
+          padding: const EdgeInsets.only(top: 20, left: 40, right: 40),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(height: 5),
+              Row(
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.menu, color: Colors.green, size: 25),
+                    onPressed: () {
+                      Scaffold.of(context).openDrawer(); // Opens the drawer
+                    },
+                  ),
+                  Text(
+                    'Vehicles',
+                    style: GoogleFonts.poppins(
+                      textStyle:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  Container(
+                    height: 30,
+                    width: 430,
+                    decoration: BoxDecoration(
+                      border: Border.all(),
+                      borderRadius: BorderRadius.circular(17.5),
+                    ),
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText:
+                            'Search by vehicle ID, assigned_driver, brand, color, fuel_type, model, vehicle_type, weight_limit, and license_plate_number',
+                        border: InputBorder.none,
+                        prefixIcon: Icon(Icons.search),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 20),
+                  ElevatedButton(
+                    onPressed: () {
+                      _showAddVehicleDialog(
+                          context); // Call add vehicle function
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF4CAF4F),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30)),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      textStyle: TextStyle(fontSize: 16),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        IconButton(
-                          icon: Icon(Icons.menu, color: Colors.green, size: 25),
-                          onPressed: () {
-                            Scaffold.of(context)
-                                .openDrawer(); // Opens the drawer
-                          },
-                        ),
+                        SizedBox(width: 8),
                         Text(
-                          'Vehicles',
-                          style: GoogleFonts.poppins(
-                            textStyle: TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 20),
-                          ),
+                          'Add Vehicle',
+                          style: GoogleFonts.roboto(
+                              textStyle: TextStyle(
+                                  fontWeight: FontWeight.w300,
+                                  color: Colors.white)),
+                        ),
+                        Icon(
+                          Icons.add,
+                          color: Colors.white,
                         ),
                       ],
                     ),
-                    Row(
+                  ),
+                  SizedBox(width: 20),
+                  ElevatedButton(
+                    onPressed: () {
+                      _assignDriverToVehicles();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF0062FF),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30)),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      textStyle: TextStyle(fontSize: 16),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Container(
-                          height: 30,
-                          width: 430,
-                          decoration: BoxDecoration(
-                            border: Border.all(),
-                            borderRadius: BorderRadius.circular(17.5),
-                          ),
-                          child: TextField(
-                            controller: _searchController,
-                            decoration: InputDecoration(
-                              hintText:
-                                  'Search by vehicle ID, assigned_driver, brand, color, fuel_type, model, vehicle_type, weight_limit, and license_plate_number',
-                              border: InputBorder.none,
-                              prefixIcon: Icon(Icons.search),
-                            ),
-                          ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Assign Driver',
+                          style: GoogleFonts.roboto(
+                              textStyle: TextStyle(
+                                  fontWeight: FontWeight.w300,
+                                  color: Colors.white)),
                         ),
-                        SizedBox(width: 20),
-                        ElevatedButton(
-                          onPressed: () {
-                            _showAddVehicleDialog(
-                                context); // Call add vehicle function
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Color(0xFF4CAF4F),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30)),
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                            textStyle: TextStyle(fontSize: 16),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              SizedBox(width: 8),
-                              Text(
-                                'Add Vehicle',
-                                style: GoogleFonts.roboto(
-                                    textStyle: TextStyle(
-                                        fontWeight: FontWeight.w300,
-                                        color: Colors.white)),
-                              ),
-                              Icon(
-                                Icons.add,
-                                color: Colors.white,
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(width: 20),
-                        ElevatedButton(
-                          onPressed: () {
-                            _assignDriverToVehicles();
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Color(0xFF0062FF),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30)),
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                            textStyle: TextStyle(fontSize: 16),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              SizedBox(width: 8),
-                              Text(
-                                'Assign Driver',
-                                style: GoogleFonts.roboto(
-                                    textStyle: TextStyle(
-                                        fontWeight: FontWeight.w300,
-                                        color: Colors.white)),
-                              ),
-                              Icon(
-                                Icons.add,
-                                color: Colors.white,
-                              ),
-                            ],
-                          ),
+                        Icon(
+                          Icons.add,
+                          color: Colors.white,
                         ),
                       ],
                     ),
-                    SizedBox(height: 20),
+                  ),
+                ],
+              ),
+              SizedBox(height: 20),
+              Container(
+                height: MediaQuery.of(context).size.height * 0.85,
+                decoration: BoxDecoration(border: Border.all()),
+                child: Column(
+                  children: [
                     Container(
-                      height: MediaQuery.of(context).size.height * .825,
-                      decoration: BoxDecoration(border: Border.all()),
-                      child: Column(
+                      child: Row(
                         children: [
                           Container(
-                            child: Row(
-                              children: [
-                                Container(
-                                    height: 20,
-                                    width: 20,
-                                    decoration: BoxDecoration(
-                                        border: Border(bottom: BorderSide()))),
-                                title('Vehicle ID', 1),
-                                title('Brand', 2),
-                                title('Vehicle Type', 1),
-                                title('Model', 1),
-                                title('Plate Number', 1),
-                                title('Assigned Driver', 2),
-                                title('Weight Limit', 1),
-                                title('Details', 1),
-                              ],
-                            ),
-                          ),
-                          Expanded(
-                            child: ListView(
-                              children: filteredVehicles.map((vehicle) {
-                                return _buildCustomCheckboxTile(
-                                  vehicle,
-                                );
-                              }).toList(),
-                            ),
-                          ),
+                              height: 20,
+                              width: 20,
+                              decoration: BoxDecoration(
+                                  border: Border(bottom: BorderSide()))),
+                          title('Vehicle ID', 1),
+                          title('Brand', 2),
+                          title('Vehicle Type', 1),
+                          title('Model', 1),
+                          title('Plate Number', 1),
+                          title('Assigned Driver', 2),
+                          title('Weight Limit', 1),
+                          title('Details', 1),
                         ],
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView(
+                        children: filteredVehicles.map((vehicle) {
+                          return _buildCustomCheckboxTile(vehicle);
+                        }).toList(),
                       ),
                     ),
                   ],
                 ),
               ),
-            )),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget title(String text, int fl) {
+  Widget title(String text, int flex) {
     return Expanded(
-      flex: fl,
+      flex: flex,
       child: Container(
         height: 20,
         decoration: BoxDecoration(border: Border(bottom: BorderSide())),
@@ -292,7 +281,6 @@ class _VehicleState extends State<Vehicle> {
     );
   }
 
-  // Build the custom checkbox tile
   Widget _buildCustomCheckboxTile(Map<String, dynamic> vehicle) {
     String vehicleId = vehicle['id'] ?? 'N/A';
     String assignedDriver = _driverCache[vehicleId] ?? 'N/A';
@@ -371,9 +359,8 @@ class _VehicleState extends State<Vehicle> {
 
     return snapshot.docs.map((doc) {
       Map<String, dynamic> driverData = doc.data() as Map<String, dynamic>;
-      driverData['id'] = doc.id; // Include document ID
-      driverData['name'] =
-          driverData['name'] ?? 'N/A'; // Ensure driver's name is included
+      driverData['id'] = doc.id;
+      driverData['name'] = driverData['name'] ?? 'N/A';
       return driverData;
     }).toList();
   }
@@ -409,29 +396,24 @@ class _VehicleState extends State<Vehicle> {
       return;
     }
 
-    // Show dialog to pick a driver and retrieve driver ID and name
     Map<String, String>? selectedDriver = await _showDriverSelectionDialog();
 
-    // Check if selectedDriver is not null
     if (selectedDriver != null &&
         selectedDriver.containsKey('name') &&
         selectedDriver.containsKey('id')) {
-      // Assign the driver to each selected vehicle
       for (String vehicleId in selectedVehicleIds) {
         await FirebaseFirestore.instance
             .collection('vehicles')
             .doc(vehicleId)
             .collection('drivers')
             .add({
-          'assigned_driver': selectedDriver['name'], // Store driver name
-          'driverid': selectedDriver['id'], // Store driver ID
+          'assigned_driver': selectedDriver['name'],
+          'driverid': selectedDriver['id'],
           'time': FieldValue.serverTimestamp(),
         });
 
-        // Safely update _driverCache in setState
         setState(() {
-          _driverCache[vehicleId] =
-              selectedDriver['name'] ?? 'Unknown'; // Ensure 'name' is not null
+          _driverCache[vehicleId] = selectedDriver['name'] ?? 'Unknown';
         });
       }
 
@@ -441,7 +423,6 @@ class _VehicleState extends State<Vehicle> {
                 Text('Driver assigned to all selected vehicles successfully!')),
       );
     } else {
-      // Handle case where driver selection fails
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Driver selection failed! Please try again.')),
       );
@@ -451,7 +432,6 @@ class _VehicleState extends State<Vehicle> {
   Future<Map<String, String>?> _showDriverSelectionDialog() async {
     List<Map<String, dynamic>> drivers = [];
 
-    // Fetch drivers from the 'employees' collection where the position is 'Driver'
     QuerySnapshot snapshot = await FirebaseFirestore.instance
         .collection('employees')
         .where('position', isEqualTo: 'Driver')
@@ -483,8 +463,8 @@ class _VehicleState extends State<Vehicle> {
                 },
                 items: drivers.map<DropdownMenuItem<String>>((driver) {
                   return DropdownMenuItem<String>(
-                    value: driver['id'], // Use driver ID as the value
-                    child: Text(driver['name']), // Display driver name
+                    value: driver['id'],
+                    child: Text(driver['name']),
                   );
                 }).toList(),
                 decoration: InputDecoration(labelText: 'Driver'),
@@ -492,7 +472,7 @@ class _VehicleState extends State<Vehicle> {
               actions: [
                 TextButton(
                   onPressed: () {
-                    Navigator.of(dialogContext).pop(); // Close dialog on cancel
+                    Navigator.of(dialogContext).pop();
                   },
                   child: Text('Cancel'),
                 ),
@@ -500,13 +480,11 @@ class _VehicleState extends State<Vehicle> {
                   onPressed: () {
                     if (selectedDriverId != null &&
                         selectedDriverName != null) {
-                      // Close the dialog and return the selected driver's ID and name
                       Navigator.of(dialogContext).pop({
                         'id': selectedDriverId!,
                         'name': selectedDriverName!,
                       });
                     } else {
-                      // Optional: Handle case when no driver is selected
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('Please select a driver.')),
                       );
@@ -525,7 +503,6 @@ class _VehicleState extends State<Vehicle> {
   void _showAddVehicleDialog(BuildContext context) async {
     final _formKey = GlobalKey<FormState>();
 
-    // Controllers for text fields
     TextEditingController brandController = TextEditingController();
     TextEditingController colorController = TextEditingController();
     TextEditingController fuelTypeController = TextEditingController();
@@ -534,7 +511,6 @@ class _VehicleState extends State<Vehicle> {
     TextEditingController vehicleTypeController = TextEditingController();
     TextEditingController weightLimitController = TextEditingController();
 
-    // Optional fields
     TextEditingController lastServiceDateController = TextEditingController();
     TextEditingController nextScheduledMaintenanceController =
         TextEditingController();
@@ -545,9 +521,8 @@ class _VehicleState extends State<Vehicle> {
         TextEditingController();
     TextEditingController yearOfManufactureController = TextEditingController();
 
-    // Fetch drivers list for dropdown
     List<Map<String, dynamic>> drivers = await _fetchDrivers();
-    String? selectedDriverId; // Store the selected driver's ID
+    String? selectedDriverId;
 
     showDialog(
       context: context,
@@ -574,8 +549,6 @@ class _VehicleState extends State<Vehicle> {
                     buildTextFormField(
                         'Weight Limit', weightLimitController, true,
                         isNumeric: true),
-
-                    // Dropdown for assigned driver (optional)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8.0),
                       child: DropdownButtonFormField<String>(
@@ -588,9 +561,8 @@ class _VehicleState extends State<Vehicle> {
                         },
                         items: drivers.map<DropdownMenuItem<String>>((driver) {
                           return DropdownMenuItem<String>(
-                            value: driver['id'], // Use driver ID as value
-                            child: Text(driver['name'] ??
-                                'N/A'), // Display driver's name
+                            value: driver['id'],
+                            child: Text(driver['name'] ?? 'N/A'),
                           );
                         }).toList(),
                         decoration: InputDecoration(
@@ -598,13 +570,10 @@ class _VehicleState extends State<Vehicle> {
                         ),
                         isExpanded: true,
                         validator: (value) {
-                          // No validation since it's optional
                           return null;
                         },
                       ),
                     ),
-
-                    // Optional fields
                     buildTextFormField('Last Service Date (optional)',
                         lastServiceDateController, false),
                     buildTextFormField('Next Scheduled Maintenance (optional)',
@@ -625,7 +594,7 @@ class _VehicleState extends State<Vehicle> {
           actions: <Widget>[
             ElevatedButton(
               onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
+                Navigator.of(context).pop();
               },
               child: Text('Cancel'),
             ),
@@ -644,8 +613,6 @@ class _VehicleState extends State<Vehicle> {
                     'model': modelController.text,
                     'vehicle_type': vehicleTypeController.text,
                     'weight_limit': double.parse(weightLimitController.text),
-
-                    // Optional fields
                     'last_service_date':
                         lastServiceDateController.text.isNotEmpty
                             ? lastServiceDateController.text
@@ -671,15 +638,12 @@ class _VehicleState extends State<Vehicle> {
                             : "",
                   };
 
-                  // Add to Firestore
                   await FirebaseFirestore.instance
                       .collection('vehicles')
                       .add(vehicleData);
 
-                  // Refresh the list of vehicles
                   fetchVehicles();
 
-                  // Close the dialog
                   Navigator.of(context).pop();
                 }
               },

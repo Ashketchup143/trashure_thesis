@@ -122,16 +122,16 @@ class _LoginState extends State<Login> {
                   width: 200,
                   height: 150,
                 ),
-                Text(
+                const Text(
                   'Login',
                   style: TextStyle(
                     fontSize: 28.0,
                   ),
                 ),
-                SizedBox(height: 24.0),
+                const SizedBox(height: 24.0),
                 TextFormField(
                   controller: _emailController,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Email',
                     prefixIcon: Icon(Icons.email),
                     border: OutlineInputBorder(),
@@ -143,11 +143,11 @@ class _LoginState extends State<Login> {
                     return null;
                   },
                 ),
-                SizedBox(height: 16.0),
+                const SizedBox(height: 16.0),
                 TextFormField(
                   controller: _passwordController,
                   obscureText: true,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Password',
                     prefixIcon: Icon(Icons.lock),
                     border: OutlineInputBorder(),
@@ -159,23 +159,23 @@ class _LoginState extends State<Login> {
                     return null;
                   },
                 ),
-                SizedBox(height: 24.0),
+                const SizedBox(height: 24.0),
                 ElevatedButton(
                   onPressed: _login,
                   style: ElevatedButton.styleFrom(
                     backgroundColor:
                         Colors.green, // Use backgroundColor instead of primary
                   ),
-                  child: Text(
+                  child: const Text(
                     'Login',
                     style: TextStyle(color: Colors.white), // Set text color
                   ),
                 ),
-                SizedBox(height: 16.0),
+                const SizedBox(height: 16.0),
                 if (_errorMessage.isNotEmpty)
                   Text(
                     _errorMessage,
-                    style: TextStyle(color: Colors.red),
+                    style: const TextStyle(color: Colors.red),
                   ),
               ],
             ),
@@ -206,16 +206,16 @@ class _LoginState extends State<Login> {
                       width: 250,
                       height: 300,
                     ),
-                    Text(
+                    const Text(
                       'Login',
                       style: TextStyle(
                         fontSize: 28.0,
                       ),
                     ),
-                    SizedBox(height: 24.0),
+                    const SizedBox(height: 24.0),
                     TextFormField(
                       controller: _emailController,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'Email',
                         prefixIcon: Icon(Icons.email),
                         border: OutlineInputBorder(),
@@ -227,11 +227,11 @@ class _LoginState extends State<Login> {
                         return null;
                       },
                     ),
-                    SizedBox(height: 16.0),
+                    const SizedBox(height: 16.0),
                     TextFormField(
                       controller: _passwordController,
                       obscureText: true,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: 'Password',
                         prefixIcon: Icon(Icons.lock),
                         border: OutlineInputBorder(),
@@ -243,23 +243,23 @@ class _LoginState extends State<Login> {
                         return null;
                       },
                     ),
-                    SizedBox(height: 24.0),
+                    const SizedBox(height: 24.0),
                     ElevatedButton(
                       onPressed: _login,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors
                             .green, // Use backgroundColor instead of primary
                       ),
-                      child: Text(
+                      child: const Text(
                         'Login',
                         style: TextStyle(color: Colors.white), // Set text color
                       ),
                     ),
-                    SizedBox(height: 16.0),
+                    const SizedBox(height: 16.0),
                     if (_errorMessage.isNotEmpty)
                       Text(
                         _errorMessage,
-                        style: TextStyle(color: Colors.red),
+                        style: const TextStyle(color: Colors.red),
                       ),
                   ],
                 ),
@@ -274,7 +274,7 @@ class _LoginState extends State<Login> {
             children: [
               // Background image
               Container(
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   image: DecorationImage(
                     image: AssetImage(
                         'assets/unnamed.jpg'), // Replace with your image
@@ -288,7 +288,7 @@ class _LoginState extends State<Login> {
                   gradient: LinearGradient(
                     colors: [
                       Colors.transparent, // Start with clear
-                      Color.fromARGB(255, 3, 73, 5)
+                      const Color.fromARGB(255, 3, 73, 5)
                           .withOpacity(0.7), // Transition to green
                     ],
                     begin: Alignment.centerLeft,

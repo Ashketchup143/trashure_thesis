@@ -48,6 +48,47 @@ class _SidebarState extends State<Sidebar> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _setCurrentUserData();
+  }
+
+  // Function to fetch the current user's email, query Firestore, and set username and role in Provider
+  Future<void> _setCurrentUserData() async {
+    final User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      String? userEmail = currentUser.email;
+      if (userEmail != null) {
+        try {
+          // Query Firestore to find the document with the matching email
+          QuerySnapshot<Map<String, dynamic>> userSnapshot =
+              await FirebaseFirestore.instance
+                  .collection('employees')
+                  .where('email_address', isEqualTo: userEmail)
+                  .limit(1)
+                  .get();
+
+          if (userSnapshot.docs.isNotEmpty) {
+            Map<String, dynamic> userData = userSnapshot.docs.first.data();
+            String userName = userData['name'] ?? 'Unknown User';
+            String userRole = userData['position'] ?? 'No Position';
+
+            // Set the username and role in the Provider
+            Provider.of<UserModel>(context, listen: false)
+                .setUserName(userName);
+            Provider.of<UserModel>(context, listen: false)
+                .setUserRole(userRole);
+          } else {
+            print('User document does not exist.');
+          }
+        } catch (e) {
+          print('Error fetching user data: $e');
+        }
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final userName =
         Provider.of<UserModel>(context).userName; // Get the user's name
@@ -88,8 +129,8 @@ class _SidebarState extends State<Sidebar> {
                   height: 200,
                 ),
                 Text(
-                  userName,
-                  style: GoogleFonts.poppins(),
+                  '$userName',
+                  style: TextStyle(fontSize: 14),
                 ),
                 SizedBox(height: 10),
                 Container(

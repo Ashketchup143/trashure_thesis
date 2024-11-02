@@ -32,6 +32,15 @@ class _VehicleInformationState extends State<VehicleInformation> {
     }
   }
 
+  @override
+  void dispose() {
+    // Dispose of controllers to prevent memory leaks
+    for (var controller in controllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
   // Fetch the latest assigned driver
   Future<void> _fetchAssignedDriver(String vehicleId) async {
     QuerySnapshot driverSnapshot = await FirebaseFirestore.instance
@@ -46,14 +55,13 @@ class _VehicleInformationState extends State<VehicleInformation> {
       var driverDoc = driverSnapshot.docs.first;
       Map<String, dynamic> driverData =
           driverDoc.data() as Map<String, dynamic>;
-
       setState(() {
         assignedDriver = driverData['assigned_driver'] ?? 'N/A';
       });
     }
   }
 
-  // Fetch all bookings associated with the vehicle
+  // Fetch all bookings associated with the vehicle and sort by date in descending order
   Future<void> _fetchBookingsForVehicle(String vehicleId) async {
     QuerySnapshot bookingsSnapshot = await FirebaseFirestore.instance
         .collection('bookings')
@@ -66,6 +74,13 @@ class _VehicleInformationState extends State<VehicleInformation> {
       bookingData['id'] = doc.id; // Add the document ID to the booking data
       return bookingData;
     }).toList();
+
+    // Sort bookings by date in descending order
+    fetchedBookings.sort((a, b) {
+      DateTime dateA = (a['date'] as Timestamp).toDate();
+      DateTime dateB = (b['date'] as Timestamp).toDate();
+      return dateB.compareTo(dateA);
+    });
 
     setState(() {
       bookings = fetchedBookings;
@@ -173,7 +188,7 @@ class _VehicleInformationState extends State<VehicleInformation> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       height: MediaQuery.of(context).size.height *
-                          .32, // Set a fixed height for the scrollable area
+                          .58, // Set a fixed height for the scrollable area
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -198,6 +213,8 @@ class _VehicleInformationState extends State<VehicleInformation> {
                               String bookingId = booking['id'] ?? 'Unknown ID';
                               String status =
                                   booking['status'] ?? 'Unknown Status';
+                              String location =
+                                  booking['location'] ?? 'Unknown location';
                               String driver =
                                   booking['driver'] ?? 'No Driver Assigned';
                               String vehicle =
@@ -213,7 +230,7 @@ class _VehicleInformationState extends State<VehicleInformation> {
 
                               return ListTile(
                                 title: Text(
-                                  'Date: ${_formatDateTime(booking['date']?.toDate() ?? DateTime(1970), startTime, endTime)}',
+                                  'Date: ${_formatDateTime(booking['date']?.toDate() ?? DateTime(1970), startTime, endTime)}           Location: $location',
                                   style: TextStyle(fontWeight: FontWeight.bold),
                                 ),
                                 subtitle: Row(
@@ -348,35 +365,32 @@ class _VehicleInformationState extends State<VehicleInformation> {
     );
   }
 
-  // Check if the data has changed before updating Firestore
   bool _hasDataChanged() {
-    return controllers['brand']!.text != originalData!['brand'] ||
-        controllers['color']!.text != originalData!['color'] ||
-        controllers['fuel_type']!.text != originalData!['fuel_type'] ||
-        controllers['license_plate_number']!.text !=
+    return controllers['brand']?.text != originalData!['brand'] ||
+        controllers['color']?.text != originalData!['color'] ||
+        controllers['fuel_type']?.text != originalData!['fuel_type'] ||
+        controllers['license_plate_number']?.text !=
             originalData!['license_plate_number'] ||
-        controllers['model']!.text != originalData!['model'] ||
-        controllers['vehicle_type']!.text != originalData!['vehicle_type'] ||
-        controllers['weight_limit']!.text !=
+        controllers['model']?.text != originalData!['model'] ||
+        controllers['vehicle_type']?.text != originalData!['vehicle_type'] ||
+        controllers['weight_limit']?.text !=
             originalData!['weight_limit'].toString() ||
-        controllers['last_service_date']!.text !=
+        controllers['last_service_date']?.text !=
             originalData!['last_service_date'] ||
-        controllers['next_scheduled_maintenance']!.text !=
+        controllers['next_scheduled_maintenance']?.text !=
             originalData!['next_scheduled_maintenance'] ||
-        controllers['purchase_date']!.text != originalData!['purchase_date'] ||
-        controllers['registration_expire_date']!.text !=
+        controllers['purchase_date']?.text != originalData!['purchase_date'] ||
+        controllers['registration_expire_date']?.text !=
             originalData!['registration_expire_date'] ||
-        controllers['registration_number']!.text !=
+        controllers['registration_number']?.text !=
             originalData!['registration_number'] ||
-        controllers['year_of_manufacture']!.text !=
+        controllers['year_of_manufacture']?.text !=
             originalData!['year_of_manufacture'];
   }
 
-  // Update vehicle data in Firestore only if there are changes
   Future<void> _updateVehicleData() async {
     if (vehicleData == null || !_hasDataChanged()) {
       _showDialog('No changes', 'No information has been changed.');
-      // If there are no changes, don't update Firestore
       setState(() {
         isEditing = false; // Exit edit mode
       });
@@ -386,20 +400,22 @@ class _VehicleInformationState extends State<VehicleInformation> {
     String vehicleId = vehicleData!['id'];
 
     Map<String, dynamic> updatedData = {
-      'brand': controllers['brand']!.text,
-      'color': controllers['color']!.text,
-      'fuel_type': controllers['fuel_type']!.text,
-      'license_plate_number': controllers['license_plate_number']!.text,
-      'model': controllers['model']!.text,
-      'vehicle_type': controllers['vehicle_type']!.text,
-      'weight_limit': double.tryParse(controllers['weight_limit']!.text) ?? 0.0,
-      'last_service_date': controllers['last_service_date']!.text,
+      'brand': controllers['brand']?.text ?? '',
+      'color': controllers['color']?.text ?? '',
+      'fuel_type': controllers['fuel_type']?.text ?? '',
+      'license_plate_number': controllers['license_plate_number']?.text ?? '',
+      'model': controllers['model']?.text ?? '',
+      'vehicle_type': controllers['vehicle_type']?.text ?? '',
+      'weight_limit':
+          double.tryParse(controllers['weight_limit']?.text ?? '') ?? 0.0,
+      'last_service_date': controllers['last_service_date']?.text ?? '',
       'next_scheduled_maintenance':
-          controllers['next_scheduled_maintenance']!.text,
-      'purchase_date': controllers['purchase_date']!.text,
-      'registration_expire_date': controllers['registration_expire_date']!.text,
-      'registration_number': controllers['registration_number']!.text,
-      'year_of_manufacture': controllers['year_of_manufacture']!.text,
+          controllers['next_scheduled_maintenance']?.text ?? '',
+      'purchase_date': controllers['purchase_date']?.text ?? '',
+      'registration_expire_date':
+          controllers['registration_expire_date']?.text ?? '',
+      'registration_number': controllers['registration_number']?.text ?? '',
+      'year_of_manufacture': controllers['year_of_manufacture']?.text ?? '',
     };
 
     await FirebaseFirestore.instance
@@ -413,7 +429,6 @@ class _VehicleInformationState extends State<VehicleInformation> {
     });
   }
 
-  // Initialize TextEditingControllers for each field, using default values for null
   void _initializeControllers(Map<String, dynamic> data) {
     controllers['brand'] = TextEditingController(text: data['brand'] ?? '');
     controllers['color'] = TextEditingController(text: data['color'] ?? '');

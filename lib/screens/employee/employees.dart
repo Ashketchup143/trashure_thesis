@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:trashure_thesis/sidebar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart';
 
 class Employees extends StatefulWidget {
   const Employees({super.key});
@@ -23,6 +22,7 @@ class _EmployeesState extends State<Employees> {
   void initState() {
     super.initState();
     _fetchEmployees();
+    _searchController.addListener(_onSearchChanged);
   }
 
   void _fetchEmployees() async {
@@ -46,15 +46,12 @@ class _EmployeesState extends State<Employees> {
       };
     }).toList();
 
-    // Initialize attendance status for each employee
     Map<String, bool> tempAttendanceStatus = {};
     Map<String, bool> tempSelectedOptions = {};
 
     for (var employee in tempEmployeesList) {
       String employeeid = employee['id'];
-      // Initialize selected options
       tempSelectedOptions[employeeid] = false;
-      // Check if the employee is currently clocked in
       bool isClockedIn = await _checkIfClockedIn(employeeid);
       tempAttendanceStatus[employeeid] = isClockedIn;
     }
@@ -96,203 +93,187 @@ class _EmployeesState extends State<Employees> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: Sidebar(),
-      body: Builder(
-          builder: (context) => Container(
-                height: MediaQuery.of(context).size.height,
-                width: MediaQuery.of(context).size.width,
-                child: Expanded(
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.only(top: 20, left: 40, right: 40),
-                    child: Container(
-                      width: MediaQuery.of(context).size.width,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(height: 5),
-                          Row(
-                            children: [
-                              IconButton(
-                                icon: Icon(Icons.menu,
-                                    color: Colors.green, size: 25),
-                                onPressed: () {
-                                  Scaffold.of(context)
-                                      .openDrawer(); // Opens the drawer
-                                },
-                              ),
-                              Text(
-                                'Employees',
-                                textAlign: TextAlign.left,
-                                style: GoogleFonts.poppins(
-                                    textStyle: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 20)),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 20),
-                          // Search bar
-                          Row(
-                            children: [
-                              Container(
-                                height: 30,
-                                width: 430,
-                                decoration: BoxDecoration(
-                                  border: Border.all(),
-                                  borderRadius: BorderRadius.circular(17.5),
-                                ),
-                                child: TextField(
-                                  controller: _searchController,
-                                  decoration: InputDecoration(
-                                    hintText:
-                                        'Search by employee name, id, or position',
-                                    border: InputBorder.none,
-                                    prefixIcon: Icon(Icons.search),
-                                  ),
-                                  onChanged: (value) {
-                                    _onSearchChanged();
-                                  },
-                                ),
-                              ),
-                              SizedBox(width: 20),
-                              ElevatedButton(
-                                onPressed: () {
-                                  _addEmployee(); // Call add employee function
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Color(0xFF4CAF4F),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30)),
-                                  padding: EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 8),
-                                  textStyle: TextStyle(fontSize: 16),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Add Employee',
-                                      style: GoogleFonts.roboto(
-                                          textStyle: TextStyle(
-                                              fontWeight: FontWeight.w300,
-                                              color: Colors.white)),
-                                    ),
-                                    Icon(
-                                      Icons.add,
-                                      color: Colors.white,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              SizedBox(width: 20),
-                              ElevatedButton(
-                                onPressed: () {
-                                  Navigator.pushNamed(context,
-                                      '/payroll'); // Navigate to payroll screen
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Color(0xFF0062FF),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30)),
-                                  padding: EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 8),
-                                  textStyle: TextStyle(fontSize: 16),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Payroll',
-                                      style: GoogleFonts.roboto(
-                                          textStyle: TextStyle(
-                                              fontWeight: FontWeight.w300,
-                                              color: Colors.white)),
-                                    ),
-                                    Icon(
-                                      Icons.receipt_long_outlined,
-                                      size: 20,
-                                      color: Colors.white,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 20),
-                          Container(
-                            height: MediaQuery.of(context).size.height * .8,
-                            width: MediaQuery.of(context).size.width,
-                            decoration: BoxDecoration(border: Border.all()),
-                            child: Column(
-                              children: [
-                                // Title row
-                                Container(
-                                  child: Row(
-                                    children: [
-                                      title('Employee ID', 3),
-                                      title('Name', 3),
-                                      title('Position', 3),
-                                      title('Exp. Time In', 3),
-                                      title('Exp. Time Out', 3),
-                                      title('Attendance', 3),
-                                      title('Details', 2),
-                                    ],
-                                  ),
-                                ),
-                                Expanded(
-                                  child: ListView.builder(
-                                    itemCount: _filteredEmployees.length,
-                                    itemBuilder: (context, index) {
-                                      var employee = _filteredEmployees[index];
-                                      var employeeid = employee['id'];
-                                      var name = employee['name'];
-                                      var position = employee['position'];
-                                      var expTimeIn = employee['exp_time_in'];
-                                      var expTimeOut = employee['exp_time_out'];
-
-                                      _selectedOptions[employeeid] ??= false;
-                                      _attendanceStatus[employeeid] ??= false;
-
-                                      return _buildCustomCheckboxTile(
-                                        employeeid,
-                                        employeeid,
-                                        name,
-                                        position,
-                                        expTimeIn,
-                                        expTimeOut,
-                                        employee,
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+      drawer: const Sidebar(),
+      body: Padding(
+        padding: const EdgeInsets.only(top: 20, left: 40, right: 40),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 5),
+            Row(
+              children: [
+                Builder(
+                  builder: (BuildContext context) {
+                    return IconButton(
+                      icon:
+                          const Icon(Icons.menu, color: Colors.green, size: 25),
+                      onPressed: () {
+                        Scaffold.of(context).openDrawer(); // Opens the drawer
+                      },
+                    );
+                  },
+                ),
+                Text(
+                  'Employees',
+                  style: GoogleFonts.poppins(
+                    textStyle: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 20),
                   ),
                 ),
-              )),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Container(
+                  height: 30,
+                  width: 430,
+                  decoration: BoxDecoration(
+                    border: Border.all(),
+                    borderRadius: BorderRadius.circular(17.5),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: const InputDecoration(
+                      hintText: 'Search by employee name, id, or position',
+                      border: InputBorder.none,
+                      prefixIcon: Icon(Icons.search),
+                    ),
+                    onChanged: (value) {
+                      _onSearchChanged();
+                    },
+                  ),
+                ),
+                const SizedBox(width: 20),
+                ElevatedButton(
+                  onPressed: () {
+                    _addEmployee();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4CAF4F),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30)),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(width: 8),
+                      Text(
+                        'Add Employee',
+                        style: GoogleFonts.roboto(
+                            textStyle: const TextStyle(
+                                fontWeight: FontWeight.w300,
+                                color: Colors.white)),
+                      ),
+                      const Icon(
+                        Icons.add,
+                        color: Colors.white,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 20),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/payroll');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0062FF),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30)),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(width: 8),
+                      Text(
+                        'Payroll',
+                        style: GoogleFonts.roboto(
+                            textStyle: const TextStyle(
+                                fontWeight: FontWeight.w300,
+                                color: Colors.white)),
+                      ),
+                      const Icon(
+                        Icons.receipt_long_outlined,
+                        size: 20,
+                        color: Colors.white,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Container(
+              height: MediaQuery.of(context).size.height * 0.82,
+              decoration: BoxDecoration(border: Border.all()),
+              child: Column(
+                children: [
+                  Container(
+                    child: Row(
+                      children: [
+                        title('Employee ID', 3),
+                        title('Name', 3),
+                        title('Position', 3),
+                        title('Exp. Time In', 3),
+                        title('Exp. Time Out', 3),
+                        title('Attendance', 3),
+                        title('Details', 2),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: _filteredEmployees.length,
+                      itemBuilder: (context, index) {
+                        var employee = _filteredEmployees[index];
+                        var employeeid = employee['id'];
+                        var name = employee['name'];
+                        var position = employee['position'];
+                        var expTimeIn = employee['exp_time_in'];
+                        var expTimeOut = employee['exp_time_out'];
+
+                        _selectedOptions[employeeid] ??= false;
+                        _attendanceStatus[employeeid] ??= false;
+
+                        return _buildCustomCheckboxTile(
+                          employeeid,
+                          employeeid,
+                          name,
+                          position,
+                          expTimeIn,
+                          expTimeOut,
+                          employee,
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget title(String text, int fl) {
+  Widget title(String text, int flex) {
     return Expanded(
-      flex: fl,
+      flex: flex,
       child: Container(
         height: 20,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           border: Border(bottom: BorderSide()),
         ),
         child: Center(
           child: Text(
             text,
             style: GoogleFonts.roboto(
-                textStyle: TextStyle(fontWeight: FontWeight.bold)),
+                textStyle: const TextStyle(fontWeight: FontWeight.bold)),
           ),
         ),
       ),
@@ -331,14 +312,12 @@ class _EmployeesState extends State<Employees> {
                   onPressed: () async {
                     if (_attendanceStatus[option] == null ||
                         !_attendanceStatus[option]!) {
-                      // Employee is not clocked in; proceed to Time In
                       try {
                         DocumentReference employeeDocRef = FirebaseFirestore
                             .instance
                             .collection('employees')
                             .doc(employeeid);
 
-                        // Create a new time record with time_in
                         await employeeDocRef
                             .collection('daily_time_record')
                             .add({
@@ -356,27 +335,18 @@ class _EmployeesState extends State<Employees> {
                         print('Error during Time In: $e');
                       }
                     } else {
-                      // Employee is clocked in; proceed to Time Out
                       try {
                         DocumentReference employeeDocRef = FirebaseFirestore
                             .instance
                             .collection('employees')
                             .doc(employeeid);
 
-                        print(
-                            'Attempting to Time Out for employee: $employeeid');
-
-                        // Find all time_in records without time_out
                         QuerySnapshot dtrSnapshot = await employeeDocRef
                             .collection('daily_time_record')
                             .where('time_out', isNull: true)
                             .get();
 
-                        print(
-                            'Number of open time_in records: ${dtrSnapshot.docs.length}');
-
                         if (dtrSnapshot.docs.isNotEmpty) {
-                          // Update the earliest time_in record
                           DocumentReference dtrDocRef =
                               dtrSnapshot.docs.first.reference;
                           await dtrDocRef.update({
@@ -389,7 +359,6 @@ class _EmployeesState extends State<Employees> {
 
                           print('Time Out recorded for employee $employeeid');
                         } else {
-                          // No time_in record found without time_out
                           print('No time_in record found to update time_out');
                         }
                       } catch (e) {
@@ -399,38 +368,26 @@ class _EmployeesState extends State<Employees> {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _attendanceStatus[option] == true
-                        ? Colors.red // Time Out
-                        : Colors.blue, // Time In
+                        ? Colors.red
+                        : Colors.blue,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(15)),
                   ),
                   child: Text(
                     _attendanceStatus[option] == true ? 'Time Out' : 'Time In',
-                    style: TextStyle(color: Colors.white),
+                    style: const TextStyle(color: Colors.white),
                   ),
                 ),
               ),
               Expanded(
                 flex: 1,
                 child: IconButton(
-                  icon: Icon(Icons.info_outline),
+                  icon: const Icon(Icons.info_outline),
                   onPressed: () {
-                    // Navigate to the employee profile screen and pass employee data
                     Navigator.pushNamed(
                       context,
                       '/employeeprofile',
-                      arguments: {
-                        'id': employee['id'],
-                        'name': employee['name'],
-                        'position': employee['position'],
-                        'address': employee['address'],
-                        'birth_date': employee['birth_date'],
-                        'contact_number': employee['contact_number'],
-                        'email_address': employee['email_address'],
-                        'salary_per_hour': employee['salary_per_hour'],
-                        'exp_time_in': employee['exp_time_in'],
-                        'exp_time_out': employee['exp_time_out'],
-                      },
+                      arguments: employee,
                     );
                   },
                 ),
@@ -448,7 +405,7 @@ class _EmployeesState extends State<Employees> {
       flex: flex,
       child: Text(
         text,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 16,
         ),
       ),
@@ -460,7 +417,7 @@ class _EmployeesState extends State<Employees> {
       flex: flex,
       child: Text(
         text,
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -475,62 +432,63 @@ class _EmployeesState extends State<Employees> {
     TextEditingController birthDateController = TextEditingController();
     TextEditingController expTimeInController = TextEditingController();
     TextEditingController expTimeOutController = TextEditingController();
-    TextEditingController passwordController =
-        TextEditingController(); // New controller for password
+    TextEditingController passwordController = TextEditingController();
 
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Add New Employee'),
+          title: const Text('Add New Employee'),
           content: SingleChildScrollView(
             child: Container(
-              height: MediaQuery.of(context).size.height * 0.65,
+              height: 500,
               width: MediaQuery.of(context).size.width * 0.4,
               child: Column(
                 children: [
                   TextField(
                     controller: nameController,
-                    decoration: InputDecoration(labelText: 'Name'),
+                    decoration: const InputDecoration(labelText: 'Name'),
                   ),
                   TextField(
                     controller: contactController,
-                    decoration: InputDecoration(labelText: 'Contact Number'),
+                    decoration:
+                        const InputDecoration(labelText: 'Contact Number'),
                   ),
                   TextField(
                     controller: addressController,
-                    decoration: InputDecoration(labelText: 'Address'),
+                    decoration: const InputDecoration(labelText: 'Address'),
                   ),
                   TextField(
                     controller: emailController,
-                    decoration: InputDecoration(labelText: 'Email Address'),
+                    decoration:
+                        const InputDecoration(labelText: 'Email Address'),
                   ),
                   TextField(
                     controller: passwordController,
-                    decoration: InputDecoration(
-                        labelText: 'Password'), // New field for password
-                    obscureText: true, // Hide password input
+                    decoration: const InputDecoration(labelText: 'Password'),
+                    obscureText: true,
                   ),
                   TextField(
                     controller: positionController,
-                    decoration: InputDecoration(labelText: 'Position'),
+                    decoration: const InputDecoration(labelText: 'Position'),
                   ),
                   TextField(
                     controller: salaryController,
-                    decoration: InputDecoration(labelText: 'Salary Per Hour'),
+                    decoration:
+                        const InputDecoration(labelText: 'Salary Per Hour'),
                   ),
                   TextField(
                     controller: birthDateController,
-                    decoration: InputDecoration(labelText: 'Birth Date'),
+                    decoration: const InputDecoration(labelText: 'Birth Date'),
                   ),
                   TextField(
                     controller: expTimeInController,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                         labelText: 'Expected Time In (Optional)'),
                   ),
                   TextField(
                     controller: expTimeOutController,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                         labelText: 'Expected Time Out (Optional)'),
                   ),
                 ],
@@ -540,34 +498,29 @@ class _EmployeesState extends State<Employees> {
           actions: [
             ElevatedButton(
               onPressed: () async {
-                // Ensure required fields are filled in
                 if (nameController.text.isEmpty ||
                     contactController.text.isEmpty ||
                     addressController.text.isEmpty ||
                     emailController.text.isEmpty ||
-                    passwordController
-                        .text.isEmpty || // Ensure password is provided
+                    passwordController.text.isEmpty ||
                     positionController.text.isEmpty ||
                     salaryController.text.isEmpty ||
                     birthDateController.text.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                       content: Text('Please fill in all required fields')));
                   return;
                 }
 
                 try {
-                  // Create user in Firebase Authentication
                   UserCredential userCredential = await FirebaseAuth.instance
                       .createUserWithEmailAndPassword(
                     email: emailController.text,
-                    password:
-                        passwordController.text, // Use the provided password
+                    password: passwordController.text,
                   );
                   String userUid = userCredential.user!.uid;
 
-                  // Add new employee to Firestore with the UID
                   await FirebaseFirestore.instance.collection('employees').add({
-                    'uid': userUid, // Store the UID for reference
+                    'uid': userUid,
                     'name': nameController.text,
                     'contact_number': contactController.text,
                     'address': addressController.text,
@@ -585,25 +538,23 @@ class _EmployeesState extends State<Employees> {
                     'status': 'active',
                   });
 
-                  Navigator.of(context).pop(); // Close dialog
-                  _fetchEmployees(); // Refresh the employee list
+                  Navigator.of(context).pop();
+                  _fetchEmployees();
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Failed to add employee: $e')),
                   );
                 }
               },
-              child: Text(
-                'Add Employee',
-              ),
+              child: const Text('Add Employee'),
             ),
             ElevatedButton(
-              style:
-                  ElevatedButton.styleFrom(backgroundColor: Color(0xFF4CAF4F)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4CAF4F)),
               onPressed: () {
-                Navigator.of(context).pop(); // Close dialog without adding
+                Navigator.of(context).pop();
               },
-              child: Text('Cancel'),
+              child: const Text('Cancel'),
             ),
           ],
         );

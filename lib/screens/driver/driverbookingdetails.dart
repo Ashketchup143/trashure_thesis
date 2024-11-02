@@ -37,13 +37,14 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
         'Booking status: $status'); // Add this to check if status is correctly being passed
     return Scaffold(
       appBar: AppBar(
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white),
         title: Row(
           children: [
-            Text("Booking Details", style: TextStyle(color: Colors.white)),
-            Spacer(),
+            const Text("Booking Details",
+                style: TextStyle(color: Colors.white)),
+            const Spacer(),
             IconButton(
-              icon: Icon(Icons.map),
+              icon: const Icon(Icons.map),
               onPressed: () {
                 Navigator.push(
                   context,
@@ -73,12 +74,12 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
               children: [
                 Row(
                   children: [
-                    Text('Booking Details',
+                    const Text('Booking Details',
                         style: TextStyle(
                             color: Colors.green,
                             fontSize: 24,
                             fontWeight: FontWeight.bold)),
-                    Spacer(),
+                    const Spacer(),
                     if (status == 'collecting') // Show only if collecting
                       ElevatedButton(
                         onPressed: () {
@@ -89,24 +90,27 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                             },
                           );
                         },
-                        child: Text('Add Guest User'),
+                        child: const Text('Add Guest User'),
                         style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green),
                       ),
                   ],
                 ),
-                SizedBox(height: 10),
-                Text('Booking ID: $bookingId', style: TextStyle(fontSize: 18)),
-                Text('Status: $status', style: TextStyle(fontSize: 18)),
-                Text('Vehicle: $vehicle', style: TextStyle(fontSize: 18)),
-                Text('Vehicle ID: $vehicleId', style: TextStyle(fontSize: 18)),
+                const SizedBox(height: 10),
+                Text('Booking ID: $bookingId',
+                    style: const TextStyle(fontSize: 18)),
+                Text('Status: $status', style: const TextStyle(fontSize: 18)),
+                Text('Vehicle: $vehicle', style: const TextStyle(fontSize: 18)),
+                Text('Vehicle ID: $vehicleId',
+                    style: const TextStyle(fontSize: 18)),
                 Text('Est. Total Price: ₱${overallPrice.toStringAsFixed(2)}',
-                    style: TextStyle(fontSize: 18)),
+                    style: const TextStyle(fontSize: 18)),
                 Text(
                     'Est. Total Weight: ${overallWeight.toStringAsFixed(2)} kg',
-                    style: TextStyle(fontSize: 18)),
-                Text('Date: $formattedDate', style: TextStyle(fontSize: 18)),
-                SizedBox(height: 20),
+                    style: const TextStyle(fontSize: 18)),
+                Text('Date: $formattedDate',
+                    style: const TextStyle(fontSize: 18)),
+                const SizedBox(height: 20),
                 Expanded(
                   child: StreamBuilder(
                     stream: FirebaseFirestore.instance
@@ -116,12 +120,12 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                         .snapshots(),
                     builder: (context, userSnapshot) {
                       if (!userSnapshot.hasData) {
-                        return Center(child: CircularProgressIndicator());
+                        return const Center(child: CircularProgressIndicator());
                       }
 
                       var users = userSnapshot.data?.docs ?? [];
                       if (users.isEmpty) {
-                        return Center(child: Text('No users found.'));
+                        return const Center(child: Text('No users found.'));
                       }
 
                       // Sorting logic for users
@@ -187,8 +191,8 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                             color: isCollected ? Colors.lightGreen[100] : null,
                             child: ExpansionTile(
                               title: Text('$firstName $lastName',
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.bold)),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold)),
                               subtitle: Text(
                                 'Address: $address, Contact: $contact\nEmail: $email\nTotal Price: ₱$totalPrice\nTotal Weight: ${totalWeight.toStringAsFixed(2)} kg\nCollected: $collectedDate',
                               ),
@@ -203,7 +207,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                       .snapshots(),
                                   builder: (context, recyclableSnapshot) {
                                     if (!recyclableSnapshot.hasData) {
-                                      return Center(
+                                      return const Center(
                                           child: CircularProgressIndicator());
                                     }
 
@@ -213,7 +217,8 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                     return ListView.builder(
                                       itemCount: recyclables.length,
                                       shrinkWrap: true,
-                                      physics: NeverScrollableScrollPhysics(),
+                                      physics:
+                                          const NeverScrollableScrollPhysics(),
                                       itemBuilder: (context, recIndex) {
                                         var recyclableData =
                                             recyclables[recIndex].data()
@@ -266,7 +271,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                                                   weightControllers[
                                                                       recyclableId],
                                                               decoration:
-                                                                  InputDecoration(
+                                                                  const InputDecoration(
                                                                 labelText:
                                                                     'Weight (kg)',
                                                                 border:
@@ -315,7 +320,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                               Text('Price: ₱$price'),
                                               Text(
                                                   'Item Price: ₱${(updatedWeights[recyclableId]! * price).toStringAsFixed(2)}'),
-                                              Divider(),
+                                              const Divider(),
                                             ],
                                           ),
                                         );
@@ -333,7 +338,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                           _showAddProductModal(userId,
                                               bookingId); // Function to open modal for adding a product
                                         },
-                                        child: Text('Add Product'),
+                                        child: const Text('Add Product'),
                                         style: ElevatedButton.styleFrom(
                                             backgroundColor: Colors.blue),
                                       ),
@@ -351,7 +356,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                           lastName,
                                           userData);
                                     },
-                                    child: Text('Collected'),
+                                    child: const Text('Collected'),
                                     style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.green),
                                   ),
@@ -369,7 +374,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                     onPressed: () async {
                       await _showFinalCollectedConfirmation(bookingId);
                     },
-                    child: Text('Mark Booking as Collected'),
+                    child: const Text('Mark Booking as Collected'),
                     style:
                         ElevatedButton.styleFrom(backgroundColor: Colors.green),
                   ),
@@ -388,13 +393,13 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Confirm Collection'),
+          title: const Text('Confirm Collection'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                   'Are you sure you want to mark $firstName $lastName as collected?'),
-              Text(
+              const Text(
                   'Recyclables and their updated weights/prices will be finalized.'),
             ],
           ),
@@ -403,13 +408,13 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
               onPressed: () {
                 Navigator.of(context).pop(false); // Cancel
               },
-              child: Text('Cancel'),
+              child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop(true); // Confirm
               },
-              child: Text('Confirm'),
+              child: const Text('Confirm'),
             ),
           ],
         );
@@ -502,7 +507,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
     await batch.commit();
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+      const SnackBar(
           content: Text(
               'User marked as collected, total price and weight calculated, and outflow recorded')),
     );
@@ -530,15 +535,15 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
-            title: Text('Incomplete Collection'),
-            content: Text(
+            title: const Text('Incomplete Collection'),
+            content: const Text(
                 'There are users who have not been marked as collected. Please finish collecting before marking the booking as completed.'),
             actions: [
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pop();
                 },
-                child: Text('Ok'),
+                child: const Text('Ok'),
               ),
             ],
           );
@@ -549,23 +554,23 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
-            title: Text(
+            title: const Text(
               'Mark Booking as Completed',
             ),
-            content: Text(
+            content: const Text(
                 'Are you sure you want to mark the entire booking as completed?'),
             actions: [
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pop(false); // Cancel
                 },
-                child: Text('Cancel'),
+                child: const Text('Cancel'),
               ),
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pop(true); // Confirm
                 },
-                child: Text('Confirm'),
+                child: const Text('Confirm'),
               ),
             ],
           );
@@ -623,7 +628,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
               backgroundColor: Colors.green,
               content: Text(
                   'Booking marked as collected. Final overall price and weight updated.')),
@@ -649,7 +654,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: Text('Add Product'),
+              title: const Text('Add Product'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -660,7 +665,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                         .snapshots(),
                     builder: (context, snapshot) {
                       if (!snapshot.hasData) {
-                        return CircularProgressIndicator();
+                        return const CircularProgressIndicator();
                       }
 
                       var products = snapshot.data!.docs.where((doc) {
@@ -671,7 +676,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                       }).toList();
 
                       if (products.isEmpty) {
-                        return Text("No new products available to add.");
+                        return const Text("No new products available to add.");
                       }
 
                       if (selectedProductName == 'Unknown' &&
@@ -701,18 +706,18 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                       );
                     },
                   ),
-                  SizedBox(height: 10),
+                  const SizedBox(height: 10),
                   // Display the most recent price
                   recentPrice != null
                       ? Text(
                           'Recent Price: ₱${recentPrice!.toStringAsFixed(2)} per kg')
-                      : Text("no product chosen"),
-                  SizedBox(height: 10),
+                      : const Text("no product chosen"),
+                  const SizedBox(height: 10),
                   // Input for weight
                   TextField(
                     controller: weightController,
                     keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       labelText: 'Weight (kg)',
                       border: OutlineInputBorder(),
                     ),
@@ -724,7 +729,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                   onPressed: () {
                     Navigator.of(context).pop();
                   },
-                  child: Text('Cancel'),
+                  child: const Text('Cancel'),
                 ),
                 ElevatedButton(
                   onPressed: () async {
@@ -736,7 +741,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                       Navigator.of(context).pop();
                     }
                   },
-                  child: Text('Add'),
+                  child: const Text('Add'),
                 ),
               ],
             );
@@ -815,7 +820,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Product added successfully.')),
+      const SnackBar(content: Text('Product added successfully.')),
     );
   }
 }

@@ -250,6 +250,7 @@ class _UserInformationState extends State<UserInformation> {
     );
   }
 
+  // Modified _buildBookingsList function
   Widget _buildBookingsList(String userId) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('bookings').snapshots(),
@@ -291,89 +292,94 @@ class _UserInformationState extends State<UserInformation> {
                 var formattedDate = DateFormat('MM/dd/yyyy').format(date);
                 var status = bookingData['status'] ?? 'Unknown';
 
-                // Show the appropriate total price and weight based on the status
-                var totalAmount =
-                    (status == 'collected' || status == 'completed')
-                        ? bookingData['final_overall_price'] ?? 0.0
-                        : bookingData['overall_price'] ?? 0.0;
-                var totalWeight =
-                    (status == 'collected' || status == 'completed')
-                        ? bookingData['final_overall_weight'] ?? 0.0
-                        : bookingData['overall_weight'] ?? 0.0;
+                // Call the function to get user-specific data for amount and weight
+                return FutureBuilder<Map<String, dynamic>?>(
+                  future: _fetchUserBookingDetails(bookingId, userId, status),
+                  builder: (context, userBookingSnapshot) {
+                    if (!userBookingSnapshot.hasData) {
+                      return Center(child: CircularProgressIndicator());
+                    }
 
-                return Container(
-                  margin: EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-                  padding: EdgeInsets.all(8.0),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(8),
-                    color: Colors.white,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Row of titles
-                      Row(
-                        children: [
-                          Expanded(
-                              child: Text('Date', style: _headerTextStyle())),
-                          Expanded(
-                              child: Text('Booking ID',
-                                  style: _headerTextStyle())),
-                          Expanded(
-                              child: Text('Driver', style: _headerTextStyle())),
-                          Expanded(
-                              child:
-                                  Text('Vehicle', style: _headerTextStyle())),
-                          Expanded(
-                              child: Text('Total Amount',
-                                  style: _headerTextStyle())),
-                          Expanded(
-                              child: Text('Total Weight',
-                                  style: _headerTextStyle())),
-                          Expanded(
-                              child: Text('Status', style: _headerTextStyle())),
-                        ],
+                    var userBookingDetails = userBookingSnapshot.data!;
+                    var totalAmount = userBookingDetails['totalAmount'];
+                    var totalWeight = userBookingDetails['totalWeight'];
+
+                    return Container(
+                      margin:
+                          EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                      padding: EdgeInsets.all(8.0),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey),
+                        borderRadius: BorderRadius.circular(8),
+                        color: Colors.white,
                       ),
-                      Divider(),
-                      // Row of data
-                      Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(child: Text(formattedDate)),
-                          Expanded(child: Text(bookingId)),
-                          Expanded(child: Text(driver)),
-                          Expanded(child: Text(vehicle)),
-                          Expanded(
-                              child:
-                                  Text('₱${totalAmount.toStringAsFixed(2)}')),
-                          Expanded(
-                              child:
-                                  Text('${totalWeight.toStringAsFixed(2)} kg')),
-                          Expanded(
-                              child: Text(status,
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.bold))),
-                        ],
-                      ),
-                      SizedBox(height: 10),
-                      // Display recyclables in an expansion tile in horizontal row format
-                      ExpansionTile(
-                        title: Text(
-                          'Recyclables',
-                          style:
-                              GoogleFonts.poppins(fontWeight: FontWeight.bold),
-                        ),
-                        children: [
-                          Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 8.0),
-                            child: _buildRecyclablesList(
-                                bookingId, userId, status),
+                          Row(
+                            children: [
+                              Expanded(
+                                  child:
+                                      Text('Date', style: _headerTextStyle())),
+                              Expanded(
+                                  child: Text('Booking ID',
+                                      style: _headerTextStyle())),
+                              Expanded(
+                                  child: Text('Driver',
+                                      style: _headerTextStyle())),
+                              Expanded(
+                                  child: Text('Vehicle',
+                                      style: _headerTextStyle())),
+                              Expanded(
+                                  child: Text('Total Amount',
+                                      style: _headerTextStyle())),
+                              Expanded(
+                                  child: Text('Total Weight',
+                                      style: _headerTextStyle())),
+                              Expanded(
+                                  child: Text('Status',
+                                      style: _headerTextStyle())),
+                            ],
+                          ),
+                          Divider(),
+                          Row(
+                            children: [
+                              Expanded(child: Text(formattedDate)),
+                              Expanded(child: Text(bookingId)),
+                              Expanded(child: Text(driver)),
+                              Expanded(child: Text(vehicle)),
+                              Expanded(
+                                  child: Text(
+                                      '₱${totalAmount.toStringAsFixed(2)}')),
+                              Expanded(
+                                  child: Text(
+                                      '${totalWeight.toStringAsFixed(2)} kg')),
+                              Expanded(
+                                  child: Text(status,
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold))),
+                            ],
+                          ),
+                          SizedBox(height: 10),
+                          ExpansionTile(
+                            title: Text(
+                              'Recyclables',
+                              style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.bold),
+                            ),
+                            children: [
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8.0),
+                                child: _buildRecyclablesList(
+                                    bookingId, userId, status),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 );
               },
             );
@@ -381,6 +387,34 @@ class _UserInformationState extends State<UserInformation> {
         );
       },
     );
+  }
+
+  // New function to fetch user-specific details for total amount and weight
+  Future<Map<String, dynamic>> _fetchUserBookingDetails(
+      String bookingId, String userId, String status) async {
+    var userDoc = await FirebaseFirestore.instance
+        .collection('bookings')
+        .doc(bookingId)
+        .collection('users')
+        .doc(userId)
+        .get();
+
+    if (!userDoc.exists) {
+      return {'totalAmount': 0.0, 'totalWeight': 0.0};
+    }
+
+    var userData = userDoc.data()!;
+    var totalAmount = (status == 'collected' || status == 'completed')
+        ? userData['final_total_price'] ?? 0.0
+        : userData['total_price'] ?? 0.0;
+    var totalWeight = (status == 'collected' || status == 'completed')
+        ? userData['final_total_weight'] ?? 0.0
+        : userData['total_weight'] ?? 0.0;
+
+    return {
+      'totalAmount': totalAmount,
+      'totalWeight': totalWeight,
+    };
   }
 
 // Helper function to filter bookings based on userId locally

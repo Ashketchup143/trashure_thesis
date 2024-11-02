@@ -35,14 +35,14 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
 
     return Scaffold(
       appBar: AppBar(
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white),
         title: Row(
           children: [
-            Text("Booking History Details",
+            const Text("Booking History Details",
                 style: TextStyle(color: Colors.white)),
-            Spacer(),
+            const Spacer(),
             IconButton(
-              icon: Icon(Icons.map),
+              icon: const Icon(Icons.map),
               onPressed: () {
                 Navigator.push(
                   context,
@@ -70,23 +70,26 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Booking Details',
+                const Text('Booking Details',
                     style: TextStyle(
                         color: Colors.green,
                         fontSize: 24,
                         fontWeight: FontWeight.bold)),
-                SizedBox(height: 10),
-                Text('Booking ID: $bookingId', style: TextStyle(fontSize: 18)),
-                Text('Status: $status', style: TextStyle(fontSize: 18)),
-                Text('Vehicle: $vehicle', style: TextStyle(fontSize: 18)),
-                Text('Vehicle ID: $vehicleId', style: TextStyle(fontSize: 18)),
+                const SizedBox(height: 10),
+                Text('Booking ID: $bookingId',
+                    style: const TextStyle(fontSize: 18)),
+                Text('Status: $status', style: const TextStyle(fontSize: 18)),
+                Text('Vehicle: $vehicle', style: const TextStyle(fontSize: 18)),
+                Text('Vehicle ID: $vehicleId',
+                    style: const TextStyle(fontSize: 18)),
                 Text('Est. Total Price: ₱${overallPrice.toStringAsFixed(2)}',
-                    style: TextStyle(fontSize: 18)),
+                    style: const TextStyle(fontSize: 18)),
                 Text(
                     'Est. Total Weight: ${overallWeight.toStringAsFixed(2)} kg',
-                    style: TextStyle(fontSize: 18)),
-                Text('Date: $formattedDate', style: TextStyle(fontSize: 18)),
-                SizedBox(height: 20),
+                    style: const TextStyle(fontSize: 18)),
+                Text('Date: $formattedDate',
+                    style: const TextStyle(fontSize: 18)),
+                const SizedBox(height: 20),
                 Expanded(
                   child: StreamBuilder(
                     stream: FirebaseFirestore.instance
@@ -96,12 +99,12 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
                         .snapshots(),
                     builder: (context, userSnapshot) {
                       if (!userSnapshot.hasData) {
-                        return Center(child: CircularProgressIndicator());
+                        return const Center(child: CircularProgressIndicator());
                       }
 
                       var users = userSnapshot.data?.docs ?? [];
                       if (users.isEmpty) {
-                        return Center(child: Text('No users found.'));
+                        return const Center(child: Text('No users found.'));
                       }
 
                       // Sorting logic for users
@@ -167,8 +170,8 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
                             color: isCollected ? Colors.lightGreen[100] : null,
                             child: ExpansionTile(
                               title: Text('$firstName $lastName',
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.bold)),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold)),
                               subtitle: Text(
                                 'Address: $address, Contact: $contact\nEmail: $email\nTotal Price: ₱$totalPrice\nTotal Weight: ${totalWeight.toStringAsFixed(2)} kg\nCollected: $collectedDate',
                               ),
@@ -183,7 +186,7 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
                                       .snapshots(),
                                   builder: (context, recyclableSnapshot) {
                                     if (!recyclableSnapshot.hasData) {
-                                      return Center(
+                                      return const Center(
                                           child: CircularProgressIndicator());
                                     }
 
@@ -193,7 +196,8 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
                                     return ListView.builder(
                                       itemCount: recyclables.length,
                                       shrinkWrap: true,
-                                      physics: NeverScrollableScrollPhysics(),
+                                      physics:
+                                          const NeverScrollableScrollPhysics(),
                                       itemBuilder: (context, recIndex) {
                                         var recyclableData =
                                             recyclables[recIndex].data()
@@ -244,7 +248,7 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
                                                                   weightControllers[
                                                                       recyclableId],
                                                               decoration:
-                                                                  InputDecoration(
+                                                                  const InputDecoration(
                                                                 labelText:
                                                                     'Weight (kg)',
                                                                 border:
@@ -291,7 +295,7 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
                                               Text('Price: ₱$price'),
                                               Text(
                                                   'Item Price: ₱${(updatedWeights[recyclableId]! * price).toStringAsFixed(2)}'),
-                                              Divider(),
+                                              const Divider(),
                                             ],
                                           ),
                                         );

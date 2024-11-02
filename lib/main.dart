@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
@@ -67,7 +66,7 @@ class MyApp extends StatelessWidget {
           '/vehicleinformation': (context) => VehicleInformation(),
           '/userinformation': (context) => UserInformation(),
           // '/map': (context) => Maps(),
-          '/finance': (context) => Finance(),
+          // '/finance': (context) => Finance(),
           '/inflow': (context) => Inflow(),
           '/outflow': (context) => Outflow(),
           '/products': (context) => Products(),

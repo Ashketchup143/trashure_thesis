@@ -166,48 +166,48 @@ class _UserHouseState extends State<UserHouse> {
                 ),
                 SizedBox(height: 20),
                 // Users List Container
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(border: Border.all()),
-                    child: Column(
-                      children: [
-                        // Table Headers
-                        Row(
-                          children: [
-                            title('Name', 4),
-                            title('Contact', 3),
-                            title('Address', 3),
-                            title('Status', 2),
-                            title('Details', 1),
-                          ],
-                        ),
-                        // Users List
-                        Expanded(
-                          child: _filteredUsers.isNotEmpty
-                              ? ListView.builder(
-                                  itemCount: _filteredUsers.length,
-                                  itemBuilder: (context, index) {
-                                    final user = _filteredUsers[index];
-                                    final uid = user['id'];
+                Container(
+                  height: MediaQuery.of(context).size.height * .8,
+                  width: MediaQuery.of(context).size.width,
+                  decoration: BoxDecoration(border: Border.all()),
+                  child: Column(
+                    children: [
+                      // Table Headers
+                      Row(
+                        children: [
+                          title('Name', 4),
+                          title('Contact', 3),
+                          title('Address', 3),
+                          title('Status', 2),
+                          title('Details', 1),
+                        ],
+                      ),
+                      // Users List
+                      Expanded(
+                        child: _filteredUsers.isNotEmpty
+                            ? ListView.builder(
+                                itemCount: _filteredUsers.length,
+                                itemBuilder: (context, index) {
+                                  final user = _filteredUsers[index];
+                                  final uid = user['id'];
 
-                                    // Initialize checkbox state if not present
-                                    _selectedOptions[uid] =
-                                        _selectedOptions[uid] ?? false;
+                                  // Initialize checkbox state if not present
+                                  _selectedOptions[uid] =
+                                      _selectedOptions[uid] ?? false;
 
-                                    return _buildCustomCheckboxTile(
-                                      uid,
-                                      '${user['firstName']} ${user['lastName']}',
-                                      user['contact'],
-                                      user['address'],
-                                      user['status'], // Include status
-                                      user,
-                                    );
-                                  },
-                                )
-                              : Center(child: Text('No users found.')),
-                        ),
-                      ],
-                    ),
+                                  return _buildCustomCheckboxTile(
+                                    uid,
+                                    '${user['firstName']} ${user['lastName']}',
+                                    user['contact'],
+                                    user['address'],
+                                    user['status'], // Include status
+                                    user,
+                                  );
+                                },
+                              )
+                            : Center(child: Text('No users found.')),
+                      ),
+                    ],
                   ),
                 ),
               ],

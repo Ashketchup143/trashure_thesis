@@ -278,7 +278,7 @@ class _ProductInformationState extends State<ProductInformation> {
             _isEditing
                 ? TextFormField(
                     controller: _detailsController,
-                    maxLines: 3,
+                    maxLines: 1,
                     decoration: InputDecoration(
                       labelText: 'Edit Details',
                       border: OutlineInputBorder(),

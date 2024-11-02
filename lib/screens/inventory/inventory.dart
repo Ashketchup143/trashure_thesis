@@ -71,7 +71,7 @@ class _InventoryState extends State<Inventory> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: Sidebar(),
+      drawer: const Sidebar(),
       body: Builder(
         builder: (context) => Container(
           height: MediaQuery.of(context).size.height,
@@ -81,11 +81,12 @@ class _InventoryState extends State<Inventory> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(height: 5),
+                const SizedBox(height: 5),
                 Row(
                   children: [
                     IconButton(
-                      icon: Icon(Icons.menu, color: Colors.green, size: 25),
+                      icon:
+                          const Icon(Icons.menu, color: Colors.green, size: 25),
                       onPressed: () {
                         Scaffold.of(context).openDrawer();
                       },
@@ -94,7 +95,7 @@ class _InventoryState extends State<Inventory> {
                       'Inventory',
                       textAlign: TextAlign.left,
                       style: GoogleFonts.poppins(
-                        textStyle: TextStyle(
+                        textStyle: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 20,
                         ),
@@ -102,7 +103,7 @@ class _InventoryState extends State<Inventory> {
                     ),
                   ],
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
                 // Search Bar
                 Row(
                   children: [
@@ -115,22 +116,22 @@ class _InventoryState extends State<Inventory> {
                       ),
                       child: TextField(
                         controller: _searchController,
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           hintText: 'Search by type or category',
                           border: InputBorder.none,
                           prefixIcon: Icon(Icons.search),
                         ),
                       ),
                     ),
-                    Spacer(), // Push the button to the right
+                    const Spacer(), // Push the button to the right
                     ElevatedButton(
                       onPressed: _openSellProductModal,
-                      child: Text(
+                      child: const Text(
                         'Sell Product',
                         style: TextStyle(color: Colors.white),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF4CAF4F),
+                        backgroundColor: const Color(0xFF4CAF4F),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -138,10 +139,10 @@ class _InventoryState extends State<Inventory> {
                     ),
                   ],
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
                 // Bordered Container for Titles and List
                 Container(
-                  height: MediaQuery.of(context).size.height * .8,
+                  height: MediaQuery.of(context).size.height * .82,
                   width: MediaQuery.of(context).size.width,
                   decoration: BoxDecoration(
                     border: Border.all(), // Add border
@@ -160,8 +161,9 @@ class _InventoryState extends State<Inventory> {
                           ],
                         ),
                       ),
-                      Divider(height: 1, color: Colors.black), // Separator line
-                      SizedBox(height: 10),
+                      const Divider(
+                          height: 1, color: Colors.black), // Separator line
+                      const SizedBox(height: 10),
                       // Use StreamBuilder to dynamically display inventory list
                       Expanded(
                         child: StreamBuilder<QuerySnapshot>(
@@ -170,7 +172,7 @@ class _InventoryState extends State<Inventory> {
                               .snapshots(),
                           builder: (context, snapshot) {
                             if (!snapshot.hasData) {
-                              return Center(
+                              return const Center(
                                 child: CircularProgressIndicator(),
                               );
                             }
@@ -206,7 +208,7 @@ class _InventoryState extends State<Inventory> {
                                 child: Text(
                                   'No items found',
                                   style: GoogleFonts.poppins(
-                                    textStyle: TextStyle(
+                                    textStyle: const TextStyle(
                                       fontWeight: FontWeight.w400,
                                       fontSize: 16,
                                     ),
@@ -244,7 +246,7 @@ class _InventoryState extends State<Inventory> {
         child: Text(
           text,
           style: GoogleFonts.roboto(
-            textStyle: TextStyle(fontWeight: FontWeight.bold),
+            textStyle: const TextStyle(fontWeight: FontWeight.bold),
           ),
         ),
       ),
@@ -276,27 +278,27 @@ class _InventoryState extends State<Inventory> {
             flex: 2,
             child: Text(
               category,
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
           ),
           Expanded(
             flex: 2,
             child: Text(
               type,
-              style: TextStyle(fontSize: 16),
+              style: const TextStyle(fontSize: 16),
             ),
           ),
           Expanded(
             flex: 1,
             child: Text(
               weight,
-              style: TextStyle(fontSize: 16),
+              style: const TextStyle(fontSize: 16),
             ),
           ),
           Expanded(
             flex: 1,
             child: IconButton(
-              icon: Icon(Icons.info_outline),
+              icon: const Icon(Icons.info_outline),
               onPressed: () {
                 // Handle navigation to item details
               },
@@ -323,12 +325,12 @@ class _InventoryState extends State<Inventory> {
         context: context,
         builder: (context) {
           return AlertDialog(
-            title: Text('No Items Selected'),
-            content: Text('Please select at least one item to sell.'),
+            title: const Text('No Items Selected'),
+            content: const Text('Please select at least one item to sell.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: Text('OK'),
+                child: const Text('OK'),
               ),
             ],
           );
@@ -386,47 +388,47 @@ class _InventoryState extends State<Inventory> {
             builder: (context, setState) {
               return Dialog(
                 insetPadding:
-                    EdgeInsets.symmetric(horizontal: 50), // Make it wider
+                    const EdgeInsets.symmetric(horizontal: 50), // Make it wider
                 child: Container(
                   width: MediaQuery.of(context).size.width *
                       0.8, // Set modal width
-                  padding: EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         'Sell Products',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 24,
                         ),
                       ),
-                      SizedBox(height: 20),
+                      const SizedBox(height: 20),
                       // Additional fields for customer name, description, and payment method
                       TextField(
                         controller: customerNameController,
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           labelText: 'Customer Name (Optional)',
                           border: OutlineInputBorder(),
                         ),
                       ),
-                      SizedBox(height: 10),
+                      const SizedBox(height: 10),
                       TextField(
                         controller: descriptionController,
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           labelText: 'Description (Optional)',
                           border: OutlineInputBorder(),
                         ),
                       ),
-                      SizedBox(height: 10),
+                      const SizedBox(height: 10),
                       TextField(
                         controller: paymentMethodController,
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           labelText: 'Payment Method',
                           border: OutlineInputBorder(),
                         ),
                       ),
-                      SizedBox(height: 20),
+                      const SizedBox(height: 20),
                       Expanded(
                         child: SingleChildScrollView(
                           child: Column(
@@ -445,7 +447,7 @@ class _InventoryState extends State<Inventory> {
                                 children: [
                                   Text(
                                       '$category - $type (Available: $currentWeight kg)'),
-                                  SizedBox(height: 10),
+                                  const SizedBox(height: 10),
                                   Row(
                                     children: [
                                       Expanded(
@@ -453,13 +455,13 @@ class _InventoryState extends State<Inventory> {
                                         child: TextField(
                                           controller: weightControllers[itemId],
                                           keyboardType: TextInputType.number,
-                                          decoration: InputDecoration(
+                                          decoration: const InputDecoration(
                                             labelText: 'Weight to sell (kg)',
                                             border: OutlineInputBorder(),
                                           ),
                                         ),
                                       ),
-                                      SizedBox(width: 10),
+                                      const SizedBox(width: 10),
                                       Expanded(
                                         flex: 1,
                                         child: TextField(
@@ -469,7 +471,7 @@ class _InventoryState extends State<Inventory> {
                                             labelText: originalPrice != null
                                                 ? 'Original Price: ₱$originalPrice'
                                                 : 'Enter Price per kg',
-                                            border: OutlineInputBorder(),
+                                            border: const OutlineInputBorder(),
                                             // Suggest original_price in price field if available
                                           ),
                                           // Prefill the original price in the text field if available
@@ -483,34 +485,35 @@ class _InventoryState extends State<Inventory> {
                                       ),
                                     ],
                                   ),
-                                  SizedBox(height: 10),
+                                  const SizedBox(height: 10),
                                   if (percentageProfit != null &&
                                       suggestedPrice != null)
                                     Text(
                                       'Profit: ${percentageProfit.toStringAsFixed(2)}%, Suggested Price: ₱$suggestedPrice',
-                                      style: TextStyle(color: Colors.grey),
+                                      style:
+                                          const TextStyle(color: Colors.grey),
                                     ),
                                   if (errorMessages[itemId] != null &&
                                       errorMessages[itemId]!.isNotEmpty)
                                     Text(
                                       errorMessages[itemId]!,
-                                      style: TextStyle(color: Colors.red),
+                                      style: const TextStyle(color: Colors.red),
                                     ),
-                                  SizedBox(height: 20),
+                                  const SizedBox(height: 20),
                                 ],
                               );
                             }).toList(),
                           ),
                         ),
                       ),
-                      SizedBox(height: 20),
+                      const SizedBox(height: 20),
                       // Buttons for Cancel and Confirm actions, directly added within the dialog content
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           TextButton(
                             onPressed: () => Navigator.of(context).pop(),
-                            child: Text('Cancel'),
+                            child: const Text('Cancel'),
                           ),
                           ElevatedButton(
                             onPressed: () {
@@ -534,7 +537,7 @@ class _InventoryState extends State<Inventory> {
                                     .pop(); // Close the modal after processing
                               }
                             },
-                            child: Text('Confirm Sell'),
+                            child: const Text('Confirm Sell'),
                           ),
                         ],
                       ),

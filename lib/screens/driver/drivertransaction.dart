@@ -62,7 +62,7 @@ class _DriverTransactionsState extends State<DriverTransactions> {
         title: Row(
           children: [
             IconButton(
-              icon: Icon(
+              icon: const Icon(
                 Icons.arrow_back,
                 color: Colors.white,
               ),
@@ -70,9 +70,9 @@ class _DriverTransactionsState extends State<DriverTransactions> {
                 Navigator.pop(context); // Go back to the previous screen
               },
             ),
-            Text(
+            const Text(
               "Booking History",
-              style: TextStyle(color: Colors.white),
+              style: const TextStyle(color: Colors.white),
             ), // Display the driver's name in the app bar
           ],
         ),
@@ -95,7 +95,7 @@ class _DriverTransactionsState extends State<DriverTransactions> {
                   padding: const EdgeInsets.all(16.0),
                   child: Text(
                     'Driver: $name', // Header for Booking data
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Colors.green,
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -106,7 +106,7 @@ class _DriverTransactionsState extends State<DriverTransactions> {
                   padding: const EdgeInsets.only(left: 16),
                   child: Text(
                     'Driver ID: $id', // Display the driver's ID
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Colors.black,
                       fontSize: 18,
                       fontWeight: FontWeight.normal,
@@ -121,7 +121,7 @@ class _DriverTransactionsState extends State<DriverTransactions> {
                         .snapshots(),
                     builder: (context, snapshot) {
                       if (!snapshot.hasData) {
-                        return Center(child: CircularProgressIndicator());
+                        return const Center(child: CircularProgressIndicator());
                       }
 
                       // Filter bookings with 'status' of either 'collected' or 'completed'
@@ -132,7 +132,7 @@ class _DriverTransactionsState extends State<DriverTransactions> {
                       }).toList();
 
                       if (bookings == null || bookings.isEmpty) {
-                        return Center(
+                        return const Center(
                             child: Text(
                                 'No collected or completed bookings found.'));
                       }
@@ -157,7 +157,8 @@ class _DriverTransactionsState extends State<DriverTransactions> {
                             child: ListTile(
                               title: Text(
                                 'Date: ${formatDate(bookingDate)}',
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
                               ),
                               subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -172,7 +173,7 @@ class _DriverTransactionsState extends State<DriverTransactions> {
                                 ],
                               ),
                               trailing: IconButton(
-                                icon: Icon(Icons.info),
+                                icon: const Icon(Icons.info),
                                 onPressed: () {
                                   Navigator.pushNamed(
                                     context,

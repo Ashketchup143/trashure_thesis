@@ -22,7 +22,7 @@ class _ReceivingState extends State<Receiving> {
       drawer: Sidebar(),
       body: Builder(
         builder: (context) => Container(
-          height: MediaQuery.of(context).size.height,
+          height: MediaQuery.of(context).size.height * .96,
           width: MediaQuery.of(context).size.width,
           child: Padding(
             padding: const EdgeInsets.only(top: 20, left: 40, right: 40),
