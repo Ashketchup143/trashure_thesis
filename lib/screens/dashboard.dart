@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import 'package:trashure_thesis/sidebar.dart';
 
 class Dashboard extends StatefulWidget {
@@ -9,37 +11,33 @@ class Dashboard extends StatefulWidget {
 }
 
 class _DashboardState extends State<Dashboard> {
-  Map<String, bool> _selectedOptions = {
-    '1': false,
-    '2': false,
-    '3': false,
-    '4': false,
-  };
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final DateTime _today = DateTime.now();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: Sidebar(), // Add the Sidebar (Drawer) here
+      drawer: Sidebar(),
       body: Builder(
         builder: (context) => Container(
           height: MediaQuery.of(context).size.height,
           width: MediaQuery.of(context).size.width,
-          child: Column(
-            children: [
-              // Add hamburger button here
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
+          padding: const EdgeInsets.all(16.0),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
                     IconButton(
-                      icon: Icon(Icons.menu, color: Colors.green, size: 25),
+                      icon:
+                          const Icon(Icons.menu, color: Colors.green, size: 25),
                       onPressed: () {
-                        Scaffold.of(context).openDrawer(); // Opens the drawer
+                        Scaffold.of(context).openDrawer();
                       },
                     ),
-                    SizedBox(width: 10), // Space between icon and title
-
-                    Text(
+                    const SizedBox(width: 10),
+                    const Text(
                       'Dashboard',
                       style: TextStyle(
                         fontSize: 22,
@@ -49,77 +47,262 @@ class _DashboardState extends State<Dashboard> {
                     ),
                   ],
                 ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      _buildCustomCheckboxTile('1', 'John Doe', '123 Main St',
-                          '2024-09-01', '50kg', 'Recyclable', 'Complete'),
-                      _buildCustomCheckboxTile('2', 'Jane Smith', '456 Elm St',
-                          '2024-09-05', '30kg', 'Organic', 'Pending'),
-                      _buildCustomCheckboxTile('3', 'Alice Brown', '789 Oak St',
-                          '2024-09-10', '20kg', 'Plastic', 'In Progress'),
-                      _buildCustomCheckboxTile('4', 'Alice Brown', '789 Oak St',
-                          '2024-09-10', '20kg', 'Plastic', 'In Progress'),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+                const SizedBox(height: 20),
+                _buildTodaysBookingsTable(),
+                const SizedBox(height: 20),
+                _buildTodaysCollectedBookingsTable(),
+                const SizedBox(height: 20),
+                _buildMostRecentInflowTable(),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildCustomCheckboxTile(
-    String option,
-    String name,
-    String address,
-    String dateBooked,
-    String totalWeight,
-    String typeStatus,
-    String details,
-  ) {
-    return CheckboxListTile(
-      value: _selectedOptions[option],
-      activeColor: Colors.green,
-      onChanged: (bool? value) {
-        setState(() {
-          _selectedOptions[option] = value!;
-        });
-      },
-      title: Row(
-        children: [
-          Expanded(
-              flex: 2,
-              child: Text(name,
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
-          Expanded(flex: 3, child: Text('Address: $address')),
-          Expanded(flex: 2, child: Text('Date: $dateBooked')),
-          Expanded(flex: 2, child: Text('Weight: $totalWeight')),
-          Expanded(flex: 2, child: Text('Type: $typeStatus')),
-          Expanded(flex: 2, child: Text('Details: $details')),
-        ],
-      ),
-      controlAffinity: ListTileControlAffinity.leading,
+  Future<List<DocumentSnapshot>> _fetchTodaysBookings() async {
+    QuerySnapshot snapshot = await _firestore.collection('bookings').get();
+    return snapshot.docs;
+  }
+
+  Widget _buildTodaysBookingsTable() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Today's Bookings",
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.green,
+          ),
+        ),
+        const SizedBox(height: 10),
+        FutureBuilder<List<DocumentSnapshot>>(
+          future: _fetchTodaysBookings(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            var bookings = snapshot.data!.where((doc) {
+              var data = doc.data() as Map<String, dynamic>;
+              var bookingDate = (data['date'] as Timestamp).toDate();
+              var status = data['status']?.toLowerCase() ?? '';
+              return _isSameDay(bookingDate, _today) &&
+                  (status == 'pending' || status == 'collecting');
+            }).toList();
+            return bookings.isEmpty
+                ? Center(child: Text("No bookings for today."))
+                : _buildBookingsTable(bookings);
+          },
+        ),
+      ],
     );
   }
-}
 
-    // Custom Checkbox Tile for multiple selections
-    // Widget _buildCustomCheckboxTile(String option) {
-    //   return CheckboxListTile(
-    //     value: _selectedOptions[option],
-    //     activeColor: Colors.green, // Turns green when checked
-    //     // Background color when checked
-    //     onChanged: (bool? value) {
-    //       setState(() {
-    //         _selectedOptions[option] = value!;
-    //       });
-    //     },
-    //     controlAffinity: ListTileControlAffinity.leading, // Checkbox on the left
-    //   );
-  
+  Widget _buildTodaysCollectedBookingsTable() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Today's Collected Bookings",
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.green,
+          ),
+        ),
+        const SizedBox(height: 10),
+        FutureBuilder<List<DocumentSnapshot>>(
+          future: _fetchTodaysBookings(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            var collectedBookings = snapshot.data!.where((doc) {
+              var data = doc.data() as Map<String, dynamic>;
+              var bookingDate = (data['date'] as Timestamp).toDate();
+              var status = data['status']?.toLowerCase() ?? '';
+              return _isSameDay(bookingDate, _today) &&
+                  (status == 'collected' || status == 'completed');
+            }).toList();
+            return collectedBookings.isEmpty
+                ? Center(child: Text("No collected bookings for today."))
+                : _buildBookingsTable(collectedBookings);
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBookingsTable(List<DocumentSnapshot> bookings) {
+    return Table(
+      border: TableBorder.all(color: Colors.grey),
+      columnWidths: const {
+        0: FlexColumnWidth(1),
+        1: FlexColumnWidth(2),
+        2: FlexColumnWidth(2),
+        3: FlexColumnWidth(2),
+        4: FlexColumnWidth(2),
+      },
+      children: [
+        TableRow(
+          children: [
+            _buildTableHeaderCell('Booking ID'),
+            _buildTableHeaderCell('Date'),
+            _buildTableHeaderCell('Status'),
+            _buildTableHeaderCell('Driver'),
+            _buildTableHeaderCell('Vehicle'), // New column for Vehicle
+          ],
+        ),
+        ...bookings.map((booking) {
+          var data = booking.data() as Map<String, dynamic>;
+          var date = (data['date'] as Timestamp).toDate();
+          var formattedDate = DateFormat('yyyy-MM-dd').format(date);
+          return TableRow(
+            children: [
+              _buildTableCell(booking.id),
+              _buildTableCell(formattedDate),
+              _buildTableCell(data['status'] ?? 'N/A'),
+              _buildTableCell(data['driver'] ?? 'N/A'),
+              _buildTableCell(data['vehicle'] ?? 'N/A'), // Display vehicle
+            ],
+          );
+        }).toList(),
+      ],
+    );
+  }
+
+  Widget _buildMostRecentInflowTable() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Most Recent Inflows',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.green,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey),
+            borderRadius: BorderRadius.circular(8.0),
+          ),
+          padding: const EdgeInsets.all(8.0),
+          child: StreamBuilder<QuerySnapshot>(
+            stream: _firestore
+                .collection('inflow')
+                .orderBy('date', descending: true)
+                .limit(5)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              var inflows = snapshot.data!.docs;
+              if (inflows.isEmpty) {
+                return Center(child: Text("No recent inflows."));
+              }
+              return ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: inflows.length,
+                itemBuilder: (context, index) {
+                  var inflowData =
+                      inflows[index].data() as Map<String, dynamic>;
+                  var date = (inflowData['date'] as Timestamp).toDate();
+                  var formattedDate = DateFormat('yyyy-MM-dd').format(date);
+                  return ExpansionTile(
+                    title: Row(
+                      children: [
+                        Expanded(
+                            flex: 2,
+                            child: Text(inflowData['authorized_by'] ?? 'N/A')),
+                        Expanded(
+                            flex: 2,
+                            child: Text(inflowData['customer_name'] ?? 'N/A')),
+                        Expanded(flex: 2, child: Text(formattedDate)),
+                        Expanded(
+                            flex: 2,
+                            child: Text(
+                                'PHP ${inflowData['overall_total']?.toStringAsFixed(2) ?? '0.00'}')),
+                        Expanded(
+                            flex: 2,
+                            child: Text(inflowData['payment_method'] ?? 'N/A')),
+                      ],
+                    ),
+                    children: [
+                      _buildSoldItems(inflows[index].id),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSoldItems(String inflowId) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore
+          .collection('inflow')
+          .doc(inflowId)
+          .collection('sold')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        var soldItems = snapshot.data!.docs;
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: soldItems.length,
+          itemBuilder: (context, index) {
+            var soldData = soldItems[index].data() as Map<String, dynamic>;
+            return ListTile(
+              title: Text('Item: ${soldData['type']}'),
+              subtitle: Text(
+                'Price: PHP ${soldData['price']}, Weight: ${soldData['weight']} kg, Total: PHP ${soldData['item_total']}',
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildTableHeaderCell(String text) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Text(
+        text,
+        style:
+            const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+
+  Widget _buildTableCell(String text) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+
+  bool _isSameDay(DateTime date1, DateTime date2) {
+    return date1.year == date2.year &&
+        date1.month == date2.month &&
+        date1.day == date2.day;
+  }
+}

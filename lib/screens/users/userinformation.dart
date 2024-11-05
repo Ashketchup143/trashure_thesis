@@ -250,7 +250,6 @@ class _UserInformationState extends State<UserInformation> {
     );
   }
 
-  // Modified _buildBookingsList function
   Widget _buildBookingsList(String userId) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('bookings').snapshots(),
@@ -292,94 +291,64 @@ class _UserInformationState extends State<UserInformation> {
                 var formattedDate = DateFormat('MM/dd/yyyy').format(date);
                 var status = bookingData['status'] ?? 'Unknown';
 
-                // Call the function to get user-specific data for amount and weight
-                return FutureBuilder<Map<String, dynamic>?>(
-                  future: _fetchUserBookingDetails(bookingId, userId, status),
-                  builder: (context, userBookingSnapshot) {
-                    if (!userBookingSnapshot.hasData) {
-                      return Center(child: CircularProgressIndicator());
-                    }
-
-                    var userBookingDetails = userBookingSnapshot.data!;
-                    var totalAmount = userBookingDetails['totalAmount'];
-                    var totalWeight = userBookingDetails['totalWeight'];
-
-                    return Container(
-                      margin:
-                          EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-                      padding: EdgeInsets.all(8.0),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey),
-                        borderRadius: BorderRadius.circular(8),
-                        color: Colors.white,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                return Container(
+                  margin: EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                  padding: EdgeInsets.all(8.0),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                  child:
-                                      Text('Date', style: _headerTextStyle())),
-                              Expanded(
-                                  child: Text('Booking ID',
-                                      style: _headerTextStyle())),
-                              Expanded(
-                                  child: Text('Driver',
-                                      style: _headerTextStyle())),
-                              Expanded(
-                                  child: Text('Vehicle',
-                                      style: _headerTextStyle())),
-                              Expanded(
-                                  child: Text('Total Amount',
-                                      style: _headerTextStyle())),
-                              Expanded(
-                                  child: Text('Total Weight',
-                                      style: _headerTextStyle())),
-                              Expanded(
-                                  child: Text('Status',
-                                      style: _headerTextStyle())),
-                            ],
-                          ),
-                          Divider(),
-                          Row(
-                            children: [
-                              Expanded(child: Text(formattedDate)),
-                              Expanded(child: Text(bookingId)),
-                              Expanded(child: Text(driver)),
-                              Expanded(child: Text(vehicle)),
-                              Expanded(
-                                  child: Text(
-                                      '₱${totalAmount.toStringAsFixed(2)}')),
-                              Expanded(
-                                  child: Text(
-                                      '${totalWeight.toStringAsFixed(2)} kg')),
-                              Expanded(
-                                  child: Text(status,
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold))),
-                            ],
-                          ),
-                          SizedBox(height: 10),
-                          ExpansionTile(
-                            title: Text(
-                              'Recyclables',
-                              style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.bold),
-                            ),
-                            children: [
-                              Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 8.0),
-                                child: _buildRecyclablesList(
-                                    bookingId, userId, status),
-                              ),
-                            ],
+                          Expanded(
+                              child: Text('Date', style: _headerTextStyle())),
+                          Expanded(
+                              child: Text('Booking ID',
+                                  style: _headerTextStyle())),
+                          Expanded(
+                              child: Text('Driver', style: _headerTextStyle())),
+                          Expanded(
+                              child:
+                                  Text('Vehicle', style: _headerTextStyle())),
+                          Expanded(
+                              child: Text('Status', style: _headerTextStyle())),
+                        ],
+                      ),
+                      Divider(),
+                      Row(
+                        children: [
+                          Expanded(child: Text(formattedDate)),
+                          Expanded(child: Text(bookingId)),
+                          Expanded(child: Text(driver)),
+                          Expanded(child: Text(vehicle)),
+                          Expanded(
+                              child: Text(status,
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold))),
+                        ],
+                      ),
+                      SizedBox(height: 10),
+                      ExpansionTile(
+                        title: Text(
+                          'Recyclables',
+                          style:
+                              GoogleFonts.poppins(fontWeight: FontWeight.bold),
+                        ),
+                        children: [
+                          Padding(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 8.0),
+                            child: _buildRecyclablesList(
+                                bookingId, userId, status),
                           ),
                         ],
                       ),
-                    );
-                  },
+                    ],
+                  ),
                 );
               },
             );
@@ -389,35 +358,6 @@ class _UserInformationState extends State<UserInformation> {
     );
   }
 
-  // New function to fetch user-specific details for total amount and weight
-  Future<Map<String, dynamic>> _fetchUserBookingDetails(
-      String bookingId, String userId, String status) async {
-    var userDoc = await FirebaseFirestore.instance
-        .collection('bookings')
-        .doc(bookingId)
-        .collection('users')
-        .doc(userId)
-        .get();
-
-    if (!userDoc.exists) {
-      return {'totalAmount': 0.0, 'totalWeight': 0.0};
-    }
-
-    var userData = userDoc.data()!;
-    var totalAmount = (status == 'collected' || status == 'completed')
-        ? userData['final_total_price'] ?? 0.0
-        : userData['total_price'] ?? 0.0;
-    var totalWeight = (status == 'collected' || status == 'completed')
-        ? userData['final_total_weight'] ?? 0.0
-        : userData['total_weight'] ?? 0.0;
-
-    return {
-      'totalAmount': totalAmount,
-      'totalWeight': totalWeight,
-    };
-  }
-
-// Helper function to filter bookings based on userId locally
   Future<List<Map<String, dynamic>>> _filterBookingsByUser(
       List<DocumentSnapshot> bookings, String userId) async {
     List<Map<String, dynamic>> userBookings = [];
@@ -436,7 +376,6 @@ class _UserInformationState extends State<UserInformation> {
     return userBookings;
   }
 
-// Helper function for header text style
   TextStyle _headerTextStyle() {
     return TextStyle(
       fontWeight: FontWeight.bold,
@@ -445,7 +384,6 @@ class _UserInformationState extends State<UserInformation> {
     );
   }
 
-// Method to build list of recyclables within a user's document in a booking in horizontal row format
   Widget _buildRecyclablesList(String bookingId, String userId, String status) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -469,9 +407,23 @@ class _UserInformationState extends State<UserInformation> {
           );
         }
 
+        double totalAmount = 0;
+        double totalWeight = 0;
+
+        recyclables.forEach((recyclable) {
+          var data = recyclable.data() as Map<String, dynamic>;
+          var weight = data['weight'] ?? 0.0;
+          var pricePerKg = data['price'] ?? 0.0;
+          var itemPrice = (status == 'collected' || status == 'completed')
+              ? data['final_item_price'] ?? weight * pricePerKg
+              : weight * pricePerKg;
+
+          totalWeight += weight;
+          totalAmount += itemPrice;
+        });
+
         return Column(
           children: [
-            // Header row for recyclables
             Row(
               children: [
                 Expanded(child: Text('Type', style: _headerTextStyle())),
@@ -482,18 +434,13 @@ class _UserInformationState extends State<UserInformation> {
               ],
             ),
             Divider(),
-            // Each recyclable item in a horizontal row
             ...recyclables.map((recyclable) {
-              var recyclableData = recyclable.data() as Map<String, dynamic>;
-              var type = recyclableData['type'] ?? 'Unknown';
-
-              // Show appropriate weight, price, and item price based on the status
-              var weight = (status == 'collected' || status == 'completed')
-                  ? recyclableData['final_weight'] ?? recyclableData['weight']
-                  : recyclableData['weight'];
-              var price = recyclableData['price'] ?? 0.0;
+              var data = recyclable.data() as Map<String, dynamic>;
+              var type = data['type'] ?? 'Unknown';
+              var weight = data['weight'] ?? 0.0;
+              var price = data['price'] ?? 0.0;
               var itemPrice = (status == 'collected' || status == 'completed')
-                  ? recyclableData['final_item_price'] ?? (weight * price)
+                  ? data['final_item_price'] ?? weight * price
                   : weight * price;
 
               return Padding(
@@ -508,6 +455,21 @@ class _UserInformationState extends State<UserInformation> {
                 ),
               );
             }).toList(),
+            Divider(),
+            Row(
+              children: [
+                Expanded(
+                    child: Text('Total',
+                        style: TextStyle(fontWeight: FontWeight.bold))),
+                Expanded(
+                    child: Text('${totalWeight.toStringAsFixed(2)} kg',
+                        style: TextStyle(fontWeight: FontWeight.bold))),
+                Expanded(child: SizedBox()),
+                Expanded(
+                    child: Text('₱${totalAmount.toStringAsFixed(2)}',
+                        style: TextStyle(fontWeight: FontWeight.bold))),
+              ],
+            ),
           ],
         );
       },

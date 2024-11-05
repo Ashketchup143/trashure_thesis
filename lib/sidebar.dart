@@ -37,7 +37,7 @@ class _SidebarState extends State<Sidebar> {
       // Navigate to the login screen after logout with a slight delay to allow the SnackBar to be visible
       Future.delayed(Duration(seconds: 1), () {
         Navigator.pushReplacementNamed(
-            context, '/login'); // Replace '/login' with your login route
+            context, '/'); // Replace '/login' with your login route
       });
     } catch (e) {
       print('Error signing out: $e');
@@ -60,7 +60,6 @@ class _SidebarState extends State<Sidebar> {
       String? userEmail = currentUser.email;
       if (userEmail != null) {
         try {
-          // Query Firestore to find the document with the matching email
           QuerySnapshot<Map<String, dynamic>> userSnapshot =
               await FirebaseFirestore.instance
                   .collection('employees')
@@ -73,11 +72,17 @@ class _SidebarState extends State<Sidebar> {
             String userName = userData['name'] ?? 'Unknown User';
             String userRole = userData['position'] ?? 'No Position';
 
-            // Set the username and role in the Provider
             Provider.of<UserModel>(context, listen: false)
                 .setUserName(userName);
             Provider.of<UserModel>(context, listen: false)
                 .setUserRole(userRole);
+
+            // Check if the role is 'driver' and redirect to /driver
+            if (userRole.toLowerCase() == 'driver') {
+              Future.delayed(Duration.zero, () {
+                Navigator.pushReplacementNamed(context, '/driver');
+              });
+            }
           } else {
             print('User document does not exist.');
           }

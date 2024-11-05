@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:trashure_thesis/sidebar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -42,7 +43,7 @@ class _EmployeesState extends State<Employees> {
         'birth_date': doc['birth_date'],
         'contact_number': doc['contact_number'],
         'email_address': doc['email_address'],
-        'salary_per_hour': doc['salary_per_hour'],
+        'salary_per_day': double.parse(doc['salary_per_day']),
       };
     }).toList();
 
@@ -50,10 +51,10 @@ class _EmployeesState extends State<Employees> {
     Map<String, bool> tempSelectedOptions = {};
 
     for (var employee in tempEmployeesList) {
-      String employeeid = employee['id'];
-      tempSelectedOptions[employeeid] = false;
-      bool isClockedIn = await _checkIfClockedIn(employeeid);
-      tempAttendanceStatus[employeeid] = isClockedIn;
+      String employeeId = employee['id'];
+      tempSelectedOptions[employeeId] = false;
+      bool isClockedIn = await _checkIfClockedIn(employeeId);
+      tempAttendanceStatus[employeeId] = isClockedIn;
     }
 
     setState(() {
@@ -64,17 +65,17 @@ class _EmployeesState extends State<Employees> {
     });
   }
 
-  Future<bool> _checkIfClockedIn(String employeeid) async {
+  Future<bool> _checkIfClockedIn(String employeeId) async {
     try {
       DocumentReference employeeDocRef =
-          FirebaseFirestore.instance.collection('employees').doc(employeeid);
+          FirebaseFirestore.instance.collection('employees').doc(employeeId);
       QuerySnapshot dtrSnapshot = await employeeDocRef
           .collection('daily_time_record')
           .where('time_out', isNull: true)
           .get();
       return dtrSnapshot.docs.isNotEmpty;
     } catch (e) {
-      print('Error checking attendance status for $employeeid: $e');
+      print('Error checking attendance status for $employeeId: $e');
       return false;
     }
   }
@@ -88,6 +89,162 @@ class _EmployeesState extends State<Employees> {
             employee['id'].toLowerCase().contains(searchTerm);
       }).toList();
     });
+  }
+
+  Future<void> _timeIn(String employeeId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('employees')
+          .doc(employeeId)
+          .collection('daily_time_record')
+          .add({
+        'date': DateTime.now(),
+        'time_in': FieldValue.serverTimestamp(),
+        'time_out': null,
+      });
+    } catch (e) {
+      print('Error during Time In: $e');
+    }
+  }
+
+  Future<void> _timeOut(
+      String employeeId, String employeeName, double salaryPerDay) async {
+    try {
+      QuerySnapshot dtrSnapshot = await FirebaseFirestore.instance
+          .collection('employees')
+          .doc(employeeId)
+          .collection('daily_time_record')
+          .where('time_out', isNull: true)
+          .get();
+
+      if (dtrSnapshot.docs.isNotEmpty) {
+        DocumentReference dtrDocRef = dtrSnapshot.docs.first.reference;
+        await dtrDocRef.update({
+          'time_out': FieldValue.serverTimestamp(),
+        });
+
+        // Calculate pay after setting time_out
+        _calculateAndShowDailyPay(employeeId, employeeName, salaryPerDay);
+      }
+    } catch (e) {
+      print('Error during Time Out: $e');
+    }
+  }
+
+  Future<void> _calculateAndShowDailyPay(
+      String employeeId, String employeeName, double salaryPerDay) async {
+    try {
+      DateTime now = DateTime.now();
+      DateTime startOfDay = DateTime(now.year, now.month, now.day, 0, 0, 0);
+      DateTime endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+      QuerySnapshot attendanceSnapshot = await FirebaseFirestore.instance
+          .collection('employees')
+          .doc(employeeId)
+          .collection('daily_time_record')
+          .where('time_in',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+          .where('time_in', isLessThanOrEqualTo: Timestamp.fromDate(endOfDay))
+          .get();
+
+      if (attendanceSnapshot.docs.isEmpty) {
+        _showPayModal(
+            context, employeeId, employeeName, 0.0, salaryPerDay, 0.0);
+        return;
+      }
+
+      double totalHoursWorked = 0.0;
+
+      // Iterate through each time-in and time-out pair to calculate total hours worked
+      for (var attendanceDoc in attendanceSnapshot.docs) {
+        Timestamp timeInTimestamp = attendanceDoc['time_in'];
+        Timestamp? timeOutTimestamp = attendanceDoc['time_out'];
+
+        if (timeOutTimestamp != null) {
+          DateTime timeIn = timeInTimestamp.toDate();
+          DateTime timeOut = timeOutTimestamp.toDate();
+          double hoursWorked = timeOut.difference(timeIn).inMinutes / 60.0;
+          totalHoursWorked += hoursWorked;
+        }
+      }
+
+      // Calculate total pay based on total hours worked
+      double totalPay = 0.0;
+      if (totalHoursWorked >= 8) {
+        double regularPay = salaryPerDay;
+        double overtimeHours = totalHoursWorked - 8;
+        double overtimeRate = (salaryPerDay / 8) * 1.05;
+        totalPay = regularPay + (overtimeHours * overtimeRate);
+      } else {
+        totalPay = (salaryPerDay / 8) * totalHoursWorked;
+      }
+
+      _showPayModal(context, employeeId, employeeName, totalHoursWorked,
+          salaryPerDay, totalPay);
+    } catch (e) {
+      print('Error calculating daily pay for $employeeId: $e');
+    }
+  }
+
+  void _showPayModal(
+      BuildContext context,
+      String employeeId,
+      String employeeName,
+      double hoursWorked,
+      double salaryPerDay,
+      double totalPay) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Daily Pay Calculation for $employeeName'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Hours Worked: ${hoursWorked.toStringAsFixed(2)}'),
+              Text(
+                  'Daily Salary Rate: ${NumberFormat.currency(symbol: "\$").format(salaryPerDay)}'),
+              Text(
+                  'Total Pay: ${NumberFormat.currency(symbol: "\$").format(totalPay)}'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: Text('Close'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                await _recordPayment(employeeId, employeeName, totalPay);
+                Navigator.pop(context); // Close the modal after payment
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Payment recorded for $employeeName')),
+                );
+              },
+              child: Text('Pay'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _recordPayment(
+      String employeeId, String employeeName, double totalPay) async {
+    try {
+      await FirebaseFirestore.instance.collection('outflow').add({
+        'category': 'employee wage',
+        'date': Timestamp.fromDate(DateTime.now()),
+        'employee': employeeName,
+        'employeeid': employeeId,
+        'price': totalPay,
+      });
+      print('Payment recorded successfully in outflow.');
+    } catch (e) {
+      print('Error recording payment: $e');
+    }
   }
 
   @override
@@ -174,37 +331,6 @@ class _EmployeesState extends State<Employees> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 20),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/payroll');
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0062FF),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30)),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SizedBox(width: 8),
-                      Text(
-                        'Payroll',
-                        style: GoogleFonts.roboto(
-                            textStyle: const TextStyle(
-                                fontWeight: FontWeight.w300,
-                                color: Colors.white)),
-                      ),
-                      const Icon(
-                        Icons.receipt_long_outlined,
-                        size: 20,
-                        color: Colors.white,
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
             const SizedBox(height: 20),
@@ -231,23 +357,79 @@ class _EmployeesState extends State<Employees> {
                       itemCount: _filteredEmployees.length,
                       itemBuilder: (context, index) {
                         var employee = _filteredEmployees[index];
-                        var employeeid = employee['id'];
+                        var employeeId = employee['id'];
                         var name = employee['name'];
                         var position = employee['position'];
                         var expTimeIn = employee['exp_time_in'];
                         var expTimeOut = employee['exp_time_out'];
+                        double salaryPerDay = employee['salary_per_day'];
 
-                        _selectedOptions[employeeid] ??= false;
-                        _attendanceStatus[employeeid] ??= false;
-
-                        return _buildCustomCheckboxTile(
-                          employeeid,
-                          employeeid,
-                          name,
-                          position,
-                          expTimeIn,
-                          expTimeOut,
-                          employee,
+                        return CheckboxListTile(
+                          value: _selectedOptions[employeeId],
+                          activeColor: Colors.green,
+                          onChanged: (bool? value) {
+                            setState(() {
+                              _selectedOptions[employeeId] = value!;
+                            });
+                          },
+                          title: Row(
+                            children: [
+                              _buildText(employeeId, 2),
+                              _buildTitleText(name, 2),
+                              _buildText(position, 2),
+                              _buildText(expTimeIn, 2),
+                              _buildText(expTimeOut, 2),
+                              Expanded(
+                                flex: 2,
+                                child: ElevatedButton(
+                                  onPressed: () async {
+                                    if (_attendanceStatus[employeeId] == null ||
+                                        !_attendanceStatus[employeeId]!) {
+                                      await _timeIn(employeeId);
+                                      setState(() {
+                                        _attendanceStatus[employeeId] = true;
+                                      });
+                                    } else {
+                                      await _timeOut(
+                                          employeeId, name, salaryPerDay);
+                                      setState(() {
+                                        _attendanceStatus[employeeId] = false;
+                                      });
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor:
+                                        _attendanceStatus[employeeId] == true
+                                            ? Colors.red
+                                            : Colors.blue,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(15)),
+                                  ),
+                                  child: Text(
+                                    _attendanceStatus[employeeId] == true
+                                        ? 'Time Out'
+                                        : 'Time In',
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 1,
+                                child: IconButton(
+                                  icon: const Icon(Icons.info_outline),
+                                  onPressed: () {
+                                    Navigator.pushNamed(
+                                      context,
+                                      '/employeeprofile',
+                                      arguments: employee,
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          controlAffinity: ListTileControlAffinity.leading,
                         );
                       },
                     ),
@@ -277,126 +459,6 @@ class _EmployeesState extends State<Employees> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildCustomCheckboxTile(
-    String option,
-    String employeeid,
-    String empname,
-    String position,
-    String exptimein,
-    String exptimeout,
-    Map<String, dynamic> employee,
-  ) {
-    return Column(
-      children: [
-        CheckboxListTile(
-          value: _selectedOptions[option],
-          activeColor: Colors.green,
-          onChanged: (bool? value) {
-            setState(() {
-              _selectedOptions[option] = value!;
-            });
-          },
-          title: Row(
-            children: [
-              _buildText(employeeid, 2),
-              _buildTitleText(empname, 2),
-              _buildText(position, 2),
-              _buildText(exptimein, 2),
-              _buildText(exptimeout, 2),
-              Expanded(
-                flex: 2,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    if (_attendanceStatus[option] == null ||
-                        !_attendanceStatus[option]!) {
-                      try {
-                        DocumentReference employeeDocRef = FirebaseFirestore
-                            .instance
-                            .collection('employees')
-                            .doc(employeeid);
-
-                        await employeeDocRef
-                            .collection('daily_time_record')
-                            .add({
-                          'date': DateTime.now(),
-                          'time_in': FieldValue.serverTimestamp(),
-                          'time_out': null,
-                        });
-
-                        setState(() {
-                          _attendanceStatus[option] = true;
-                        });
-
-                        print('Time In recorded for employee $employeeid');
-                      } catch (e) {
-                        print('Error during Time In: $e');
-                      }
-                    } else {
-                      try {
-                        DocumentReference employeeDocRef = FirebaseFirestore
-                            .instance
-                            .collection('employees')
-                            .doc(employeeid);
-
-                        QuerySnapshot dtrSnapshot = await employeeDocRef
-                            .collection('daily_time_record')
-                            .where('time_out', isNull: true)
-                            .get();
-
-                        if (dtrSnapshot.docs.isNotEmpty) {
-                          DocumentReference dtrDocRef =
-                              dtrSnapshot.docs.first.reference;
-                          await dtrDocRef.update({
-                            'time_out': FieldValue.serverTimestamp(),
-                          });
-
-                          setState(() {
-                            _attendanceStatus[option] = false;
-                          });
-
-                          print('Time Out recorded for employee $employeeid');
-                        } else {
-                          print('No time_in record found to update time_out');
-                        }
-                      } catch (e) {
-                        print('Error during Time Out: $e');
-                      }
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _attendanceStatus[option] == true
-                        ? Colors.red
-                        : Colors.blue,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15)),
-                  ),
-                  child: Text(
-                    _attendanceStatus[option] == true ? 'Time Out' : 'Time In',
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ),
-              ),
-              Expanded(
-                flex: 1,
-                child: IconButton(
-                  icon: const Icon(Icons.info_outline),
-                  onPressed: () {
-                    Navigator.pushNamed(
-                      context,
-                      '/employeeprofile',
-                      arguments: employee,
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-          controlAffinity: ListTileControlAffinity.leading,
-        ),
-      ],
     );
   }
 
@@ -441,7 +503,7 @@ class _EmployeesState extends State<Employees> {
           title: const Text('Add New Employee'),
           content: SingleChildScrollView(
             child: Container(
-              height: 500,
+              height: 600,
               width: MediaQuery.of(context).size.width * 0.4,
               child: Column(
                 children: [
@@ -475,7 +537,7 @@ class _EmployeesState extends State<Employees> {
                   TextField(
                     controller: salaryController,
                     decoration:
-                        const InputDecoration(labelText: 'Salary Per Hour'),
+                        const InputDecoration(labelText: 'Salary Per Day'),
                   ),
                   TextField(
                     controller: birthDateController,
@@ -526,7 +588,7 @@ class _EmployeesState extends State<Employees> {
                     'address': addressController.text,
                     'email_address': emailController.text,
                     'position': positionController.text,
-                    'salary_per_hour': salaryController.text,
+                    'salary_per_day': salaryController.text,
                     'password': passwordController.text,
                     'birth_date': birthDateController.text,
                     'exp_time_in': expTimeInController.text.isNotEmpty

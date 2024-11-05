@@ -50,8 +50,8 @@ class MyApp extends StatelessWidget {
         initialRoute: '/login', // Set initial route to the login screen
         debugShowCheckedModeBanner: false,
         routes: {
-          '/': (context) => Booking(),
-          '/login': (context) => Login(),
+          '/': (context) => Login(),
+          // '/login': (context) => Login(),
           '/dashboard': (context) => Dashboard(),
           '/users': (context) => Users(),
           '/bookings': (context) => Booking(),

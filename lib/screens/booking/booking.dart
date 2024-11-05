@@ -252,7 +252,7 @@ class _BookingState extends State<Booking> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'District',
+                            'Location',
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                           Text(
@@ -274,21 +274,32 @@ class _BookingState extends State<Booking> {
                           var location = locations[index];
                           var locationData =
                               location.data() as Map<String, dynamic>;
-                          var district = locationData['district'] ?? 'Unknown';
+                          var district =
+                              locationData['district'] ?? 'Unknown District';
+                          var locationName =
+                              locationData['location'] ?? 'Unknown Location';
                           var suggestedDays = List<String>.from(
                               locationData['suggested_days'] ?? []);
 
                           return Card(
                             margin: const EdgeInsets.symmetric(vertical: 4.0),
                             child: ListTile(
-                              title: Text(district,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold)),
-                              subtitle: Wrap(
-                                spacing: 8.0,
-                                children: suggestedDays
-                                    .map((day) => Chip(label: Text(day)))
-                                    .toList(),
+                              title: Text(
+                                locationName,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('District: $district'),
+                                  Wrap(
+                                    spacing: 8.0,
+                                    children: suggestedDays
+                                        .map((day) => Chip(label: Text(day)))
+                                        .toList(),
+                                  ),
+                                ],
                               ),
                               trailing: IconButton(
                                 icon:
@@ -352,7 +363,7 @@ class _BookingState extends State<Booking> {
   }
 
   void _showAddDistrictModal(BuildContext context) {
-    final TextEditingController _districtController = TextEditingController();
+    final TextEditingController _locationController = TextEditingController();
     List<String> _selectedDays = [];
     final List<String> _daysOfWeek = [
       'Monday',
@@ -362,6 +373,8 @@ class _BookingState extends State<Booking> {
       'Friday',
       'Saturday'
     ];
+    String? selectedDistrict;
+    final List<String> districts = ['1', '2', '3'];
 
     showDialog(
       context: context,
@@ -373,10 +386,29 @@ class _BookingState extends State<Booking> {
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  TextField(
-                    controller: _districtController,
+                  DropdownButtonFormField<String>(
+                    value: selectedDistrict,
                     decoration: const InputDecoration(
-                      labelText: 'District Name',
+                      labelText: 'Select District',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: districts.map((district) {
+                      return DropdownMenuItem<String>(
+                        value: district,
+                        child: Text(district),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        selectedDistrict = newValue;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _locationController,
+                    decoration: const InputDecoration(
+                      labelText: 'Location Name',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -424,22 +456,23 @@ class _BookingState extends State<Booking> {
             ),
             ElevatedButton(
               onPressed: () async {
-                String district = _districtController.text.trim();
-                if (district.isNotEmpty) {
+                if (selectedDistrict != null &&
+                    _locationController.text.trim().isNotEmpty) {
                   await FirebaseFirestore.instance.collection('locations').add({
-                    'district': district.toLowerCase(),
+                    'district': selectedDistrict,
+                    'location': _locationController.text.trim().toUpperCase(),
                     'suggested_days': _selectedDays,
                   });
 
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content: Text('District added successfully!')),
+                        content: Text('Location added successfully!')),
                   );
                   Navigator.of(context).pop();
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content: Text('Please enter a district name.')),
+                        content: Text('Please complete all fields.')),
                   );
                 }
               },
@@ -452,8 +485,18 @@ class _BookingState extends State<Booking> {
   }
 
   void _showAddScheduleModal() {
-    final TextEditingController _districtController = TextEditingController();
+    final TextEditingController _locationController = TextEditingController();
+    final List<String> districts = [
+      'All',
+      '1',
+      '2',
+      '3'
+    ]; // Including "All" option
+    String? selectedDistrict = 'All';
+    List<String> selectedLocations = [];
+    String? errorMessage;
 
+    // Fetch locations from Firestore
     FirebaseFirestore.instance.collection('locations').get().then((snapshot) {
       locations = snapshot.docs.map((doc) {
         var data = doc.data() as Map<String, dynamic>;
@@ -467,108 +510,176 @@ class _BookingState extends State<Booking> {
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setState) {
-            String? selectedLocation;
-            String? errorMessage;
+            // Filter locations based on selected district
+            List<Map<String, dynamic>> filteredLocations =
+                selectedDistrict == 'All'
+                    ? locations
+                    : locations
+                        .where((loc) => loc['district'] == selectedDistrict)
+                        .toList();
 
             return AlertDialog(
               title: const Text('Add Schedule'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: dateController,
-                    decoration: const InputDecoration(
-                      labelText: "Select Date",
-                      border: OutlineInputBorder(),
+              content: SizedBox(
+                width: 400, // Set your desired width
+                height: 500, // Set your desired height
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: dateController,
+                      decoration: const InputDecoration(
+                        labelText: "Select Date",
+                        border: OutlineInputBorder(),
+                      ),
+                      readOnly: true,
+                      onTap: () async {
+                        DateTime? pickedDate = await showDatePicker(
+                          context: context,
+                          initialDate: selectedDate,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2030),
+                        );
+                        if (pickedDate != null) {
+                          setState(() {
+                            selectedDate = pickedDate;
+                            dateController.text = _formatDate(pickedDate);
+                          });
+                        }
+                      },
                     ),
-                    readOnly: true,
-                    onTap: () async {
-                      DateTime? pickedDate = await showDatePicker(
-                        context: context,
-                        initialDate: selectedDate,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime(2030),
-                      );
-                      if (pickedDate != null) {
+                    const SizedBox(height: 10),
+                    // District Dropdown
+                    DropdownButtonFormField<String>(
+                      value: selectedDistrict,
+                      decoration: const InputDecoration(
+                        labelText: 'Select District',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: districts.map((district) {
+                        return DropdownMenuItem<String>(
+                          value: district,
+                          child: Text(district == 'All'
+                              ? 'All Districts'
+                              : 'District $district'),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
                         setState(() {
-                          selectedDate = pickedDate;
-                          dateController.text =
-                              "${pickedDate.year}-${pickedDate.month}-${pickedDate.day}";
+                          selectedDistrict = newValue;
+                          selectedLocations
+                              .clear(); // Clear selected locations on district change
                         });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  DropdownButtonHideUnderline(
-                    child: DropdownButtonFormField<String>(
-                      value: selectedLocation,
-                      menuMaxHeight: 200,
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    // Button to add all locations
+                    const SizedBox(height: 10),
+                    // Location Dropdown (allows multiple selections)
+                    DropdownButtonFormField<String>(
                       decoration: const InputDecoration(
                         labelText: 'Select Location',
                         border: OutlineInputBorder(),
                       ),
-                      items: _getLocationDropdownItems(),
+                      items: filteredLocations.map((location) {
+                        return DropdownMenuItem<String>(
+                          value: location['id'],
+                          child: Text(location['location']),
+                        );
+                      }).toList(),
                       onChanged: (String? newValue) {
-                        setState(() {
-                          selectedLocation = newValue;
-                        });
+                        if (newValue != null &&
+                            !selectedLocations.contains(newValue)) {
+                          setState(() {
+                            selectedLocations.add(newValue);
+                          });
+                        }
                       },
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  TextFormField(
-                    controller: startTimeController,
-                    decoration: const InputDecoration(
-                      labelText: "Start Time",
-                      border: OutlineInputBorder(),
-                    ),
-                    readOnly: true,
-                    onTap: () async {
-                      TimeOfDay? pickedTime = await showTimePicker(
-                        context: context,
-                        initialTime: const TimeOfDay(hour: 5, minute: 0),
-                      );
-                      if (pickedTime != null) {
+                    const SizedBox(height: 8),
+                    ElevatedButton(
+                      onPressed: () {
                         setState(() {
-                          selectedStartTime = pickedTime;
-                          startTimeController.text = pickedTime.format(context);
+                          selectedLocations = filteredLocations
+                              .map<String>(
+                                  (location) => location['id'] as String)
+                              .toList();
                         });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  TextFormField(
-                    controller: endTimeController,
-                    decoration: const InputDecoration(
-                      labelText: "End Time",
-                      border: OutlineInputBorder(),
+                      },
+                      child: const Text("Add All Locations"),
                     ),
-                    readOnly: true,
-                    onTap: () async {
-                      TimeOfDay? pickedTime = await showTimePicker(
-                        context: context,
-                        initialTime: const TimeOfDay(hour: 17, minute: 0),
-                      );
-                      if (pickedTime != null) {
-                        setState(() {
-                          selectedEndTime = pickedTime;
-                          endTimeController.text = pickedTime.format(context);
-                        });
-                      }
-                    },
-                  ),
-                  if (errorMessage != null)
-                    Text(
-                      errorMessage!,
-                      style: const TextStyle(color: Colors.red),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8.0,
+                      children: selectedLocations.map((locationId) {
+                        String locationName = filteredLocations.firstWhere(
+                            (loc) => loc['id'] == locationId)['location'];
+                        return Chip(
+                          label: Text(locationName),
+                          onDeleted: () {
+                            setState(() {
+                              selectedLocations.remove(locationId);
+                            });
+                          },
+                        );
+                      }).toList(),
                     ),
-                ],
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: startTimeController,
+                      decoration: const InputDecoration(
+                        labelText: "Start Time",
+                        border: OutlineInputBorder(),
+                      ),
+                      readOnly: true,
+                      onTap: () async {
+                        TimeOfDay? pickedTime = await showTimePicker(
+                          context: context,
+                          initialTime: const TimeOfDay(hour: 5, minute: 0),
+                        );
+                        if (pickedTime != null) {
+                          setState(() {
+                            selectedStartTime = pickedTime;
+                            startTimeController.text =
+                                pickedTime.format(context);
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: endTimeController,
+                      decoration: const InputDecoration(
+                        labelText: "End Time",
+                        border: OutlineInputBorder(),
+                      ),
+                      readOnly: true,
+                      onTap: () async {
+                        TimeOfDay? pickedTime = await showTimePicker(
+                          context: context,
+                          initialTime: const TimeOfDay(hour: 17, minute: 0),
+                        );
+                        if (pickedTime != null) {
+                          setState(() {
+                            selectedEndTime = pickedTime;
+                            endTimeController.text = pickedTime.format(context);
+                          });
+                        }
+                      },
+                    ),
+                    if (errorMessage != null)
+                      Text(
+                        errorMessage!,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                  ],
+                ),
               ),
               actions: [
                 TextButton(
                   onPressed: () {
                     Navigator.of(context).pop();
-                    _addSchedule(selectedLocation);
+                    _addSchedules(selectedLocations);
                   },
                   child: const Text('Add'),
                 ),
@@ -613,24 +724,123 @@ class _BookingState extends State<Booking> {
     return items;
   }
 
-  Future<void> _addSchedule(String? locationId) async {
+  Future<void> _addSchedules(List<String> locationIds) async {
     try {
-      await FirebaseFirestore.instance.collection('bookings').add({
-        'date': Timestamp.fromDate(selectedDate),
-        'start_time': startTimeController.text,
-        'end_time': endTimeController.text,
-        'status': 'pending',
-        'locationId': locationId,
-        'driver': null,
-        'vehicle': null,
-      });
+      bool conflictDetected = false;
+      String conflictMessage = "";
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Schedule added successfully!')),
-      );
+      // Define date and time format
+      final timeFormat = DateFormat('hh:mm a');
+
+      for (var locationId in locationIds) {
+        var locationData =
+            locations.firstWhere((loc) => loc['id'] == locationId);
+
+        // Fetch schedules for the same location and date
+        QuerySnapshot existingSchedules = await FirebaseFirestore.instance
+            .collection('bookings')
+            .where('locationId', isEqualTo: locationId)
+            .where('date', isEqualTo: Timestamp.fromDate(selectedDate))
+            .get();
+
+        DateTime newStartTime = timeFormat.parse(startTimeController.text);
+        DateTime newEndTime = timeFormat.parse(endTimeController.text);
+
+        // Check for overlapping times
+        for (var doc in existingSchedules.docs) {
+          var scheduleData = doc.data() as Map<String, dynamic>;
+          DateTime existingStartTime =
+              timeFormat.parse(scheduleData['start_time']);
+          DateTime existingEndTime = timeFormat.parse(scheduleData['end_time']);
+
+          // If the times overlap, set conflictDetected to true and break
+          if (!(newEndTime.isBefore(existingStartTime) ||
+              newStartTime.isAfter(existingEndTime))) {
+            conflictDetected = true;
+            conflictMessage =
+                "The location ${locationData['location']} has a conflicting schedule on ${_formatDate(selectedDate)} between ${startTimeController.text} and ${endTimeController.text}.";
+            break;
+          }
+        }
+
+        if (conflictDetected) break; // Exit if any conflict is found
+      }
+
+      if (conflictDetected) {
+        // Show conflict dialog
+        await showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Conflict Detected'),
+              content: Text(conflictMessage),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      } else {
+        // No conflicts, proceed with adding schedules
+        for (var locationId in locationIds) {
+          var locationData =
+              locations.firstWhere((loc) => loc['id'] == locationId);
+
+          await FirebaseFirestore.instance.collection('bookings').add({
+            'date': Timestamp.fromDate(selectedDate),
+            'start_time': startTimeController.text,
+            'end_time': endTimeController.text,
+            'status': 'pending',
+            'locationId': locationId,
+            'location': locationData['location'],
+            'district': locationData['district'],
+            'driver': null,
+            'vehicle': null,
+          });
+        }
+
+        // Show success message only if schedules are added without conflicts
+        await showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Success'),
+              content: const Text('Schedule(s) added successfully!'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to add schedule: $e')),
+      // Show an error dialog in case of exceptions
+      await showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Error'),
+            content: Text('Failed to add schedule(s): $e'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          );
+        },
       );
     }
   }
@@ -760,60 +970,173 @@ class _BookingState extends State<Booking> {
 
   Future<void> _updateDriverVehicle() async {
     if (selectedVehicle == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a vehicle')),
+      await showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Error'),
+            content: const Text('Please select a vehicle.'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          );
+        },
       );
       return;
     }
 
     if (selectedDriver == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text(
-                'The selected vehicle has no driver assigned. Please assign a driver first.')),
+      await showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Error'),
+            content: const Text(
+                'The selected vehicle has no driver assigned. Please assign a driver first.'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          );
+        },
       );
       return;
     }
 
+    bool conflictDetected = false;
     try {
       var selectedSchedules = _selectedOptions.keys
           .where((key) => _selectedOptions[key] == true)
           .toList();
 
+      final timeFormat = DateFormat('hh:mm a');
+
       for (var scheduleId in selectedSchedules) {
-        var vehicleDoc = await FirebaseFirestore.instance
-            .collection('vehicles')
-            .doc(selectedVehicle)
-            .get();
-        var vehicleData = vehicleDoc.data() as Map<String, dynamic>;
-
-        var driverDoc = await FirebaseFirestore.instance
-            .collection('employees')
-            .doc(selectedDriver)
-            .get();
-        var driverData = driverDoc.data() as Map<String, dynamic>;
-
-        var vehicleName = "${vehicleData['brand']} ${vehicleData['model']}";
-        var driverName = driverData['name'];
-
-        await FirebaseFirestore.instance
+        DocumentSnapshot bookingDoc = await FirebaseFirestore.instance
             .collection('bookings')
             .doc(scheduleId)
-            .update({
-          'vehicle': vehicleName,
-          'vehicleId': selectedVehicle,
-          'driver': driverName,
-          'driverId': selectedDriver,
-        });
+            .get();
+        var bookingData = bookingDoc.data() as Map<String, dynamic>;
+
+        DateTime bookingDate = bookingData['date'].toDate();
+        DateTime bookingStartTime = timeFormat.parse(bookingData['start_time']);
+        DateTime bookingEndTime = timeFormat.parse(bookingData['end_time']);
+
+        QuerySnapshot conflictingBookings = await FirebaseFirestore.instance
+            .collection('bookings')
+            .where('driverId', isEqualTo: selectedDriver)
+            .where('date', isEqualTo: Timestamp.fromDate(bookingDate))
+            .get();
+
+        for (var conflictDoc in conflictingBookings.docs) {
+          var conflictData = conflictDoc.data() as Map<String, dynamic>;
+          DateTime conflictStartTime =
+              timeFormat.parse(conflictData['start_time']);
+          DateTime conflictEndTime = timeFormat.parse(conflictData['end_time']);
+
+          bool timesOverlap = bookingStartTime.isBefore(conflictEndTime) &&
+              bookingEndTime.isAfter(conflictStartTime);
+
+          if (timesOverlap) {
+            conflictDetected = true;
+            break;
+          }
+        }
+
+        if (conflictDetected) break;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Driver and vehicle assigned successfully!')),
-      );
+      if (conflictDetected) {
+        await showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Conflict Detected'),
+              content: const Text(
+                  'The selected driver is already assigned to another booking on the same date and overlapping time. Please choose a different driver or time.'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      } else {
+        for (var scheduleId in selectedSchedules) {
+          var vehicleDoc = await FirebaseFirestore.instance
+              .collection('vehicles')
+              .doc(selectedVehicle)
+              .get();
+          var vehicleData = vehicleDoc.data() as Map<String, dynamic>;
+
+          var driverDoc = await FirebaseFirestore.instance
+              .collection('employees')
+              .doc(selectedDriver)
+              .get();
+          var driverData = driverDoc.data() as Map<String, dynamic>;
+
+          var vehicleName = "${vehicleData['brand']} ${vehicleData['model']}";
+          var driverName = driverData['name'];
+
+          await FirebaseFirestore.instance
+              .collection('bookings')
+              .doc(scheduleId)
+              .update({
+            'vehicle': vehicleName,
+            'vehicleId': selectedVehicle,
+            'driver': driverName,
+            'driverId': selectedDriver,
+          });
+        }
+
+        await showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Success'),
+              content: const Text('Driver and vehicle assigned successfully!'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to assign driver and vehicle: $e')),
+      await showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Error'),
+            content: Text('Failed to assign driver and vehicle: $e'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          );
+        },
       );
     }
   }
@@ -875,6 +1198,7 @@ class _BookingState extends State<Booking> {
       leading: Checkbox(
         value: _selectedOptions[scheduleId] ?? false,
         onChanged: (bool? value) {
+          // Update only the specific checkbox state
           setState(() {
             _selectedOptions[scheduleId] = value ?? false;
           });
@@ -927,8 +1251,9 @@ class _BookingState extends State<Booking> {
               flex: 1,
               child: Center(
                   child: Text(
-                      '${bookingData['overall_weight']?.toStringAsFixed(2)} kg' ??
-                          'N/A',
+                      bookingData['overall_weight'] != null
+                          ? '${bookingData['overall_weight'].toStringAsFixed(2)} kg'
+                          : 'N/A',
                       style: GoogleFonts.poppins(fontSize: 14)))),
           Expanded(
               flex: 1,

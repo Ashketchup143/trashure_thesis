@@ -61,7 +61,7 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
         _birthDateController.text = employee!['birth_date'] ?? '';
         _contactController.text = employee!['contact_number'] ?? '';
         _emailController.text = employee!['email_address'] ?? '';
-        _salaryController.text = employee!['salary_per_hour'] ?? '';
+        _salaryController.text = employee!['salary_per_day'].toString() ?? '';
         _expTimeInController.text = employee!['exp_time_in'] ?? '';
         _expTimeOutController.text = employee!['exp_time_out'] ?? '';
 
@@ -163,7 +163,7 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
         _birthDateController.text != originalEmployeeData!['birth_date'] ||
         _contactController.text != originalEmployeeData!['contact_number'] ||
         _emailController.text != originalEmployeeData!['email_address'] ||
-        _salaryController.text != originalEmployeeData!['salary_per_hour'] ||
+        _salaryController.text != originalEmployeeData!['salary_per_day'] ||
         _expTimeInController.text != originalEmployeeData!['exp_time_in'] ||
         _expTimeOutController.text != originalEmployeeData!['exp_time_out'];
   }
@@ -191,7 +191,7 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
         'birth_date': _birthDateController.text,
         'contact_number': _contactController.text,
         'email_address': _emailController.text,
-        'salary_per_hour': _salaryController.text,
+        'salary_per_day': _salaryController.text,
         'exp_time_in': _expTimeInController.text,
         'exp_time_out': _expTimeOutController.text,
       });
@@ -206,7 +206,7 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
           'birth_date': _birthDateController.text,
           'contact_number': _contactController.text,
           'email_address': _emailController.text,
-          'salary_per_hour': _salaryController.text,
+          'salary_per_day': _salaryController.text,
           'exp_time_in': _expTimeInController.text,
           'exp_time_out': _expTimeOutController.text,
         };

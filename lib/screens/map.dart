@@ -55,7 +55,7 @@ class _MapsState extends State<Maps> {
         );
       }
       return Marker(
-        point: LatLng(0, 0),
+        point: const LatLng(0, 0),
         builder: (ctx) =>
             const Icon(Icons.location_on, color: Colors.grey, size: 40),
         anchorPos: AnchorPos.align(AnchorAlign.top),
@@ -124,7 +124,7 @@ class _MapsState extends State<Maps> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           'User Locations Map',
           style: TextStyle(color: Colors.white),
@@ -148,7 +148,7 @@ class _MapsState extends State<Maps> {
                   options: MapOptions(
                     center: _markers.isNotEmpty
                         ? _markers.first.point
-                        : LatLng(7.0800, 125.6200),
+                        : const LatLng(7.0800, 125.6200),
                     zoom: 15.0,
                     maxZoom: 18.0,
                     minZoom: 5.0,

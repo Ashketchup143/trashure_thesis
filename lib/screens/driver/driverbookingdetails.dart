@@ -3,6 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:trashure_thesis/screens/addusermodal.dart';
 import 'package:trashure_thesis/screens/map.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'dart:html' as html; // Import for web-based download and display
 
 class DriverBookingDetails extends StatefulWidget {
   @override
@@ -42,7 +46,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
           children: [
             const Text("Booking Details",
                 style: TextStyle(color: Colors.white)),
-            const Spacer(),
+            Spacer(),
             IconButton(
               icon: const Icon(Icons.map),
               onPressed: () {
@@ -52,6 +56,13 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                       builder: (context) => Maps(
                           bookingId: bookingId)), // Pushing the Maps widget
                 );
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.print),
+              onPressed: () {
+                _generatePdf(context, bookingId, status, vehicle, vehicleId,
+                    overallPrice, overallWeight, formattedDate);
               },
             ),
           ],
@@ -822,5 +833,120 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Product added successfully.')),
     );
+  }
+
+  Future<void> _generatePdf(
+    BuildContext context,
+    String bookingId,
+    String status,
+    String vehicle,
+    String vehicleId,
+    double overallPrice,
+    double overallWeight,
+    String formattedDate,
+  ) async {
+    final pdf = pw.Document();
+
+    // Collect user details asynchronously
+    List<pw.Widget> userDetails = await _generateUserDetails(bookingId);
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        build: (context) => [
+          pw.Text(
+            "Booking Details",
+            style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 20),
+          pw.Text("Booking ID: $bookingId"),
+          pw.Text("Status: $status"),
+          pw.Text("Vehicle: $vehicle"),
+          pw.Text("Vehicle ID: $vehicleId"),
+          pw.Text("Est. Total Price: PHP ${overallPrice.toStringAsFixed(2)}"),
+          pw.Text("Est. Total Weight: ${overallWeight.toStringAsFixed(2)} kg"),
+          pw.Text("Date: $formattedDate"),
+          pw.SizedBox(height: 20),
+          pw.Text(
+            "Users",
+            style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 10),
+
+          // Add user details here
+          ...userDetails,
+        ],
+      ),
+    );
+
+    // Convert PDF to Uint8List
+    final pdfBytes = await pdf.save();
+
+    // Create a Blob and open in a new tab
+    final blob = html.Blob([pdfBytes], 'application/pdf');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    html.window.open(url, '_blank');
+    html.Url.revokeObjectUrl(url); // Clean up the object URL
+  }
+
+// Modify _generateUserDetails to be fully synchronous when returning the widgets
+  Future<List<pw.Widget>> _generateUserDetails(String bookingId) async {
+    List<pw.Widget> userDetails = [];
+
+    var usersSnapshot = await FirebaseFirestore.instance
+        .collection('bookings')
+        .doc(bookingId)
+        .collection('users')
+        .get();
+
+    for (var userDoc in usersSnapshot.docs) {
+      var userData = userDoc.data() as Map<String, dynamic>;
+      String firstName = userData['firstName'] ?? 'Unknown';
+      String lastName = userData['lastName'] ?? 'Unknown';
+      String address = userData['address'] ?? 'Unknown';
+      String email = userData['email'] ?? 'Unknown';
+      String contact = userData['contact'] ?? 'Unknown';
+      double totalPrice = userData['total_price'] ?? 0.0;
+      double totalWeight = userData['total_weight'] ?? 0.0;
+
+      userDetails.add(pw.Text("$firstName $lastName",
+          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)));
+      userDetails.add(pw.Text("Address: $address"));
+      userDetails.add(pw.Text("Email: $email"));
+      userDetails.add(pw.Text("Contact: $contact"));
+      userDetails
+          .add(pw.Text("Total Price: PHP ${totalPrice.toStringAsFixed(2)}"));
+      userDetails
+          .add(pw.Text("Total Weight: ${totalWeight.toStringAsFixed(2)} kg"));
+      userDetails.add(pw.SizedBox(height: 10));
+
+      var recyclablesSnapshot = await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .collection('users')
+          .doc(userDoc.id)
+          .collection('recyclables')
+          .get();
+
+      for (var recDoc in recyclablesSnapshot.docs) {
+        var recData = recDoc.data();
+        String type = recData['type'] ?? 'Unknown';
+        double weight = recData['weight'] ?? 0.0;
+        double price = recData['price'] ?? 0.0;
+        double itemPrice = weight * price;
+
+        userDetails.add(pw.Text(" - Type: $type"));
+        userDetails.add(pw.Text(" - Weight: ${weight.toStringAsFixed(2)} kg"));
+        userDetails
+            .add(pw.Text(" - Price per kg: PHP ${price.toStringAsFixed(2)}"));
+        userDetails
+            .add(pw.Text(" - Item Price: PHP ${itemPrice.toStringAsFixed(2)}"));
+        userDetails.add(pw.SizedBox(height: 5));
+      }
+
+      userDetails.add(pw.Divider());
+    }
+
+    return userDetails;
   }
 }

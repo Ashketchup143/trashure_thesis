@@ -6,6 +6,10 @@ import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:trashure_thesis/user_model.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'dart:html' as html; // Import for web-based download and display
 
 class Outflow extends StatefulWidget {
   const Outflow({super.key});
@@ -19,6 +23,7 @@ class _OutflowState extends State<Outflow> {
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _startDateController = TextEditingController();
   final TextEditingController _endDateController = TextEditingController();
+  double _totalPrice = 0.0; // Variable to hold the total price
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +54,15 @@ class _OutflowState extends State<Outflow> {
                   style: GoogleFonts.poppins(
                     textStyle: const TextStyle(
                         fontWeight: FontWeight.bold, fontSize: 20),
+                  ),
+                ),
+                const Spacer(),
+                ElevatedButton.icon(
+                  onPressed: () => _printOutflowData(),
+                  icon: const Icon(Icons.print),
+                  label: const Text("Print"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
                   ),
                 ),
               ],
@@ -119,7 +133,7 @@ class _OutflowState extends State<Outflow> {
             ),
             const SizedBox(height: 20),
             Container(
-              height: MediaQuery.of(context).size.height * 0.6,
+              height: MediaQuery.of(context).size.height * 0.75,
               decoration: BoxDecoration(border: Border.all()),
               child: Column(
                 children: [
@@ -174,45 +188,74 @@ class _OutflowState extends State<Outflow> {
                           return matchesSearch && matchesDateRange;
                         }).toList();
 
-                        return ListView.builder(
-                          itemCount: outflowList.length,
-                          itemBuilder: (context, index) {
-                            final outflowData = outflowList[index].data()
-                                as Map<String, dynamic>;
-                            String category = outflowData['category'] ?? '';
-                            Timestamp? timestamp = outflowData['date'];
-                            String formattedDate = timestamp != null
-                                ? DateFormat('MM/dd/yyyy, hh:mm a')
-                                    .format(timestamp.toDate())
-                                : '';
-                            double price =
-                                outflowData['price']?.toDouble() ?? 0.0;
-                            double weight =
-                                outflowData['weight']?.toDouble() ?? 0.0;
-                            String employee = outflowData['employee'] ?? '';
-                            String status = outflowData['status'] ?? '';
-                            String vehicle = outflowData['vehicle'] ?? '';
+                        // Calculate total price here without using setState
+                        final totalPrice = outflowList.fold(0.0, (sum, doc) {
+                          final data = doc.data() as Map<String, dynamic>;
+                          return sum + (data['price']?.toDouble() ?? 0.0);
+                        });
 
-                            return Container(
-                              decoration: const BoxDecoration(
-                                border: Border(
-                                  bottom: BorderSide(),
+                        return Column(
+                          children: [
+                            Expanded(
+                              child: ListView.builder(
+                                itemCount: outflowList.length,
+                                itemBuilder: (context, index) {
+                                  final outflowData = outflowList[index].data()
+                                      as Map<String, dynamic>;
+                                  String category =
+                                      outflowData['category'] ?? '';
+                                  Timestamp? timestamp = outflowData['date'];
+                                  String formattedDate = timestamp != null
+                                      ? DateFormat('MM/dd/yyyy, hh:mm a')
+                                          .format(timestamp.toDate())
+                                      : '';
+                                  double price =
+                                      outflowData['price']?.toDouble() ?? 0.0;
+                                  double weight =
+                                      outflowData['weight']?.toDouble() ?? 0.0;
+                                  String employee =
+                                      outflowData['employee'] ?? '';
+                                  String status = outflowData['status'] ?? '';
+                                  String vehicle = outflowData['vehicle'] ?? '';
+
+                                  return Container(
+                                    decoration: const BoxDecoration(
+                                      border: Border(
+                                        bottom: BorderSide(),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        _buildText(category, 2),
+                                        _buildText(formattedDate, 2),
+                                        _buildText(
+                                            '₱${price.toStringAsFixed(2)}', 2),
+                                        _buildText(
+                                            '${weight.toStringAsFixed(2)} kg',
+                                            2),
+                                        _buildText(employee, 2),
+                                        _buildText(status, 2),
+                                        _buildText(vehicle, 2),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.all(8.0),
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                'Total Price: ₱${totalPrice.toStringAsFixed(2)}',
+                                style: GoogleFonts.poppins(
+                                  textStyle: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
-                              child: Row(
-                                children: [
-                                  _buildText(category, 2),
-                                  _buildText(formattedDate, 2),
-                                  _buildText('₱${price.toStringAsFixed(2)}', 2),
-                                  _buildText(
-                                      '${weight.toStringAsFixed(2)} kg', 2),
-                                  _buildText(employee, 2),
-                                  _buildText(status, 2),
-                                  _buildText(vehicle, 2),
-                                ],
-                              ),
-                            );
-                          },
+                            ),
+                          ],
                         );
                       },
                     ),
@@ -224,6 +267,16 @@ class _OutflowState extends State<Outflow> {
         ),
       ),
     );
+  }
+
+  // Calculate total price
+  double _calculateTotalPrice(List<QueryDocumentSnapshot> outflowList) {
+    double total = 0.0;
+    for (var doc in outflowList) {
+      final data = doc.data() as Map<String, dynamic>;
+      total += data['price']?.toDouble() ?? 0.0;
+    }
+    return total;
   }
 
   Widget _buildDatePickerField(String label, TextEditingController controller) {
@@ -477,5 +530,178 @@ class _OutflowState extends State<Outflow> {
         ),
       ),
     );
+  }
+
+  void _printOutflowData() async {
+    final pdf = pw.Document();
+
+    // Parse the filter values
+    final searchText = _searchController.text.toLowerCase();
+    final startDate = _parseDate(_startDateController.text);
+    final endDate = _parseDate(_endDateController.text);
+
+    // Fetch and filter outflow data from Firestore
+    final outflowSnapshot = await _firestore.collection('outflow').get();
+    List<Map<String, dynamic>> outflowDataList = [];
+    double totalOverall = 0.0;
+
+    // Collect outflow documents with applied filters
+    for (var outflowDoc in outflowSnapshot.docs) {
+      final outflowData = outflowDoc.data() as Map<String, dynamic>;
+      final category = outflowData['category']?.toString().toLowerCase() ?? '';
+      final employee = outflowData['employee']?.toString().toLowerCase() ?? '';
+      final vehicle = outflowData['vehicle']?.toString().toLowerCase() ?? '';
+      final date = (outflowData['date'] as Timestamp?)?.toDate();
+
+      // Apply search and date range filters
+      final matchesSearch = category.contains(searchText) ||
+          employee.contains(searchText) ||
+          vehicle.contains(searchText);
+
+      final matchesDateRange = date != null &&
+          (startDate == null || date.isAfter(startDate)) &&
+          (endDate == null || date.isBefore(endDate));
+
+      if (matchesSearch && matchesDateRange) {
+        outflowDataList.add({
+          'data': outflowData,
+          'date': date ?? DateTime.now(), // Use current date if date is null
+          'id': outflowDoc.id,
+        });
+        totalOverall += outflowData['price']?.toDouble() ?? 0.0;
+      }
+    }
+
+    // Sort outflow documents by date in descending order
+    outflowDataList.sort(
+        (a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
+
+    // Build PDF content with sorted outflow documents
+    List<pw.TableRow> outflowRows = [
+      pw.TableRow(
+        children: [
+          pw.Text('Category',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.Text('Date', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.Text('Price', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.Text('Weight',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.Text('Employee',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.Text('Status',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.Text('Vehicle',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+        ],
+      ),
+    ];
+
+    for (var outflowMap in outflowDataList) {
+      final outflowData = outflowMap['data'] as Map<String, dynamic>;
+      final date = outflowMap['date'] as DateTime;
+
+      outflowRows.add(
+        pw.TableRow(
+          children: [
+            pw.Text(outflowData['category'] ?? 'N/A'),
+            pw.Text(DateFormat('MM/dd/yyyy, hh:mm a').format(date)),
+            pw.Text(
+                'PHP ${outflowData['price']?.toStringAsFixed(2) ?? '0.00'}'),
+            pw.Text(
+                '${outflowData['weight']?.toStringAsFixed(2) ?? '0.00'} kg'),
+            pw.Text(outflowData['employee'] ?? 'N/A'),
+            pw.Text(outflowData['status'] ?? 'N/A'),
+            pw.Text(outflowData['vehicle'] ?? 'N/A'),
+          ],
+        ),
+      );
+    }
+
+    // Add a footer with the total price outside the table
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        build: (context) => [
+          pw.Text(
+            'Outflow Report',
+            style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 20),
+          pw.Table(children: outflowRows, border: pw.TableBorder.all()),
+          pw.SizedBox(height: 20),
+          pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text(
+              'Total Price: PHP ${totalOverall.toStringAsFixed(2)}',
+              style: pw.TextStyle(
+                fontSize: 16,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    // Convert PDF to Uint8List
+    final pdfBytes = await pdf.save();
+
+    // Create a Blob and open in a new tab
+    final blob = html.Blob([pdfBytes], 'application/pdf');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    html.window.open(url, '_blank');
+    html.Url.revokeObjectUrl(url); // Clean up the object URL
+  }
+
+  Future<Map<String, dynamic>> _fetchOutflowDataForPrint({
+    DateTime? startDate,
+    DateTime? endDate,
+    String searchText = '',
+  }) async {
+    final snapshot = await _firestore.collection("outflow").get();
+
+    final List<List<String>> outflowData = [];
+    double totalPrice = 0.0;
+
+    for (var doc in snapshot.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+
+      final date = (data['date'] as Timestamp?)?.toDate();
+      final category = data['category']?.toString().toLowerCase() ?? '';
+      final status = data['status']?.toString().toLowerCase() ?? '';
+      final employee = data['employee']?.toString().toLowerCase() ?? '';
+      final vehicle = data['vehicle']?.toString().toLowerCase() ?? '';
+
+      // Apply search filter
+      final matchesSearch = category.contains(searchText) ||
+          status.contains(searchText) ||
+          employee.contains(searchText) ||
+          vehicle.contains(searchText);
+
+      // Apply date range filter
+      final matchesDateRange = date != null &&
+          (startDate == null || date.isAfter(startDate)) &&
+          (endDate == null || date.isBefore(endDate));
+
+      if (matchesSearch && matchesDateRange) {
+        final price = data['price']?.toDouble() ?? 0.0;
+        totalPrice += price; // Accumulate total price
+
+        outflowData.add([
+          data['category'] ?? '',
+          date != null ? DateFormat('MM/dd/yyyy, hh:mm a').format(date) : '',
+          'PHP ${price.toStringAsFixed(2)}',
+          '${data['weight']?.toStringAsFixed(2) ?? '0.00'} kg',
+          data['employee'] ?? '',
+          data['status'] ?? '',
+          data['vehicle'] ?? '',
+        ]);
+      }
+    }
+
+    return {
+      'data': outflowData,
+      'totalPrice': totalPrice,
+    };
   }
 }

@@ -59,8 +59,16 @@ class _DriverState extends State<Driver> {
   }
 
   Future<void> _logout() async {
-    await FirebaseAuth.instance.signOut(); // Sign out from Firebase
-    Navigator.pushReplacementNamed(context, '/login'); // Navigate to login page
+    try {
+      await FirebaseAuth.instance.signOut(); // Sign out from Firebase
+      // await Future.delayed(Duration(milliseconds: 500)); // Add a brief delay
+      Navigator.pushReplacementNamed(context, '/'); // Navigate to login page
+    } catch (e) {
+      print('Logout error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Logout failed. Please try again.')),
+      );
+    }
   }
 
   // Function to format Firestore Timestamp to "MM/dd/yyyy, DayOfWeek"
@@ -257,87 +265,126 @@ class _DriverState extends State<Driver> {
 
                           return Card(
                             margin: const EdgeInsets.all(10),
-                            child: ListTile(
-                              title: Text(
-                                'Date: ${formatDate(bookingDate)}',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              subtitle: Column(
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Booking ID: $bookingId'),
-                                  Text('Status: $bookingStatus'),
-                                  Text('Vehicle: ${bookingData['vehicle']}'),
-                                  Text(
-                                      'Vehicle ID: ${bookingData['vehicleId']}'),
-                                  Text('Overall Price: ₱${overallPrice}'),
-                                  Text('Overall Weight: ${overallWeight} kg'),
-                                ],
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (bookingStatus != 'collecting')
-                                    ElevatedButton(
-                                      onPressed: isCollecting
-                                          ? _showErrorModal // Show modal if another booking is collecting
-                                          : () {
-                                              _showCollectConfirmation(
-                                                  bookingId);
-                                            },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.green,
-                                      ),
-                                      child: Text('Collect'),
-                                    )
-                                  else
-                                    Column(
+                                  Expanded(
+                                    flex: 2,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        ElevatedButton(
-                                          onPressed: () async {
-                                            await _updateBookingStatus(
-                                                bookingId, 'pending');
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.redAccent,
-                                          ),
-                                          child: Text('Revert back to pending'),
-                                        ),
                                         Text(
-                                          'Collecting',
+                                          'Date: ${formatDate(bookingDate)}',
                                           style: TextStyle(
-                                            color: Colors.orange,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                              fontWeight: FontWeight.bold),
                                         ),
-                                        SizedBox(width: 8),
+                                        SizedBox(height: 4),
+                                        Text('Booking ID: $bookingId'),
+                                        Text('Status: $bookingStatus'),
+                                        Text(
+                                            'Vehicle: ${bookingData['vehicle']}'),
+                                        Text(
+                                            'Vehicle ID: ${bookingData['vehicleId']}'),
+                                        Text('Overall Price: ₱${overallPrice}'),
+                                        Text(
+                                            'Overall Weight: ${overallWeight} kg'),
                                       ],
                                     ),
-                                  IconButton(
-                                    icon: Icon(Icons.info),
-                                    onPressed: () {
-                                      Navigator.pushNamed(
-                                        context,
-                                        '/driverbookingdetails',
-                                        arguments: {
-                                          'bookingId': bookingId,
-                                          'status': bookingData['status'],
-                                          'vehicle': bookingData['vehicle'],
-                                          'vehicleId': bookingData['vehicleId'],
-                                          'overall_price':
-                                              bookingData['overall_price'],
-                                          'overall_weight':
-                                              bookingData['overall_weight'],
-                                          'date': bookingData['date'],
-                                        },
-                                      );
-                                    },
+                                  ),
+                                  SizedBox(
+                                      width: 10), // Spacing between columns
+
+                                  // Column for IconButton and Status Buttons
+                                  Expanded(
+                                    flex: 1,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        IconButton(
+                                          icon: Icon(Icons.info),
+                                          onPressed: () {
+                                            Navigator.pushNamed(
+                                              context,
+                                              '/driverbookingdetails',
+                                              arguments: {
+                                                'bookingId': bookingId,
+                                                'status': bookingData['status'],
+                                                'vehicle':
+                                                    bookingData['vehicle'],
+                                                'vehicleId':
+                                                    bookingData['vehicleId'],
+                                                'overall_price': bookingData[
+                                                    'overall_price'],
+                                                'overall_weight': bookingData[
+                                                    'overall_weight'],
+                                                'date': bookingData['date'],
+                                              },
+                                            );
+                                          },
+                                        ),
+                                        SizedBox(
+                                            height:
+                                                50), // Spacing between buttons
+                                        if (bookingStatus != 'collecting')
+                                          ElevatedButton(
+                                            onPressed: isCollecting
+                                                ? _showErrorModal // Show modal if another booking is collecting
+                                                : () {
+                                                    _showCollectConfirmation(
+                                                        bookingId);
+                                                  },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.green,
+                                              minimumSize: Size(
+                                                  80, 30), // Set button size
+                                            ),
+                                            child: Text(
+                                              'Collect',
+                                              style: TextStyle(
+                                                  fontSize: 12), // Smaller text
+                                            ),
+                                          )
+                                        else
+                                          Column(
+                                            children: [
+                                              ElevatedButton(
+                                                onPressed: () async {
+                                                  await _updateBookingStatus(
+                                                      bookingId, 'pending');
+                                                },
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor:
+                                                      Colors.redAccent,
+                                                  minimumSize: Size(80,
+                                                      30), // Set button size
+                                                ),
+                                                child: Text(
+                                                  'Revert',
+                                                  style: TextStyle(
+                                                      fontSize:
+                                                          12), // Smaller text
+                                                ),
+                                              ),
+                                              SizedBox(height: 4),
+                                              Text(
+                                                'Collecting',
+                                                style: TextStyle(
+                                                  color: Colors.orange,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
-                              onTap: () {
-                                print('Booking tapped');
-                              },
                             ),
                           );
                         },
