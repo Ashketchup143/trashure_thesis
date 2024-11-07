@@ -96,6 +96,7 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
   }
 
   // Fetch daily time records from the 'daily_time_record' subcollection
+  // Fetch daily time records from the 'daily_time_record' subcollection
   Future<void> _fetchDailyTimeRecords(String employeeId) async {
     try {
       CollectionReference timeRecordsRef = FirebaseFirestore.instance
@@ -118,6 +119,13 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
         return doc.data() as Map<String, dynamic>;
       }).toList();
 
+      // Sort time records by date in descending order (hard-coded)
+      timeRecords.sort((a, b) {
+        Timestamp dateA = a['date'] ?? Timestamp.now();
+        Timestamp dateB = b['date'] ?? Timestamp.now();
+        return dateB.compareTo(dateA);
+      });
+
       setState(() {
         _dailyTimeRecords = timeRecords;
       });
@@ -129,7 +137,7 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
     }
   }
 
-  // Fetch bookings where the driver is assigned
+// Fetch bookings where the driver is assigned
   Future<void> _fetchDriverBookings(String driverId) async {
     QuerySnapshot snapshot = await FirebaseFirestore.instance
         .collection('bookings')
@@ -142,6 +150,13 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
       data['booking_id'] = doc.id; // Assign the document ID as booking_id
       return data;
     }).toList();
+
+    // Sort bookings by date in descending order (hard-coded)
+    bookings.sort((a, b) {
+      Timestamp dateA = a['date'] ?? Timestamp.now();
+      Timestamp dateB = b['date'] ?? Timestamp.now();
+      return dateB.compareTo(dateA);
+    });
 
     setState(() {
       _bookings = bookings;
@@ -366,6 +381,7 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
 
                     // Display Daily Time Records for all employees
                     Container(
+                      height: MediaQuery.of(context).size.height * .3,
                       decoration: BoxDecoration(border: Border.all()),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -376,137 +392,135 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
                                 textStyle: TextStyle(
                                     fontSize: 18, fontWeight: FontWeight.bold)),
                           ),
-                          _dailyTimeRecords.isNotEmpty
-                              ? ListView.builder(
-                                  shrinkWrap: true,
-                                  physics: NeverScrollableScrollPhysics(),
-                                  itemCount: _dailyTimeRecords.length,
-                                  itemBuilder: (context, index) {
-                                    final record = _dailyTimeRecords[index];
+                          Expanded(
+                            // Wrap with Expanded to make the ListView scrollable
+                            child: _dailyTimeRecords.isNotEmpty
+                                ? ListView.builder(
+                                    itemCount: _dailyTimeRecords.length,
+                                    itemBuilder: (context, index) {
+                                      final record = _dailyTimeRecords[index];
 
-                                    // Fetch the date, time_in, and time_out as Timestamp
-                                    Timestamp dateTimestamp =
-                                        record['date'] ?? Timestamp.now();
-                                    Timestamp timeInTimestamp =
-                                        record['time_in'] ?? Timestamp.now();
-                                    Timestamp timeOutTimestamp =
-                                        record['time_out'] ?? Timestamp.now();
+                                      // Fetch the date, time_in, and time_out as Timestamp
+                                      Timestamp dateTimestamp =
+                                          record['date'] ?? Timestamp.now();
+                                      Timestamp timeInTimestamp =
+                                          record['time_in'] ?? Timestamp.now();
+                                      Timestamp timeOutTimestamp =
+                                          record['time_out'] ?? Timestamp.now();
 
-                                    return ListTile(
-                                      title: Text(
-                                        "Date: ${formatDate(dateTimestamp)} (${formatDayOfWeek(dateTimestamp)})", // Month Date, Year (Day)
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold),
-                                      ),
-                                      subtitle: Text(
-                                        "Time In: ${formatTime(timeInTimestamp)}, Time Out: ${formatTime(timeOutTimestamp)}", // HH:MM AM/PM
-                                      ),
-                                    );
-                                  },
-                                )
-                              : Text('No time records available'),
-                          SizedBox(height: 16),
+                                      return ListTile(
+                                        title: Text(
+                                          "Date: ${formatDate(dateTimestamp)} (${formatDayOfWeek(dateTimestamp)})",
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold),
+                                        ),
+                                        subtitle: Text(
+                                          "Time In: ${formatTime(timeInTimestamp)}, Time Out: ${formatTime(timeOutTimestamp)}",
+                                        ),
+                                      );
+                                    },
+                                  )
+                                : Text('No time records available'),
+                          ),
+                        ],
+                      ),
+                    ),
 
-                          // Only display bookings if the employee is a driver
-                          if (employee!['position'] == 'Driver')
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Assigned Bookings',
-                                  style: GoogleFonts.poppins(
-                                      textStyle: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold)),
-                                ),
-                                // Inside your ListView for Driver's Bookings
-                                _bookings.isNotEmpty
-                                    ? ListView.builder(
-                                        shrinkWrap: true,
-                                        physics: NeverScrollableScrollPhysics(),
-                                        itemCount: _bookings.length,
-                                        itemBuilder: (context, index) {
-                                          final booking = _bookings[index];
+// Only display bookings if the employee is a driver
+                    if (employee!['position'] == 'Driver')
+                      SizedBox(
+                        height: 20,
+                      ),
+                    Container(
+                      height: MediaQuery.of(context).size.height * .3,
+                      decoration:
+                          BoxDecoration(border: Border.all(color: Colors.grey)),
+                      padding: EdgeInsets.all(8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Assigned Bookings',
+                            style: GoogleFonts.poppins(
+                                textStyle: TextStyle(
+                                    fontSize: 18, fontWeight: FontWeight.bold)),
+                          ),
+                          Expanded(
+                            // Wrap with Expanded to make the ListView scrollable
+                            child: _bookings.isNotEmpty
+                                ? ListView.builder(
+                                    itemCount: _bookings.length,
+                                    itemBuilder: (context, index) {
+                                      final booking = _bookings[index];
+                                      Map<String, dynamic> bookingData = {
+                                        'booking_id': booking['booking_id'] ??
+                                            'No Booking ID',
+                                        'vehicle':
+                                            booking['vehicle'] ?? 'No Vehicle',
+                                        'overall_price':
+                                            booking['overall_price'] ?? 0.0,
+                                        'overall_weight':
+                                            booking['overall_weight'] ?? 0.0,
+                                        'date':
+                                            booking['date'] ?? Timestamp.now(),
+                                        'status':
+                                            booking['status'] ?? 'No Status',
+                                      };
 
-                                          // Store bookingData in a map to pass to the BookingDetails page
-                                          Map<String, dynamic> bookingData = {
-                                            'booking_id':
-                                                booking['booking_id'] ??
-                                                    'No Booking ID',
-                                            'vehicle': booking['vehicle'] ??
-                                                'No Vehicle',
-                                            'overall_price':
-                                                booking['overall_price'] ?? 0.0,
-                                            'overall_weight':
-                                                booking['overall_weight'] ??
-                                                    0.0,
-                                            'date': booking['date'] ??
-                                                Timestamp.now(),
-                                            'status': booking['status'] ??
-                                                'No Status',
-                                          };
+                                      String bookingId =
+                                          booking['booking_id'] ??
+                                              'No Booking ID';
+                                      String vehicle =
+                                          booking['vehicle'] ?? 'No Vehicle';
+                                      double overallPrice =
+                                          booking['overall_price'] ?? 0.0;
+                                      double overallWeight =
+                                          booking['overall_weight'] ?? 0.0;
+                                      Timestamp dateTimestamp =
+                                          booking['date'] ?? Timestamp.now();
+                                      String status =
+                                          booking['status'] ?? 'No Status';
 
-                                          String bookingId = booking[
-                                                  'booking_id'] ??
-                                              'No Booking ID'; // Use document ID
-                                          String vehicle = booking['vehicle'] ??
-                                              'No Vehicle'; // Vehicle
-                                          double overallPrice =
-                                              booking['overall_price'] ??
-                                                  0.0; // Overall Price
-                                          double overallWeight =
-                                              booking['overall_weight'] ??
-                                                  0.0; // Overall Weight
-                                          Timestamp dateTimestamp = booking[
-                                                  'date'] ??
-                                              Timestamp.now(); // Booking Date
-                                          String status = booking['status'] ??
-                                              'No Status'; // Booking Status
-
-                                          return ListTile(
-                                            title: Text(
-                                              "Booking ID: $bookingId",
-                                              style: TextStyle(
-                                                  fontWeight: FontWeight.bold),
-                                            ),
-                                            subtitle: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                    "Date: ${formatDate(dateTimestamp)} (${formatDayOfWeek(dateTimestamp)})"), // Date and Day of Week
-                                                Text(
-                                                    "Vehicle: $vehicle"), // Vehicle
-                                                Text(
-                                                    "Overall Price: ₱${overallPrice.toStringAsFixed(2)}"), // Overall Price with formatting
-                                                Text(
-                                                    "Overall Weight: ${overallWeight.toStringAsFixed(2)} kg"), // Overall Weight
-                                                Text(
-                                                    "Status: $status"), // Status
-                                              ],
-                                            ),
-                                            trailing: IconButton(
-                                              icon: Icon(Icons.info_outline),
-                                              onPressed: () {
-                                                // Navigate to BookingDetails with bookingId and bookingData
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (context) =>
-                                                        BookingDetails(
-                                                      bookingId: bookingId,
-                                                      bookingData: bookingData,
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          );
-                                        },
-                                      )
-                                    : Text('No bookings available'),
-                              ],
-                            ),
+                                      return ListTile(
+                                        title: Text(
+                                          "Booking ID: $bookingId",
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold),
+                                        ),
+                                        subtitle: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                                "Date: ${formatDate(dateTimestamp)} (${formatDayOfWeek(dateTimestamp)})"),
+                                            Text("Vehicle: $vehicle"),
+                                            Text(
+                                                "Overall Price: ₱${overallPrice.toStringAsFixed(2)}"),
+                                            Text(
+                                                "Overall Weight: ${overallWeight.toStringAsFixed(2)} kg"),
+                                            Text("Status: $status"),
+                                          ],
+                                        ),
+                                        trailing: IconButton(
+                                          icon: Icon(Icons.info_outline),
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    BookingDetails(
+                                                  bookingId: bookingId,
+                                                  bookingData: bookingData,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      );
+                                    },
+                                  )
+                                : Text('No bookings available'),
+                          ),
                         ],
                       ),
                     ),

@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:trashure_thesis/screens/map.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'dart:html' as html;
 
 class DriverTransactionDetails extends StatefulWidget {
   @override
@@ -9,11 +13,8 @@ class DriverTransactionDetails extends StatefulWidget {
 }
 
 class _DriverTransactionDetails extends State<DriverTransactionDetails> {
-  Map<String, bool> isEditingWeight = {};
   Map<String, TextEditingController> weightControllers = {};
   Map<String, double> updatedWeights = {};
-  List<Map<String, dynamic>> selectedProducts = [];
-  TextEditingController nameController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +51,13 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
                       builder: (context) => Maps(
                           bookingId: bookingId)), // Pushing the Maps widget
                 );
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.print),
+              onPressed: () {
+                _generatePdf(context, bookingId, status, vehicle, vehicleId,
+                    overallPrice, overallWeight, formattedDate);
               },
             ),
           ],
@@ -151,6 +159,11 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
                           double totalWeight = userData['status'] == 'collected'
                               ? userData['final_total_weight'] ?? 0.0
                               : userData['total_weight'] ?? 0.0;
+                          // Retrieve calculated_total_price or final_calculated_total_price from userData
+                          double calculatedTotalPrice = userData['status'] ==
+                                  'collected'
+                              ? userData['final_calculated_total_price'] ?? 0.0
+                              : userData['calculated_total_price'] ?? 0.0;
 
                           String userId = sortedUsers[userIndex].id;
                           String userStatus =
@@ -173,7 +186,14 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
                                   style: const TextStyle(
                                       fontWeight: FontWeight.bold)),
                               subtitle: Text(
-                                'Address: $address, Contact: $contact\nEmail: $email\nTotal Price: ₱$totalPrice\nTotal Weight: ${totalWeight.toStringAsFixed(2)} kg\nCollected: $collectedDate',
+                                '${firstName == "Guest" ? "" : "Address: $address\n"}'
+                                '${firstName == "Guest" ? "" : "Contact: $contact\n"}'
+                                '${firstName == "Guest" ? "" : "Email: $email\n"}'
+                                'Total Price: ₱$totalPrice\n'
+                                'Calculated Total Price: ₱${calculatedTotalPrice.toStringAsFixed(2)}\n'
+                                'Total Weight: ${totalWeight.toStringAsFixed(2)} kg\n'
+                                'Driver Share: ₱${((((((totalPrice ?? 0.0) / (1 - 0.20)) + 40) - (totalPrice ?? 0.0)) * 0.25).toStringAsFixed(2))}\n'
+                                '${userStatus == 'collected' ? 'Collected: $collectedDate' : ''}',
                               ),
                               children: [
                                 StreamBuilder(
@@ -226,10 +246,6 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
                                           updatedWeights[recyclableId] = weight;
                                         }
 
-                                        bool isEditing =
-                                            isEditingWeight[recyclableId] ??
-                                                false;
-
                                         return Padding(
                                           padding: const EdgeInsets.all(8.0),
                                           child: Column(
@@ -237,61 +253,8 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
                                                 CrossAxisAlignment.start,
                                             children: [
                                               Text('Type: $type'),
-                                              Row(
-                                                children: [
-                                                  if (!isCollected)
-                                                    isEditing
-                                                        ? Expanded(
-                                                            child:
-                                                                TextFormField(
-                                                              controller:
-                                                                  weightControllers[
-                                                                      recyclableId],
-                                                              decoration:
-                                                                  const InputDecoration(
-                                                                labelText:
-                                                                    'Weight (kg)',
-                                                                border:
-                                                                    OutlineInputBorder(),
-                                                              ),
-                                                              keyboardType:
-                                                                  TextInputType
-                                                                      .number,
-                                                            ),
-                                                          )
-                                                        : Text(
-                                                            'Weight: ${updatedWeights[recyclableId]!.toStringAsFixed(2)} kg'),
-                                                  if (!isCollected)
-                                                    IconButton(
-                                                      icon: Icon(isEditing
-                                                          ? Icons.check
-                                                          : Icons.edit),
-                                                      onPressed: () {
-                                                        setState(() {
-                                                          if (isEditing) {
-                                                            double newWeight =
-                                                                double.tryParse(
-                                                                        weightControllers[recyclableId]!
-                                                                            .text) ??
-                                                                    weight;
-                                                            updatedWeights[
-                                                                    recyclableId] =
-                                                                newWeight;
-                                                            itemPrice =
-                                                                newWeight *
-                                                                    price;
-                                                          }
-                                                          isEditingWeight[
-                                                                  recyclableId] =
-                                                              !isEditing;
-                                                        });
-                                                      },
-                                                    ),
-                                                ],
-                                              ),
-                                              if (isCollected)
-                                                Text(
-                                                    'Final Weight: ${updatedWeights[recyclableId]!.toStringAsFixed(2)} kg'),
+                                              Text(
+                                                  'Weight: ${updatedWeights[recyclableId]!.toStringAsFixed(2)} kg'),
                                               Text('Price: ₱$price'),
                                               Text(
                                                   'Item Price: ₱${(updatedWeights[recyclableId]! * price).toStringAsFixed(2)}'),
@@ -317,5 +280,121 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
         ),
       ),
     );
+  }
+
+  Future<void> _generatePdf(
+    BuildContext context,
+    String bookingId,
+    String status,
+    String vehicle,
+    String vehicleId,
+    double overallPrice,
+    double overallWeight,
+    String formattedDate,
+  ) async {
+    final pdf = pw.Document();
+
+    // Collect user details asynchronously
+    List<pw.Widget> userDetails = await _generateUserDetails(bookingId);
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        build: (context) => [
+          pw.Text(
+            "Booking Details",
+            style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 20),
+          pw.Text("Booking ID: $bookingId"),
+          pw.Text("Status: $status"),
+          pw.Text("Vehicle: $vehicle"),
+          pw.Text("Vehicle ID: $vehicleId"),
+          pw.Text("Est. Total Price: PHP ${overallPrice.toStringAsFixed(2)}"),
+          pw.Text("Est. Total Weight: ${overallWeight.toStringAsFixed(2)} kg"),
+          pw.Text("Date: $formattedDate"),
+          pw.SizedBox(height: 20),
+          pw.Text(
+            "Users",
+            style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 10),
+
+          // Add user details here
+          ...userDetails,
+        ],
+      ),
+    );
+
+    // Convert PDF to Uint8List
+    final pdfBytes = await pdf.save();
+
+    // Create a Blob and open in a new tab
+    final blob = html.Blob([pdfBytes], 'application/pdf');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    html.window.open(url, '_blank');
+    html.Url.revokeObjectUrl(url); // Clean up the object URL
+  }
+
+  Future<List<pw.Widget>> _generateUserDetails(String bookingId) async {
+    List<pw.Widget> userDetails = [];
+
+    var usersSnapshot = await FirebaseFirestore.instance
+        .collection('bookings')
+        .doc(bookingId)
+        .collection('users')
+        .get();
+
+    for (var userDoc in usersSnapshot.docs) {
+      var userData = userDoc.data() as Map<String, dynamic>;
+      String firstName = userData['firstName'] ?? 'Unknown';
+      String lastName = userData['lastName'] ?? 'Unknown';
+      String address = userData['address'] ?? 'Unknown';
+      String email = userData['email'] ?? 'Unknown';
+      String contact = userData['contact'] ?? 'Unknown';
+      double totalPrice = userData['total_price'] ?? 0.0;
+      double totalWeight = userData['total_weight'] ?? 0.0;
+
+      userDetails.add(pw.Text("$firstName $lastName",
+          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)));
+      if (firstName != "Guest") {
+        userDetails.add(pw.Text("Address: $address"));
+        userDetails.add(pw.Text("Email: $email"));
+        userDetails.add(pw.Text("Contact: $contact"));
+      }
+      userDetails
+          .add(pw.Text("Total Price: PHP ${totalPrice.toStringAsFixed(2)}"));
+      userDetails
+          .add(pw.Text("Total Weight: ${totalWeight.toStringAsFixed(2)} kg"));
+      userDetails.add(pw.SizedBox(height: 10));
+
+      var recyclablesSnapshot = await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .collection('users')
+          .doc(userDoc.id)
+          .collection('recyclables')
+          .get();
+
+      for (var recDoc in recyclablesSnapshot.docs) {
+        var recData = recDoc.data();
+        String type = recData['type'] ?? 'Unknown';
+        double weight = recData['weight'] ?? 0.0;
+        double price = recData['price'] ?? 0.0;
+        double itemPrice = weight * price;
+
+        userDetails.add(pw.Text(" - Type: $type"));
+        userDetails.add(pw.Text(" - Weight: ${weight.toStringAsFixed(2)} kg"));
+        userDetails
+            .add(pw.Text(" - Price per kg: PHP ${price.toStringAsFixed(2)}"));
+        userDetails
+            .add(pw.Text(" - Item Price: PHP ${itemPrice.toStringAsFixed(2)}"));
+        userDetails.add(pw.SizedBox(height: 5));
+      }
+
+      userDetails.add(pw.Divider());
+    }
+
+    return userDetails;
   }
 }

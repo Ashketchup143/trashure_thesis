@@ -45,7 +45,7 @@ class _InflowState extends State<Inflow> {
                       },
                     ),
                     Text(
-                      'Inflow',
+                      'Revenue',
                       style: GoogleFonts.poppins(
                         textStyle: TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 20),

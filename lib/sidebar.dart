@@ -151,15 +151,18 @@ class _SidebarState extends State<Sidebar> {
               4, Icons.dashboard_outlined, 'Dashboard', '/dashboard'),
           _buildUsersTile(),
           _buildBookingsTile(), // Updated Bookings Tile with dropdown
-          _buildHoverableListTile(
-              6, Icons.directions_car_outlined, 'Vehicle', '/vehicle'),
+
           _buildInventoryTile(),
-          if (hasFullAccess)
-            _buildEmployeesTile(), // Updated Employees Tile with dropdown
+
           if (hasFullAccess)
             _buildFinanceTile(), // Add finance only if full access
           _buildHoverableListTile(
               10, Icons.settings_outlined, 'Products', '/products'),
+          _buildHoverableListTile(
+              6, Icons.directions_car_outlined, 'Vehicle', '/vehicle'),
+          if (hasFullAccess)
+            _buildHoverableListTile(30, Icons.groups_outlined, 'Employees',
+                '/employee'), // Updated Employees Tile with dropdown
           // Logout tile with logout function
           _buildHoverableListTile(11, Icons.logout_outlined, 'Logout', '',
               onTap: _handleLogout),
@@ -419,9 +422,9 @@ class _SidebarState extends State<Sidebar> {
         ),
         if (_isFinanceExpanded) ...[
           _buildsecondHoverableListTile(
-              12, Icons.money_off_outlined, 'Outflow', '/outflow'),
+              12, Icons.money_off_outlined, 'Expenses', '/outflow'),
           _buildsecondHoverableListTile(
-              13, Icons.monetization_on_outlined, 'Inflow', '/inflow'),
+              13, Icons.monetization_on_outlined, 'Revenue', '/inflow'),
         ],
       ],
     );
@@ -493,79 +496,6 @@ class _SidebarState extends State<Sidebar> {
               16, Icons.inventory_2_outlined, 'Receiving', '/receiving'),
           _buildsecondHoverableListTile(
               17, Icons.inventory_outlined, 'Inventory', '/inventory'),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildEmployeesTile() {
-    return Column(
-      children: [
-        // Main Employees tile with dropdown toggle, but no navigation on tap
-        MouseRegion(
-          onEnter: (_) => setState(() => _hoveredIndex = 30),
-          onExit: (_) => setState(() => _hoveredIndex = -1),
-          child: Container(
-            height: 70,
-            color: _hoveredIndex == 30
-                ? Color(0xFF4CAF4F)
-                : Colors.transparent, // Changes color on hover
-            child: Center(
-              child: ListTile(
-                leading: Icon(
-                  Icons.groups_outlined,
-                  color: _hoveredIndex == 30 ? Colors.white : Color(0xFF4CAF4F),
-                ),
-                title: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Employee',
-                      style: GoogleFonts.poppins(
-                        textStyle: TextStyle(
-                          color: _hoveredIndex == 30
-                              ? Colors.white
-                              : Color(0xFF4CAF4F),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 20,
-                        ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _isEmployeeExpanded =
-                              !_isEmployeeExpanded; // Toggle dropdown
-                        });
-                      },
-                      child: Container(
-                        height: 60, // Adjust height as needed
-                        width: 60, // Adjust width as needed
-                        color: Colors.transparent,
-                        child: Center(
-                          child: Icon(
-                            _isEmployeeExpanded
-                                ? Icons.expand_less
-                                : Icons.expand_more,
-                            color: _hoveredIndex == 30
-                                ? Colors.white
-                                : Color(0xFF4CAF4F),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        // Dropdown options
-        if (_isEmployeeExpanded) ...[
-          _buildsecondHoverableListTile(
-              8, Icons.group_outlined, 'All Employees', '/employee'),
-          _buildsecondHoverableListTile(
-              31, Icons.payment_outlined, 'Payroll', '/payroll'),
         ],
       ],
     );

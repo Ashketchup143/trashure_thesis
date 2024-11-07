@@ -50,7 +50,7 @@ class _OutflowState extends State<Outflow> {
                   },
                 ),
                 Text(
-                  'Outflow',
+                  'Expenses',
                   style: GoogleFonts.poppins(
                     textStyle: const TextStyle(
                         fontWeight: FontWeight.bold, fontSize: 20),
@@ -108,7 +108,7 @@ class _OutflowState extends State<Outflow> {
                     children: [
                       const SizedBox(width: 8),
                       Text(
-                        'Add Outflow',
+                        'Add Expense',
                         style: GoogleFonts.roboto(
                           textStyle: const TextStyle(
                               fontWeight: FontWeight.w300, color: Colors.white),

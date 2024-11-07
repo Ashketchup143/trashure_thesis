@@ -112,7 +112,7 @@ class _AddUserModalState extends State<AddUserModal> {
 
       if (productId != null) {
         recyclables.add({
-          'type': product['product_name'],
+          'type': product['product_name'].toString().toUpperCase(),
           'weight': weight,
           'price': price,
           'item_price': weight * price,
@@ -133,6 +133,9 @@ class _AddUserModalState extends State<AddUserModal> {
       return prev + itemWeight;
     });
 
+    // Calculate calculated_total_price
+    double calculatedTotalPrice = totalPrice - 40;
+
     // Add the user with their recyclables
     await userRef.set({
       'firstName': 'Guest',
@@ -140,6 +143,8 @@ class _AddUserModalState extends State<AddUserModal> {
       'status': 'pending',
       'total_price': totalPrice, // Store total price
       'total_weight': totalWeight, // Store total weight
+      'calculated_total_price':
+          calculatedTotalPrice, // Store calculated total price
     });
 
     // Add each recyclable under the user's subcollection
@@ -152,6 +157,19 @@ class _AddUserModalState extends State<AddUserModal> {
 
   @override
   Widget build(BuildContext context) {
+    // Calculate the total price and weight for all selected products
+    double totalPrice = selectedProducts.fold(0.0, (sum, product) {
+      double weight =
+          double.tryParse(product['weightController']?.text ?? '0') ?? 0.0;
+      double price = product['price'] ?? 0.0;
+      return sum + (weight * price);
+    });
+
+    double totalWeight = selectedProducts.fold(0.0, (sum, product) {
+      return sum +
+          (double.tryParse(product['weightController']?.text ?? '0') ?? 0.0);
+    });
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: Container(
@@ -186,6 +204,20 @@ class _AddUserModalState extends State<AddUserModal> {
               ],
             ),
             SizedBox(height: 20),
+
+            // Display Total Weight and Total Price below "Add Another Product" button
+            Divider(),
+            Text(
+              'Total Weight: ${totalWeight.toStringAsFixed(2)} kg',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            Text(
+              'Total Price: ₱${totalPrice.toStringAsFixed(2)}',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            Divider(),
+            SizedBox(height: 20),
+
             ElevatedButton(
               onPressed: _addUserWithProducts,
               child: Text('Add User'),
@@ -203,66 +235,122 @@ class _AddUserModalState extends State<AddUserModal> {
   }
 
   Widget _buildProductSelection(int index) {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: fetchProducts(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return Center(child: CircularProgressIndicator());
-        }
+    // Calculate the total price and weight for all selected products
+    double totalPrice = selectedProducts.fold(0.0, (sum, product) {
+      double weight =
+          double.tryParse(product['weightController']?.text ?? '0') ?? 0.0;
+      double price = product['price'] ?? 0.0;
+      return sum + (weight * price);
+    });
 
-        var products = snapshot.data!.toSet().toList(); // Remove duplicates
+    double totalWeight = selectedProducts.fold(0.0, (sum, product) {
+      return sum +
+          (double.tryParse(product['weightController']?.text ?? '0') ?? 0.0);
+    });
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            DropdownButton<String>(
-              value: selectedProducts[index]['productId'],
-              hint: Text('Select Product'),
-              isExpanded: true,
-              items: products.map((product) {
-                return DropdownMenuItem<String>(
-                  value: product['product_id'],
-                  child: Text("${product['product_name']}"),
-                );
-              }).toList(),
-              onChanged: (selectedProductId) async {
-                double latestPrice =
-                    await _fetchLatestPrice(selectedProductId!);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      // Category Dropdown with decoration
+      InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Select Category',
+          border: OutlineInputBorder(),
+          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        ),
+        child: DropdownButton<String>(
+          value: selectedProducts[index]['category'],
+          hint: Text('Select Category'),
+          isExpanded: true,
+          underline: SizedBox(), // Remove default underline
+          items: productsList
+              .map((product) => product['category'])
+              .toSet()
+              .map((category) {
+            return DropdownMenuItem<String>(
+              value: category,
+              child: Text(category),
+            );
+          }).toList(),
+          onChanged: (selectedCategory) {
+            setState(() {
+              selectedProducts[index]['category'] = selectedCategory;
+              selectedProducts[index]['productId'] =
+                  null; // Reset product selection
+            });
+          },
+        ),
+      ),
+      SizedBox(height: 10),
 
-                setState(() {
-                  selectedProducts[index]['productId'] = selectedProductId;
-                  selectedProducts[index]['price'] = latestPrice;
-                });
+      // Product Dropdown with decoration
+      InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Select Product',
+          border: OutlineInputBorder(),
+          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        ),
+        child: DropdownButton<String>(
+          value: selectedProducts[index]['productId'],
+          hint: Text('Select Product'),
+          isExpanded: true,
+          underline: SizedBox(), // Remove default underline
+          items: productsList.where((product) {
+            // Filter products by the selected category and prevent duplicate additions
+            return product['category'] == selectedProducts[index]['category'] &&
+                !selectedProducts.any((selectedProduct) =>
+                    selectedProduct['productId'] == product['product_id'] &&
+                    selectedProducts[index]['productId'] !=
+                        product['product_id']);
+          }).map((product) {
+            return DropdownMenuItem<String>(
+              value: product['product_id'],
+              child: Text(product['product_name']),
+            );
+          }).toList(),
+          onChanged: (selectedProductId) async {
+            double latestPrice = await _fetchLatestPrice(selectedProductId!);
+
+            setState(() {
+              selectedProducts[index]['productId'] = selectedProductId;
+              selectedProducts[index]['price'] = latestPrice;
+            });
+          },
+        ),
+      ),
+      SizedBox(height: 10),
+
+      // Latest Price Display
+      Text(
+        'Latest Price: ₱${selectedProducts[index]['price'].toStringAsFixed(2)}',
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
+      SizedBox(height: 10),
+
+      // Weight Input
+      Row(
+        children: [
+          Expanded(
+            child: TextFormField(
+              controller: selectedProducts[index]['weightController'],
+              decoration: InputDecoration(
+                labelText: 'Weight (kg)',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
+              onChanged: (value) {
+                setState(() {}); // Update totals when weight changes
               },
             ),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: selectedProducts[index]['weightController'],
-                    decoration: InputDecoration(
-                      labelText: 'Weight (kg)',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-                IconButton(
-                  onPressed: () {
-                    _removeProduct(index);
-                  },
-                  icon: Icon(Icons.delete),
-                  color: Colors.red,
-                ),
-              ],
-            ),
-            SizedBox(height: 10),
-            if (selectedProducts[index]['price'] != 0.0)
-              Text(
-                  'Price: ₱${selectedProducts[index]['price'].toStringAsFixed(2)}'),
-          ],
-        );
-      },
-    );
+          ),
+          IconButton(
+            onPressed: () {
+              _removeProduct(index);
+            },
+            icon: Icon(Icons.delete),
+            color: Colors.red,
+          ),
+        ],
+      ),
+      SizedBox(height: 10),
+    ]);
   }
 }

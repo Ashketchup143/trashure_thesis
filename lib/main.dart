@@ -47,7 +47,7 @@ class MyApp extends StatelessWidget {
         theme: ThemeData(
           primarySwatch: Colors.blue,
         ),
-        initialRoute: '/login', // Set initial route to the login screen
+        initialRoute: '/', // Set initial route to the login screen
         debugShowCheckedModeBanner: false,
         routes: {
           '/': (context) => Login(),

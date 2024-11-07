@@ -18,6 +18,7 @@ class _InventoryState extends State<Inventory> {
   List<Map<String, dynamic>> inventory = []; // Stores the data from Firestore
   List<Map<String, dynamic>> filteredInventory = [];
   Map<String, bool> _selectedOptions = {};
+
   // Updated field definitions for Representative Name, Company Name, Payment Method, and Reference Number
   final TextEditingController representativeNameController =
       TextEditingController();
@@ -76,6 +77,34 @@ class _InventoryState extends State<Inventory> {
         return category.contains(query) || type.contains(query);
       }).toList();
     });
+  }
+
+  // Function to fetch the latest original price for a specific product
+  Future<double?> _fetchLatestOriginalPrice(String productType) async {
+    try {
+      QuerySnapshot productSnapshot = await FirebaseFirestore.instance
+          .collection('products')
+          .where('product_name',
+              isEqualTo: productType.toLowerCase()) // Case-insensitive match
+          .get();
+
+      if (productSnapshot.docs.isNotEmpty) {
+        DocumentReference productRef = productSnapshot.docs.first.reference;
+
+        QuerySnapshot priceSnapshot = await productRef
+            .collection('prices')
+            .orderBy('time', descending: true)
+            .limit(1)
+            .get();
+
+        if (priceSnapshot.docs.isNotEmpty) {
+          return priceSnapshot.docs.first['original_price']?.toDouble();
+        }
+      }
+    } catch (e) {
+      print('Error fetching original price: $e');
+    }
+    return null; // Return null if no original_price found
   }
 
   @override
@@ -367,29 +396,7 @@ class _InventoryState extends State<Inventory> {
         },
       );
     } else {
-      // Fetch all product data in one read
-      Map<String, dynamic> productPriceMap = {};
-      final productsSnapshot =
-          await FirebaseFirestore.instance.collection('products').get();
-
-      for (var productDoc in productsSnapshot.docs) {
-        // Get the latest price from the subcollection
-        final priceSnapshot = await productDoc.reference
-            .collection('prices')
-            .orderBy('time', descending: true)
-            .limit(1)
-            .get();
-
-        if (priceSnapshot.docs.isNotEmpty) {
-          final priceData = priceSnapshot.docs.first.data();
-          productPriceMap[productDoc.id] = {
-            'original_price': priceData['original_price']?.toDouble(),
-            'percentage_profit': priceData['percentage_profit']?.toDouble(),
-            'price': priceData['price']?.toDouble(),
-          };
-        }
-      }
-
+      // Initialize controllers and data structures for managing product information
       final TextEditingController representativeNameController =
           TextEditingController();
       final TextEditingController descriptionController =
@@ -402,36 +409,28 @@ class _InventoryState extends State<Inventory> {
       final Map<String, TextEditingController> weightControllers = {};
       final Map<String, TextEditingController> priceControllers = {};
       final Map<String, double?> originalPrices = {};
-      final Map<String, double?> percentageProfits = {};
-      final Map<String, double?> suggestedPrices = {};
       final Map<String, String?> errorMessages = {};
 
-      // Initialize controllers with the pre-fetched product data
+      // Fetch all original prices before showing the dialog
       for (var item in selectedItems) {
         String itemId = item['id'];
+        String itemType =
+            item['type'].toLowerCase(); // Convert to lowercase for comparison
         weightControllers[itemId] = TextEditingController();
         priceControllers[itemId] = TextEditingController();
         errorMessages[itemId] = null;
 
-        if (productPriceMap.containsKey(itemId)) {
-          originalPrices[itemId] = productPriceMap[itemId]['original_price'];
-          percentageProfits[itemId] =
-              productPriceMap[itemId]['percentage_profit'];
-          suggestedPrices[itemId] = productPriceMap[itemId]['price'];
-
-          // Set the price in the priceControllers directly
-          if (originalPrices[itemId] != null) {
-            priceControllers[itemId]!.text =
-                originalPrices[itemId]!.toStringAsFixed(2);
-          }
+        double? latestOriginalPrice = await _fetchLatestOriginalPrice(itemType);
+        if (latestOriginalPrice != null) {
+          originalPrices[itemId] = latestOriginalPrice;
+          priceControllers[itemId]!.text =
+              latestOriginalPrice.toStringAsFixed(2); // Set price to TextField
         } else {
-          originalPrices[itemId] = null;
-          percentageProfits[itemId] = null;
-          suggestedPrices[itemId] = null;
+          originalPrices[itemId] = null; // No price available
         }
       }
 
-      // Show the dialog with the fetched data
+      // Now that all data is ready, proceed to show the dialog
       showDialog(
         context: context,
         builder: (context) {
@@ -514,10 +513,6 @@ class _InventoryState extends State<Inventory> {
                                 String type = item['type'];
                                 double currentWeight = item['weight'];
                                 double? originalPrice = originalPrices[itemId];
-                                double? percentageProfit =
-                                    percentageProfits[itemId];
-                                double? suggestedPrice =
-                                    suggestedPrices[itemId];
 
                                 return Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -547,8 +542,9 @@ class _InventoryState extends State<Inventory> {
                                                 priceControllers[itemId],
                                             keyboardType: TextInputType.number,
                                             decoration: InputDecoration(
-                                              labelText: originalPrice != null
-                                                  ? 'Original Price: ₱$originalPrice'
+                                              labelText: 'Enter Price per kg',
+                                              hintText: originalPrice != null
+                                                  ? '₱${originalPrice.toStringAsFixed(2)}' // Display original price as hint
                                                   : 'Enter Price per kg',
                                               border:
                                                   const OutlineInputBorder(),
@@ -558,13 +554,6 @@ class _InventoryState extends State<Inventory> {
                                       ],
                                     ),
                                     const SizedBox(height: 10),
-                                    if (percentageProfit != null &&
-                                        suggestedPrice != null)
-                                      Text(
-                                        'Profit: ${percentageProfit.toStringAsFixed(2)}%, Suggested Price: ₱$suggestedPrice',
-                                        style:
-                                            const TextStyle(color: Colors.grey),
-                                      ),
                                     if (errorMessages[itemId] != null &&
                                         errorMessages[itemId]!.isNotEmpty)
                                       Text(
@@ -625,7 +614,7 @@ class _InventoryState extends State<Inventory> {
     }
   }
 
-// Function to validate sell product input
+  // Function to validate sell product input
   bool _validateSellProductInput(
       List<Map<String, dynamic>> selectedItems,
       Map<String, TextEditingController> weightControllers,
@@ -719,7 +708,7 @@ class _InventoryState extends State<Inventory> {
     // Add inflow entry with the updated fields, including `authorized_by`
     DocumentReference inflowRef =
         await FirebaseFirestore.instance.collection('inflow').add({
-      'authorized_by': authorizedBy, // Set authorized_by with username
+      'authorized_by': authorizedBy,
       'representative_name': representativeNameController.text.isNotEmpty
           ? representativeNameController.text
           : 'N/A',

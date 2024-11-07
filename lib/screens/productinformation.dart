@@ -85,53 +85,75 @@ class _ProductInformationState extends State<ProductInformation> {
   }
 
   Future<void> _updateProductDetails() async {
-    if (_detailsController.text.trim().isNotEmpty &&
-        _selectedCategory.isNotEmpty &&
-        _priceController.text.trim().isNotEmpty) {
-      double newPrice = double.tryParse(_priceController.text.trim()) ?? 0.0;
+    // Trim and get the updated values
+    String updatedDetails = _detailsController.text.trim();
+    String updatedCategory = _selectedCategory;
+    String updatedImageUrl = _imageFileName ?? widget.imageUrl;
+    double newPrice = double.tryParse(_priceController.text.trim()) ?? 0.0;
 
-      // Upload image if there's a new one selected
-      if (_imageFileName != null && _imageBytes != null) {
-        await _uploadImage(widget.productId);
-      }
+    // Check if there are any actual changes
+    bool hasDetailsChanged = updatedDetails != widget.details;
+    bool hasCategoryChanged = updatedCategory != widget.category;
+    bool hasImageChanged = _imageFileName != null;
+    bool hasPriceChanged = newPrice != _currentPrice;
 
-      // Update product details in Firestore
+    // If nothing has changed, exit the function early
+    if (!hasDetailsChanged &&
+        !hasCategoryChanged &&
+        !hasImageChanged &&
+        !hasPriceChanged) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No changes to update')),
+      );
+      return;
+    }
+
+    // Fetch percentage profit if price has changed
+    double calculatedPrice = newPrice;
+    if (hasPriceChanged) {
+      double percentageProfit = await _getPercentageProfit();
+      calculatedPrice = newPrice * (1 - percentageProfit / 100);
+    }
+
+    // If an image was selected, upload it first
+    if (hasImageChanged && _imageBytes != null) {
+      await _uploadImage(widget.productId);
+    }
+
+    // Update product details in Firestore if there are changes
+    Map<String, dynamic> updateData = {};
+    if (hasDetailsChanged) updateData['details'] = updatedDetails;
+    if (hasCategoryChanged) updateData['category'] = updatedCategory;
+    if (hasImageChanged) updateData['picture'] = updatedImageUrl;
+
+    // Perform updates only if necessary
+    if (updateData.isNotEmpty) {
       await FirebaseFirestore.instance
           .collection('products')
           .doc(widget.productId)
-          .update({
-        'details': _detailsController.text.trim(),
-        'category': _selectedCategory,
-        'picture': _imageFileName ?? widget.imageUrl,
-      });
-
-      // If the price has changed, add the new price to the prices subcollection
-      if (newPrice != _currentPrice) {
-        await FirebaseFirestore.instance
-            .collection('products')
-            .doc(widget.productId)
-            .collection('prices')
-            .add({
-          'price': newPrice,
-          'original_price':
-              newPrice, // Assuming the original price is entered manually
-          'percentage_profit':
-              20.0, // You can replace this with fetched value from your settings
-          'time': FieldValue.serverTimestamp(),
-        });
-        setState(() {
-          _currentPrice = newPrice;
-        });
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Product details updated successfully')),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Details, Category, and Price cannot be empty')),
-      );
+          .update(updateData);
     }
+
+    // Update the price history if the price has changed
+    if (hasPriceChanged) {
+      await FirebaseFirestore.instance
+          .collection('products')
+          .doc(widget.productId)
+          .collection('prices')
+          .add({
+        'price': calculatedPrice,
+        'original_price': newPrice,
+        'percentage_profit': await _getPercentageProfit(),
+        'time': FieldValue.serverTimestamp(),
+      });
+      setState(() {
+        _currentPrice = calculatedPrice;
+      });
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Product details updated successfully')),
+    );
   }
 
   Future<void> _uploadImage(String productId) async {
@@ -181,34 +203,32 @@ class _ProductInformationState extends State<ProductInformation> {
     );
 
     if (result != null) {
+      Uint8List? fileBytes = result.files.first.bytes;
+      String filename = result.files.first.name;
+
+      // Store the image filename and bytes, but don't upload yet
       setState(() {
-        _isUploading = true;
+        _imageFileName = filename;
+        _imageBytes = fileBytes;
       });
 
-      try {
-        Uint8List? fileBytes = result.files.first.bytes;
-        String filename = result.files.first.name;
-
-        // Store the image filename in state, to display the file name
-        setState(() {
-          _imageFileName = filename;
-        });
-
-        // Now the image file is stored, but we delay the upload until the user confirms
-        _imageBytes = fileBytes;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Image selected successfully!')),
-        );
-      } catch (e) {
-        setState(() {
-          _isUploading = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to select image: $e')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Image selected successfully!')),
+      );
     }
+  }
+
+  Future<double> _getPercentageProfit() async {
+    DocumentSnapshot settingsDoc = await FirebaseFirestore.instance
+        .collection('settings')
+        .doc('percentage_profit')
+        .get();
+
+    if (settingsDoc.exists && settingsDoc.data() != null) {
+      return settingsDoc['percentage_profit'] ??
+          20.0; // Default to 20% if not found
+    }
+    return 20.0; // Default percentage if not found
   }
 
 // Modify this function to get the image download URL using the filename
@@ -353,7 +373,7 @@ class _ProductInformationState extends State<ProductInformation> {
             SizedBox(height: 10),
             Container(
               height: MediaQuery.of(context).size.height *
-                  .32, // Set a fixed height for the scrollable container
+                  .30, // Set a fixed height for the scrollable container
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.grey),
                 borderRadius: BorderRadius.circular(10),
