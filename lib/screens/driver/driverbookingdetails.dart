@@ -142,7 +142,10 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                     },
                                   );
                                 },
-                                child: const Text('Add Guest User'),
+                                child: const Text(
+                                  'Add Guest User',
+                                  style: TextStyle(color: Colors.white),
+                                ),
                                 style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.green),
                               ),
@@ -150,25 +153,25 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                         ),
                         const SizedBox(height: 10),
                         Text('Booking ID: $bookingId',
-                            style: const TextStyle(fontSize: 18)),
+                            style: const TextStyle(fontSize: 15)),
                         Text('Status: $status',
-                            style: const TextStyle(fontSize: 18)),
+                            style: const TextStyle(fontSize: 15)),
                         Text('Vehicle: $vehicle',
-                            style: const TextStyle(fontSize: 18)),
+                            style: const TextStyle(fontSize: 15)),
                         Text('Vehicle ID: $vehicleId',
-                            style: const TextStyle(fontSize: 18)),
+                            style: const TextStyle(fontSize: 15)),
 
                         // Display for Est. Total Price
                         Row(
                           children: [
                             Text(
                               'Est. Total Price: ₱${overallPrice.toStringAsFixed(2)} ',
-                              style: const TextStyle(fontSize: 18),
+                              style: const TextStyle(fontSize: 15),
                             ),
                             Text(
                               '${priceDifference >= 0 ? '+' : ''}${priceDifference.toStringAsFixed(2)}',
                               style: TextStyle(
-                                fontSize: 18,
+                                fontSize: 15,
                                 color: priceDifference >= 0
                                     ? Colors.green
                                     : Colors.red,
@@ -180,7 +183,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                         // Display for Actual Calculated Price
                         Text(
                           'Actual Calculated Price: ₱${totalCalculatedPrice.toStringAsFixed(2)}',
-                          style: const TextStyle(fontSize: 18),
+                          style: const TextStyle(fontSize: 15),
                         ),
 
                         // Display for Est. Total Weight
@@ -188,12 +191,12 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                           children: [
                             Text(
                               'Est. Total Weight: ${overallWeight.toStringAsFixed(2)} kg ',
-                              style: const TextStyle(fontSize: 18),
+                              style: const TextStyle(fontSize: 15),
                             ),
                             Text(
                               '${weightDifference >= 0 ? '+' : ''}${weightDifference.toStringAsFixed(2)} kg',
                               style: TextStyle(
-                                fontSize: 18,
+                                fontSize: 15,
                                 color: weightDifference >= 0
                                     ? Colors.green
                                     : Colors.red,
@@ -205,11 +208,11 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                         // Display for Actual Calculated Weight
                         Text(
                           'Actual Calculated Weight: ${totalCalculatedWeight.toStringAsFixed(2)} kg',
-                          style: const TextStyle(fontSize: 18),
+                          style: const TextStyle(fontSize: 15),
                         ),
 
                         Text('Date: $formattedDate',
-                            style: const TextStyle(fontSize: 18)),
+                            style: const TextStyle(fontSize: 15)),
                         const SizedBox(height: 20),
                         Expanded(
                           child: StreamBuilder(
@@ -335,7 +338,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                         'Total Price: ₱${totalPrice.toStringAsFixed(2)}\n'
                                         'Calculated Total Price: ₱${calculatedTotalPrice.toStringAsFixed(2)}\n'
                                         'Total Weight: ${totalWeight.toStringAsFixed(2)} kg\n'
-                                        'Driver Share: ₱${((((((totalPrice ?? 0.0) / (1 - 0.20)) + 40) - (totalPrice ?? 0.0)) * 0.25).toStringAsFixed(2))}\n'
+                                        'Driver Share: ₱${((((((totalPrice ?? 0.0) / (1 - 0.30)) + 40) - (totalPrice ?? 0.0)) * 0.30).toStringAsFixed(2))}\n'
                                         '${userStatus == 'collected' ? 'Collected: $collectedDate' : ''}',
                                       ),
                                       children: [
@@ -441,9 +444,11 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                                                     'Weight: ${updatedWeights[recyclableId]!.toStringAsFixed(2)} kg',
                                                                   ),
                                                           ),
-                                                          if (status ==
+                                                          if (!isCollected &&
+                                                              status ==
                                                                   'collecting' &&
-                                                              !isCollected) ...[
+                                                              userStatus !=
+                                                                  'failed') ...[
                                                             IconButton(
                                                               icon: Icon(
                                                                   isEditing
@@ -456,7 +461,9 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                                                   if (isEditing) {
                                                                     double
                                                                         newWeight =
-                                                                        double.tryParse(weightControllers[recyclableId]!.text) ??
+                                                                        double.tryParse(
+                                                                              weightControllers[recyclableId]!.text,
+                                                                            ) ??
                                                                             weight;
                                                                     updatedWeights[
                                                                             recyclableId] =
@@ -471,90 +478,85 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                                                 });
                                                               },
                                                             ),
-                                                            if (status ==
-                                                                    'collecting' &&
-                                                                !isCollected) ...[
-                                                              IconButton(
-                                                                icon: Icon(
-                                                                    Icons
-                                                                        .delete,
-                                                                    color: Colors
-                                                                        .red),
-                                                                onPressed:
-                                                                    () async {
-                                                                  bool
-                                                                      confirmDelete =
-                                                                      await showDialog(
-                                                                    context:
-                                                                        context,
-                                                                    builder:
-                                                                        (context) {
-                                                                      return AlertDialog(
-                                                                        title: Text(
-                                                                            'Delete Product'),
-                                                                        content:
-                                                                            Text('Are you sure you want to delete this product?'),
-                                                                        actions: [
-                                                                          TextButton(
-                                                                            onPressed:
-                                                                                () {
-                                                                              Navigator.of(context).pop(false);
-                                                                            },
-                                                                            child:
-                                                                                Text('Cancel'),
-                                                                          ),
-                                                                          TextButton(
-                                                                            onPressed:
-                                                                                () {
-                                                                              Navigator.of(context).pop(true);
-                                                                            },
-                                                                            child:
-                                                                                Text('Delete'),
-                                                                          ),
-                                                                        ],
-                                                                      );
-                                                                    },
-                                                                  );
-
-                                                                  if (confirmDelete ==
-                                                                      true) {
-                                                                    await FirebaseFirestore
-                                                                        .instance
-                                                                        .collection(
-                                                                            'bookings')
-                                                                        .doc(
-                                                                            bookingId)
-                                                                        .collection(
-                                                                            'users')
-                                                                        .doc(
-                                                                            userId)
-                                                                        .collection(
-                                                                            'recyclables')
-                                                                        .doc(
-                                                                            recyclableId)
-                                                                        .delete();
-
-                                                                    setState(
-                                                                        () {
-                                                                      recyclables
-                                                                          .removeAt(
-                                                                              recIndex);
-                                                                    });
-
-                                                                    ScaffoldMessenger.of(
-                                                                            context)
-                                                                        .showSnackBar(
-                                                                      SnackBar(
-                                                                        content:
-                                                                            Text('Product deleted successfully.'),
-                                                                        backgroundColor:
-                                                                            Colors.red,
-                                                                      ),
+                                                            IconButton(
+                                                              icon: Icon(
+                                                                  Icons.delete,
+                                                                  color: Colors
+                                                                      .red),
+                                                              onPressed:
+                                                                  () async {
+                                                                bool
+                                                                    confirmDelete =
+                                                                    await showDialog(
+                                                                  context:
+                                                                      context,
+                                                                  builder:
+                                                                      (context) {
+                                                                    return AlertDialog(
+                                                                      title: Text(
+                                                                          'Delete Product'),
+                                                                      content: Text(
+                                                                          'Are you sure you want to delete this product?'),
+                                                                      actions: [
+                                                                        TextButton(
+                                                                          onPressed:
+                                                                              () {
+                                                                            Navigator.of(context).pop(false);
+                                                                          },
+                                                                          child:
+                                                                              Text('Cancel'),
+                                                                        ),
+                                                                        TextButton(
+                                                                          onPressed:
+                                                                              () {
+                                                                            Navigator.of(context).pop(true);
+                                                                          },
+                                                                          child:
+                                                                              Text('Delete'),
+                                                                        ),
+                                                                      ],
                                                                     );
-                                                                  }
-                                                                },
-                                                              ),
-                                                            ]
+                                                                  },
+                                                                );
+
+                                                                if (confirmDelete ==
+                                                                    true) {
+                                                                  await FirebaseFirestore
+                                                                      .instance
+                                                                      .collection(
+                                                                          'bookings')
+                                                                      .doc(
+                                                                          bookingId)
+                                                                      .collection(
+                                                                          'users')
+                                                                      .doc(
+                                                                          userId)
+                                                                      .collection(
+                                                                          'recyclables')
+                                                                      .doc(
+                                                                          recyclableId)
+                                                                      .delete();
+
+                                                                  setState(() {
+                                                                    recyclables
+                                                                        .removeAt(
+                                                                            recIndex);
+                                                                  });
+
+                                                                  ScaffoldMessenger.of(
+                                                                          context)
+                                                                      .showSnackBar(
+                                                                    SnackBar(
+                                                                      content: Text(
+                                                                          'Product deleted successfully.'),
+                                                                      backgroundColor:
+                                                                          Colors
+                                                                              .red,
+                                                                    ),
+                                                                  );
+                                                                }
+                                                              },
+                                                            ),
                                                           ],
                                                         ],
                                                       ),
@@ -574,8 +576,9 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                           },
                                         ),
                                         if (!isCollected &&
-                                            status ==
-                                                'collecting') // Allow adding products only if collecting
+                                            status == 'collecting' &&
+                                            userStatus !=
+                                                'failed') // Allow adding products only if collecting
                                           Row(
                                             children: [
                                               ElevatedButton(
@@ -583,17 +586,24 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                                   _showAddProductModal(userId,
                                                       bookingId); // Function to open modal for adding a product
                                                 },
-                                                child:
-                                                    const Text('Add Product'),
+                                                child: const Text(
+                                                  'Add Product',
+                                                  style: TextStyle(
+                                                      color: Colors.white),
+                                                ),
                                                 style: ElevatedButton.styleFrom(
                                                     backgroundColor:
                                                         Colors.blue),
                                               ),
                                             ],
                                           ),
+                                        SizedBox(
+                                          height: 10,
+                                        ),
                                         if (!isCollected &&
-                                            status ==
-                                                'collecting') // Allow actions only if status is collecting
+                                            status == 'collecting' &&
+                                            userStatus !=
+                                                'failed') // Allow actions only if status is collecting
                                           Row(
                                             children: [
                                               ElevatedButton(
@@ -605,7 +615,11 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                                       lastName,
                                                       userData);
                                                 },
-                                                child: const Text('Collected'),
+                                                child: const Text(
+                                                  'Collected',
+                                                  style: TextStyle(
+                                                      color: Colors.white),
+                                                ),
                                                 style: ElevatedButton.styleFrom(
                                                     backgroundColor:
                                                         Colors.green),
@@ -622,8 +636,11 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                                       lastName,
                                                       userData);
                                                 },
-                                                child:
-                                                    const Text('Not Collected'),
+                                                child: const Text(
+                                                  'Not Collected',
+                                                  style: TextStyle(
+                                                      color: Colors.white),
+                                                ),
                                                 style: ElevatedButton.styleFrom(
                                                     backgroundColor:
                                                         Colors.red),
@@ -644,7 +661,10 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                             onPressed: () async {
                               await _showFinalCollectedConfirmation(bookingId);
                             },
-                            child: const Text('Mark Booking as Collected'),
+                            child: const Text(
+                              'Mark Booking as Collected',
+                              style: TextStyle(color: Colors.white),
+                            ),
                             style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.green),
                           ),
@@ -701,55 +721,89 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
   }
 
   Future<void> _markAsNotCollected(String bookingId, String userId) async {
-    var recyclablesSnapshot = await FirebaseFirestore.instance
-        .collection('bookings')
-        .doc(bookingId)
-        .collection('users')
-        .doc(userId)
-        .collection('recyclables')
-        .get();
+    try {
+      // Step 1: Get the user's document reference in the 'users' collection
+      var userDocRef =
+          FirebaseFirestore.instance.collection('users').doc(userId);
 
-    var batch = FirebaseFirestore.instance.batch();
+      // Step 2: Prepare the 'reports' subcollection and create a new report entry
+      var reportRef = userDocRef.collection('reports').doc();
+      var bookingDocRef =
+          FirebaseFirestore.instance.collection('bookings').doc(bookingId);
+      var userBookingDocPath =
+          'bookings/$bookingId/users/$userId'; // Full path as a string
+      var timestamp = FieldValue.serverTimestamp();
 
-    // Set final_weight and final_item_price to 0 for each recyclable item
-    for (var rec in recyclablesSnapshot.docs) {
-      batch.update(
-        rec.reference,
-        {
+      // Step 3: Add a new report document with datetimestamp, status, bookingReference, and userDocumentPath
+      await reportRef.set({
+        'datetimestamp': timestamp,
+        'status': 'failed',
+        'bookingReference': bookingDocRef,
+        'userDocumentPath': userBookingDocPath,
+      });
+
+      // Step 4: Fetch recyclables from the booking document
+      var recyclablesSnapshot = await bookingDocRef
+          .collection('users')
+          .doc(userId)
+          .collection('recyclables')
+          .get();
+
+      var batch = FirebaseFirestore.instance.batch();
+
+      // Step 5: Copy each recyclable item into the 'recyclables' subcollection in the report
+      for (var rec in recyclablesSnapshot.docs) {
+        var recyclableData = rec.data();
+
+        // Add the full recyclable data to the report's 'recyclables' subcollection
+        await reportRef.collection('recyclables').add({
+          'category': recyclableData['category'] ?? 'Unknown',
+          'final_item_price': 0.0, // Reset final values as requested
           'final_weight': 0.0,
-          'final_item_price': 0.0,
-        },
+          'item_price': recyclableData['item_price'] ?? 0.0,
+          'original_price': recyclableData['original_price'] ?? 0.0,
+          'price': recyclableData['price'] ?? 0.0,
+          'product_Id': recyclableData['product_Id'] ?? '',
+          'timestamp': recyclableData['timestamp'],
+          'type': recyclableData['type'] ?? 'Unknown',
+          'weight': recyclableData['weight'] ?? 0.0,
+        });
+
+        // Update the original recyclable item in the booking to set final_weight and final_item_price to 0
+        batch.update(
+          rec.reference,
+          {
+            'final_weight': 0.0,
+            'final_item_price': 0.0,
+          },
+        );
+      }
+
+      // Step 6: Update the user's document in the booking with failed status
+      var userBookingRef = bookingDocRef.collection('users').doc(userId);
+      batch.update(userBookingRef, {
+        'status': 'failed',
+      });
+
+      // Commit the batch update
+      await batch.commit();
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'User marked as not collected. Report added, recyclables copied, and status updated to failed.'),
+        ),
+      );
+    } catch (e) {
+      print('Error in _markAsNotCollected: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Failed to mark user as not collected. Please try again.'),
+        ),
       );
     }
-
-    // Update the user's document with failed status and set all totals to 0
-    var userRef = FirebaseFirestore.instance
-        .collection('bookings')
-        .doc(bookingId)
-        .collection('users')
-        .doc(userId);
-
-    batch.update(userRef, {
-      'status': 'failed',
-      'final_total_price': 0.0,
-      'final_total_weight': 0.0,
-    });
-
-    // Update the booking document with final overall price and weight as 0
-    var bookingRef =
-        FirebaseFirestore.instance.collection('bookings').doc(bookingId);
-    batch.update(bookingRef, {
-      'final_overall_price': 0.0,
-      'final_overall_weight': 0.0,
-    });
-
-    await batch.commit();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text(
-              'User marked as not collected. All totals set to zero, and status updated to failed.')),
-    );
   }
 
   Future<void> _showCollectedConfirmation(String userId, String bookingId,
@@ -850,6 +904,9 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
           Timestamp.now(), // Add collected timestamp for the user
     });
 
+    // Update the status of each user in the users collection to "collected"
+    await _updateUsersStatusToCollected(bookingId);
+
     // Add new document to the `outflow` collection
     var bookingDoc = await FirebaseFirestore.instance
         .collection('bookings')
@@ -864,7 +921,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
 
     await FirebaseFirestore.instance.collection('outflow').add({
       'date': Timestamp.now(),
-      'price': finalTotalPrice,
+      'price': finalCalculatedTotalPrice,
       'weight': finalTotalWeight,
       'vehicle': vehicle,
       'vehicleId': vehicleId,
@@ -963,63 +1020,120 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
 
   Future<void> _finalizeBookingCollection(
       String bookingId, QuerySnapshot usersSnapshot) async {
-    // Calculate the total final_overall_price and final_overall_weight
+    // Calculate the total final overall price, final overall weight, and total driver share
     double finalOverallPrice = 0.0;
     double finalOverallWeight = 0.0;
+    double totalDriverShare = 0.0;
 
     for (var userDoc in usersSnapshot.docs) {
       var userData = userDoc.data() as Map<String, dynamic>;
       double finalTotalPrice = userData['final_total_price'] ?? 0.0;
       double finalTotalWeight = userData['final_total_weight'] ?? 0.0;
 
+      // Calculate the driver share for each user
+      double driverShare =
+          ((((finalTotalPrice / (1 - 0.30)) + 40) - finalTotalPrice) * 0.30);
+
+      // Accumulate the totals
       finalOverallPrice += finalTotalPrice;
       finalOverallWeight += finalTotalWeight;
+      totalDriverShare += driverShare;
     }
 
-    // Update the booking document with the final overall price and weight
-    await FirebaseFirestore.instance
-        .collection('bookings')
-        .doc(bookingId)
-        .update({
+    // Update the booking document with the final overall price, weight, and driver share
+    var bookingRef =
+        FirebaseFirestore.instance.collection('bookings').doc(bookingId);
+    await bookingRef.update({
       'status': 'collected',
       'final_overall_price': finalOverallPrice,
       'final_overall_weight': finalOverallWeight,
+      'driver_share':
+          totalDriverShare.toStringAsFixed(2), // Add the total driver share
     });
 
-    // Add the outflow entry
-    var bookingDoc = await FirebaseFirestore.instance
-        .collection('bookings')
-        .doc(bookingId)
-        .get();
+    // Fetch booking data for outflow entry
+    var bookingDoc = await bookingRef.get();
     var bookingData = bookingDoc.data() as Map<String, dynamic>;
 
-    String vehicle = bookingData['vehicle'] ?? 'Unknown';
-    String vehicleId = bookingData['vehicleId'] ?? 'Unknown';
-    String employee = bookingData['driver'] ?? 'Unknown';
-    String employeeId = bookingData['driverId'] ?? 'Unknown';
+    String vehicle = bookingData['vehicle'] ?? 'Unknown Vehicle';
+    String vehicleId = bookingData['vehicleId'] ?? 'Unknown Vehicle ID';
+    String employee = bookingData['driver'] ?? 'Unknown Driver';
+    String employeeId = bookingData['driverId'] ?? 'Unknown Driver ID';
 
+    // Add a new document to the outflow collection for the driver share
     await FirebaseFirestore.instance.collection('outflow').add({
       'date': Timestamp.now(),
-      'price': finalOverallPrice,
-      'weight': finalOverallWeight,
+      'price': double.parse(totalDriverShare.toStringAsFixed(2)),
       'vehicle': vehicle,
       'vehicleId': vehicleId,
       'employee': employee,
       'employeeId': employeeId,
       'bookingId': bookingId,
       'status': 'collected',
-      'category': 'booking',
+      'category': 'driver share',
     });
+
+    // Add the outflow entry for total
+    // var bookingDoc = await FirebaseFirestore.instance
+    //     .collection('bookings')
+    //     .doc(bookingId)
+    //     .get();
+    // var bookingData = bookingDoc.data() as Map<String, dynamic>;
+
+    // String vehicle = bookingData['vehicle'] ?? 'Unknown';
+    // String vehicleId = bookingData['vehicleId'] ?? 'Unknown';
+    // String employee = bookingData['driver'] ?? 'Unknown';
+    // String employeeId = bookingData['driverId'] ?? 'Unknown';
+
+    // await FirebaseFirestore.instance.collection('outflow').add({
+    //   'date': Timestamp.now(),
+    //   'price': finalOverallPrice,
+    //   'weight': finalOverallWeight,
+    //   'vehicle': vehicle,
+    //   'vehicleId': vehicleId,
+    //   'employee': employee,
+    //   'employeeId': employeeId,
+    //   'bookingId': bookingId,
+    //   'status': 'collected',
+    //   'category': 'booking',
+    // });
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-          backgroundColor: Colors.green,
-          content: Text(
-              'Booking marked as collected. Final overall price and weight updated.')),
+        backgroundColor: Colors.green,
+        content: Text(
+          'Booking marked as collected. Final overall price, weight, and driver share updated.',
+        ),
+      ),
     );
 
     // Pop the current screen after the operation is complete
     Navigator.of(context).pop();
+  }
+
+// Function to update the status of users in the users collection to "collected"
+  Future<void> _updateUsersStatusToCollected(String bookingId) async {
+    var usersSnapshot = await FirebaseFirestore.instance
+        .collection('bookings')
+        .doc(bookingId)
+        .collection('users')
+        .get();
+
+    var batch = FirebaseFirestore.instance.batch();
+
+    for (var userDoc in usersSnapshot.docs) {
+      var userData = userDoc.data() as Map<String, dynamic>;
+
+      if (userData['status'] != null) {
+        // Update the user's status to "collected"
+        var userRef =
+            FirebaseFirestore.instance.collection('users').doc(userDoc.id);
+        batch.update(userRef, {'status': 'done'});
+      }
+    }
+
+    // Commit the batch update
+    await batch.commit();
   }
 
   void _showAddProductModal(String userId, String bookingId) async {

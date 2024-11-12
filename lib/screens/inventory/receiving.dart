@@ -39,7 +39,7 @@ class _ReceivingState extends State<Receiving> {
                       },
                     ),
                     Text(
-                      'Receiving',
+                      'Receiving (Collected Bookings)',
                       textAlign: TextAlign.left,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
@@ -181,109 +181,105 @@ class _ReceivingState extends State<Receiving> {
         ],
       ),
       children: [
-        // Reset the total weights and differences when the tile is expanded
-        StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('bookings')
-              .doc(bookingId)
-              .collection('users')
-              .snapshots(),
-          builder: (context, userSnapshot) {
-            if (!userSnapshot.hasData) {
-              return Center(child: CircularProgressIndicator());
-            }
+        SizedBox(
+          height: 350, // Set a fixed height for scrollable content
+          child: Column(
+            children: [
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('bookings')
+                      .doc(bookingId)
+                      .collection('users')
+                      .snapshots(),
+                  builder: (context, userSnapshot) {
+                    if (!userSnapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-            var users = userSnapshot.data?.docs ?? [];
+                    var users = userSnapshot.data?.docs ?? [];
 
-            // Reset totalWeights and differences here
-            totalWeights.clear();
-            differences.clear();
+                    totalWeights.clear();
+                    differences.clear();
 
-            // Fetch recyclables for each user and accumulate the weights
-            List<Future<void>> userRecyclablesFutures =
-                users.map((userDoc) async {
-              QuerySnapshot recyclableSnapshot =
-                  await userDoc.reference.collection('recyclables').get();
-              var recyclables = recyclableSnapshot.docs;
+                    List<Future<void>> userRecyclablesFutures =
+                        users.map((userDoc) async {
+                      QuerySnapshot recyclableSnapshot = await userDoc.reference
+                          .collection('recyclables')
+                          .get();
+                      var recyclables = recyclableSnapshot.docs;
 
-              recyclables.forEach((recyclableDoc) {
-                var recyclableData =
-                    recyclableDoc.data() as Map<String, dynamic>;
+                      recyclables.forEach((recyclableDoc) {
+                        var recyclableData =
+                            recyclableDoc.data() as Map<String, dynamic>;
 
-                // Normalize type by converting to lowercase
-                String type = (recyclableData['type'] ?? 'unknown')
-                    .toString()
-                    .toLowerCase();
-                double weight =
-                    (recyclableData['final_weight'] ?? 0).toDouble();
+                        String type = (recyclableData['type'] ?? 'unknown')
+                            .toString()
+                            .toLowerCase();
+                        double weight =
+                            (recyclableData['final_weight'] ?? 0).toDouble();
 
-                // Accumulate weight by type
-                totalWeights[type] = (totalWeights[type] ?? 0) + weight;
+                        totalWeights[type] = (totalWeights[type] ?? 0) + weight;
 
-                // Initialize the input controller with the total weight suggestion
-                inputControllers[type] = TextEditingController(
-                    text: totalWeights[type]!.toStringAsFixed(1));
-                differences[type] = 0; // Initialize differences
-              });
-            }).toList();
+                        inputControllers[type] = TextEditingController(
+                            text: totalWeights[type]!.toStringAsFixed(1));
+                        differences[type] = 0;
+                      });
+                    }).toList();
 
-            // Wait for all users' recyclables to be processed
-            return FutureBuilder(
-              future: Future.wait(userRecyclablesFutures),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator());
-                }
+                    return FutureBuilder(
+                      future: Future.wait(userRecyclablesFutures),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                              child: CircularProgressIndicator());
+                        }
 
-                // Display total weights for each type after all users have been processed
-                return Column(
-                  children: [
-                    Column(
-                      children: totalWeights.entries.map((entry) {
-                        String type = entry.key;
-                        double totalWeight = entry.value;
-                        return _buildRecyclableInputTile(
-                          type,
-                          totalWeight,
-                          inputControllers[type]!,
-                          differences,
+                        return ListView(
+                          shrinkWrap: true,
+                          children: [
+                            ...totalWeights.entries.map((entry) {
+                              String type = entry.key;
+                              double totalWeight = entry.value;
+                              return _buildRecyclableInputTile(
+                                type,
+                                totalWeight,
+                                inputControllers[type]!,
+                                differences,
+                              );
+                            }).toList(),
+                          ],
                         );
-                      }).toList(),
-                    ),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: Color(0xFF4CAF4F)),
-                      onPressed: () {
-                        // Show modal before actually transferring to the inventory
-                        showInventoryTransferModal(context, totalWeights,
-                            () async {
-                          // The logic that transfers the weights to the inventory
-                          await addWeightsToInventory(
-                              totalWeights, inputControllers, bookingId);
-
-                          // Check for significant differences and create report if necessary
-                          await checkForSignificantDifferenceAndReport(
-                              bookingId,
-                              totalWeights,
-                              inputControllers,
-                              bookingData);
-
-                          await updateBookingStatus(bookingId);
-                        });
                       },
-                      child: Text(
-                        'Complete Booking and Add to Inventory',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                    SizedBox(
-                      height: 10,
-                    ),
-                  ],
-                );
-              },
-            );
-          },
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4CAF4F),
+                ),
+                onPressed: () {
+                  showInventoryTransferModal(context, totalWeights, () async {
+                    await addWeightsToInventory(
+                        totalWeights, inputControllers, bookingId);
+
+                    await checkForSignificantDifferenceAndReport(
+                        bookingId, totalWeights, inputControllers, bookingData);
+
+                    await updateBookingStatus(bookingId);
+                  });
+                },
+                child: const Text(
+                  'Complete Booking and Add to Inventory',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
         ),
       ],
     );
@@ -295,22 +291,26 @@ class _ReceivingState extends State<Receiving> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Items to be Transferred to Inventory'),
+          title: const Text('Items to be Transferred to Inventory'),
           content: Container(
             width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // List the items and their respective weights
-                ...totalWeights.entries.map((entry) {
-                  return ListTile(
-                    title: Text('Type: ${entry.key}'),
-                    subtitle:
-                        Text('Weight: ${entry.value.toStringAsFixed(2)} kg'),
-                  );
-                }).toList(),
-              ],
+            height:
+                MediaQuery.of(context).size.height * 0.6, // Set a fixed height
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // List the items and their respective weights in a scrollable view
+                  ...totalWeights.entries.map((entry) {
+                    return ListTile(
+                      title: Text('Type: ${entry.key}'),
+                      subtitle:
+                          Text('Weight: ${entry.value.toStringAsFixed(2)} kg'),
+                    );
+                  }).toList(),
+                ],
+              ),
             ),
           ),
           actions: [
@@ -318,18 +318,37 @@ class _ReceivingState extends State<Receiving> {
               onPressed: () {
                 Navigator.of(context).pop(); // Close the modal
               },
-              child: Text('Cancel'),
+              child: const Text('Cancel'),
             ),
             ElevatedButton(
-              style:
-                  ElevatedButton.styleFrom(backgroundColor: Color(0xFF4CAF4F)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4CAF4F)),
               onPressed: () {
                 Navigator.of(context).pop(); // Close the modal
                 onConfirm(); // Execute the action to transfer to inventory
               },
-              child: Text('Confirm Transfer'),
+              child: const Text('Confirm Transfer'),
             ),
           ],
+        );
+      },
+    );
+  }
+
+  void showLoadingDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible:
+          false, // Prevents closing the dialog by tapping outside
+      builder: (BuildContext context) {
+        return AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              const SizedBox(width: 20),
+              const Text("Transferring to Inventory... Please wait."),
+            ],
+          ),
         );
       },
     );
@@ -511,80 +530,129 @@ class _ReceivingState extends State<Receiving> {
 
   // Function to add inputted weights of all recyclables to inventory
   Future<void> addWeightsToInventory(
-      Map<String, double> totalWeights,
-      Map<String, TextEditingController> inputControllers,
-      String bookingId) async {
-    CollectionReference inventory =
+    Map<String, double> totalWeights,
+    Map<String, TextEditingController> inputControllers,
+    String bookingId,
+  ) async {
+    final CollectionReference inventory =
         FirebaseFirestore.instance.collection('inventory');
+    final WriteBatch batch = FirebaseFirestore.instance.batch();
 
-    for (var entry in totalWeights.entries) {
-      String type = entry.key; // Recyclable type
-      double inputWeight = double.tryParse(inputControllers[type]!.text) ??
-          0; // Weight input from user
-      String category =
-          'recyclables'; // Default category in case no category is found
+    // Cache the category data for each type
+    Map<String, String> categories = {};
 
-      // Fetch recyclables from the user subcollection to get the category
+    try {
+      // Show the loading dialog
+      showLoadingDialog(context);
+
+      // Fetch user recyclables once and store category information
       QuerySnapshot userRecyclables = await FirebaseFirestore.instance
           .collection('bookings')
-          .doc(bookingId) // Use the actual booking ID
+          .doc(bookingId)
           .collection('users')
-          .get(); // Get all user documents in the booking
+          .get();
 
+      // Iterate over user documents
       for (var userDoc in userRecyclables.docs) {
-        QuerySnapshot recyclablesSnapshot = await userDoc.reference
-            .collection('recyclables')
-            .where('type',
-                isEqualTo:
-                    type) // Filter by type to get the correct recyclables
-            .limit(1) // We only need one document to get the category
-            .get();
+        QuerySnapshot recyclablesSnapshot =
+            await userDoc.reference.collection('recyclables').get();
 
-        if (recyclablesSnapshot.docs.isNotEmpty) {
-          var recyclableData =
-              recyclablesSnapshot.docs.first.data() as Map<String, dynamic>;
-          category = recyclableData['category'] ??
-              'recyclables'; // Extract the category
-          break;
+        for (var recyclableDoc in recyclablesSnapshot.docs) {
+          var recyclableData = recyclableDoc.data() as Map<String, dynamic>;
+          String type =
+              recyclableData['type']?.toString().toLowerCase() ?? 'unknown';
+          String category =
+              recyclableData['category']?.toString() ?? 'recyclables';
+
+          // Debug print to check fetched data
+          print('Fetched Type: $type, Fetched Category: $category');
+
+          // Ensure we only set the category if it is not null or empty
+          if (category.isNotEmpty && category != 'recyclables') {
+            if (!categories.containsKey(type)) {
+              categories[type] = category;
+              print('Assigned Category for Type $type: $category');
+            }
+          }
         }
       }
 
-      // Check if a document for this type already exists in the inventory collection
-      QuerySnapshot inventoryDocs =
-          await inventory.where('type', isEqualTo: type).limit(1).get();
+// Log the final cached categories map
+      print('Final Cached Categories Map: $categories');
 
-      if (inventoryDocs.docs.isNotEmpty) {
-        // If the document exists, update the weight and add to weight_history
-        DocumentReference typeDoc = inventoryDocs.docs.first.reference;
+      // Loop through each total weight and update the inventory
+      for (var entry in totalWeights.entries) {
+        String type = entry.key;
+        double inputWeight =
+            double.tryParse(inputControllers[type]?.text ?? '0') ?? 0;
+        String category = categories[type] ??
+            'unknown'; // Use the cached category or set to "unknown"
 
-        // Update the existing weight
-        await typeDoc.update({
-          'weight': FieldValue.increment(
-              inputWeight), // Add input weight to the existing weight
-        });
+        // Log the category for debugging
+        print('Type: $type, Category: $category');
 
-        // Add entry to the weight_history subcollection
-        await typeDoc.collection('weight_history').add({
-          'weight': inputWeight,
-          'operation': 'add',
-          'timestamp': FieldValue.serverTimestamp(),
-        });
-      } else {
-        // If no document exists, create a new one with Firebase generated ID
-        DocumentReference newDocRef = await inventory.add({
-          'category':
-              category, // Use the category from the recyclables document
-          'type': type,
-          'weight': inputWeight, // Set initial weight as the input weight
-        });
+        // Query to find if the inventory document for the type already exists
+        QuerySnapshot inventoryDocs =
+            await inventory.where('type', isEqualTo: type).limit(1).get();
 
-        // Add entry to the weight_history subcollection
-        await newDocRef.collection('weight_history').add({
-          'weight': inputWeight,
-          'operation': 'add',
-          'timestamp': FieldValue.serverTimestamp(),
-        });
+        if (inventoryDocs.docs.isNotEmpty) {
+          DocumentReference typeDoc = inventoryDocs.docs.first.reference;
+          batch.update(typeDoc, {
+            'weight': FieldValue.increment(inputWeight),
+            'category': category, // Update the category as well
+          });
+
+          // Add entry to the weight history subcollection
+          await typeDoc.collection('weight_history').add({
+            'weight': inputWeight,
+            'operation': 'add',
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+        } else {
+          DocumentReference newDocRef = inventory.doc();
+          batch.set(newDocRef, {
+            'category': category,
+            'type': type,
+            'weight': inputWeight,
+          });
+
+          // Add entry to the weight history subcollection
+          await newDocRef.collection('weight_history').add({
+            'weight': inputWeight,
+            'operation': 'add',
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+        }
       }
+
+      // Commit the batch write
+      await batch.commit();
+      print('Inventory update completed successfully.');
+
+      // Close the loading dialog
+      Navigator.of(context).pop();
+    } catch (e) {
+      print('Error updating inventory: $e');
+      Navigator.of(context).pop();
+
+      // Show an error dialog
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Error'),
+            content: Text('Failed to add weights to inventory: $e'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
     }
   }
 

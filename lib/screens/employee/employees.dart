@@ -414,24 +414,25 @@ class _EmployeesState extends State<Employees> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(
-                                  width:
-                                      8), // Add some spacing between the buttons
-                              ElevatedButton(
-                                onPressed: () async {
-                                  await _calculateAndShowDailyPay(
-                                      employeeId, name, salaryPerDay);
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(15)),
+                              const SizedBox(width: 8),
+                              // Conditionally show the "Pay" button if the position is not "driver"
+                              if (position.toLowerCase() != 'driver')
+                                ElevatedButton(
+                                  onPressed: () async {
+                                    await _calculateAndShowDailyPay(
+                                        employeeId, name, salaryPerDay);
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(15)),
+                                  ),
+                                  child: const Text(
+                                    'Pay',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
                                 ),
-                                child: const Text(
-                                  'Pay',
-                                  style: TextStyle(color: Colors.white),
-                                ),
-                              ),
                               Expanded(
                                 flex: 1,
                                 child: IconButton(
@@ -451,7 +452,7 @@ class _EmployeesState extends State<Employees> {
                         );
                       },
                     ),
-                  ),
+                  )
                 ],
               ),
             ),

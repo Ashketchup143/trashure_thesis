@@ -599,7 +599,7 @@ class _ProductsState extends State<Products> {
                             _selectedUnit = newValue!;
                           });
                         },
-                        items: ['kg', 'g', 'ton'].map((unit) {
+                        items: ['kg', 'g', 'ton', 'pc'].map((unit) {
                           return DropdownMenuItem<String>(
                             value: unit,
                             child: Text(unit),

@@ -29,6 +29,8 @@ class _BookingState extends State<Booking> {
   String? selectedVehicle;
   Map<String, bool> _selectedOptions = {};
 
+  List<DocumentSnapshot> filteredBookings = [];
+
   @override
   void initState() {
     super.initState();
@@ -846,6 +848,29 @@ class _BookingState extends State<Booking> {
   }
 
   void _showAssignDriverModal() {
+    double overallWeight = 0.0; // Initialize overallWeight
+
+    // Get the selected booking's overall_weight
+    if (_selectedOptions.isNotEmpty) {
+      var selectedScheduleId = _selectedOptions.keys.firstWhere(
+        (key) => _selectedOptions[key] == true,
+        orElse: () => '',
+      );
+
+      if (selectedScheduleId.isNotEmpty) {
+        FirebaseFirestore.instance
+            .collection('bookings')
+            .doc(selectedScheduleId)
+            .get()
+            .then((bookingDoc) {
+          if (bookingDoc.exists) {
+            var bookingData = bookingDoc.data() as Map<String, dynamic>;
+            overallWeight = bookingData['overall_weight']?.toDouble() ?? 0.0;
+          }
+        });
+      }
+    }
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -864,17 +889,26 @@ class _BookingState extends State<Booking> {
                       if (!snapshot.hasData) {
                         return const CircularProgressIndicator();
                       }
+
                       var vehicles = snapshot.data?.docs ?? [];
+                      // Filter vehicles based on the weight limit
+                      var filteredVehicles = vehicles.where((doc) {
+                        var vehicleData = doc.data() as Map<String, dynamic>;
+                        double weightLimit =
+                            vehicleData['weight_limit']?.toDouble() ?? 0.0;
+                        return overallWeight <= weightLimit;
+                      }).toList();
+
                       return DropdownButtonFormField<String>(
                         value: selectedVehicle,
                         decoration: const InputDecoration(
                           labelText: 'Select Vehicle',
                           border: OutlineInputBorder(),
                         ),
-                        items: vehicles.map((doc) {
+                        items: filteredVehicles.map((doc) {
                           var vehicleData = doc.data() as Map<String, dynamic>;
                           String vehicleLabel =
-                              "${vehicleData['brand']} ${vehicleData['model']}";
+                              "${vehicleData['brand']} ${vehicleData['model']} (${vehicleData['vehicle_type']}) - Limit: ${vehicleData['weight_limit']} kg";
                           return DropdownMenuItem<String>(
                             value: doc.id,
                             child: Text(vehicleLabel),
@@ -1088,7 +1122,8 @@ class _BookingState extends State<Booking> {
               .get();
           var driverData = driverDoc.data() as Map<String, dynamic>;
 
-          var vehicleName = "${vehicleData['brand']} ${vehicleData['model']}";
+          var vehicleName =
+              "${vehicleData['brand']} ${vehicleData['model']} ${vehicleData['vehicle_type']}";
           var driverName = driverData['name'];
 
           await FirebaseFirestore.instance

@@ -180,10 +180,17 @@ class _DriverTransactionsState extends State<DriverTransactions> {
                                     '/drivertransactiondetails',
                                     arguments: {
                                       'bookingId': bookingId,
+                                      'status': bookingData['status'],
                                       'vehicle': bookingData['vehicle'],
                                       'vehicleId': bookingData['vehicleId'],
+                                      'driver_share':
+                                          bookingData['driver_share'],
                                       'overall_price':
                                           bookingData['overall_price'],
+                                      'final_overall_price':
+                                          bookingData['final_overall_price'],
+                                      'final_overall_weight':
+                                          bookingData['final_overall_weight'],
                                       'overall_weight':
                                           bookingData['overall_weight'],
                                       'date': bookingData['date'],

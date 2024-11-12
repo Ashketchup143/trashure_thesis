@@ -57,8 +57,11 @@ class _LoginState extends State<Login> {
           Provider.of<UserModel>(context, listen: false).setUserName(userName);
           Provider.of<UserModel>(context, listen: false)
               .setUserRole(position.toLowerCase());
+          Provider.of<UserModel>(context, listen: false)
+              .setUserId(employeeId.toLowerCase());
 
-          if (position.toLowerCase() == 'driver') {
+          if (position.toLowerCase() == 'driver' ||
+              position.toLowerCase() == 'contractual driver') {
             // Navigate to the driver dashboard if the user is a driver
             Navigator.pushReplacementNamed(
               context,

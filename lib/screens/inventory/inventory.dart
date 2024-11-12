@@ -42,25 +42,73 @@ class _InventoryState extends State<Inventory> {
     super.dispose();
   }
 
-  // Function to fetch inventory data from Firestore
   Future<void> fetchInventory() async {
     try {
       final QuerySnapshot snapshot =
           await FirebaseFirestore.instance.collection('inventory').get();
 
-      // Extract and map Firestore documents to a List of Maps
-      List<Map<String, dynamic>> fetchedInventory = snapshot.docs.map((doc) {
-        return {
-          'id': doc.id, // Use the document ID
-          'category': doc['category'] ?? 'N/A',
-          'type': doc['type'] ?? 'N/A',
-          'weight': doc['weight'] ?? 0.0,
-        };
-      }).toList();
+      List<Map<String, dynamic>> fetchedInventory = [];
+
+      for (var doc in snapshot.docs) {
+        String itemId = doc.id;
+        String category = doc['category'] ?? 'N/A';
+        String type = doc['type'] ?? 'N/A';
+        double currentWeight = (doc['weight'] ?? 0.0).toDouble();
+
+        // Fetch the weight history subcollection for this item
+        QuerySnapshot weightHistorySnapshot = await FirebaseFirestore.instance
+            .collection('inventory')
+            .doc(itemId)
+            .collection('weight_history')
+            .orderBy('timestamp', descending: true)
+            .get();
+
+        double previousWeight = currentWeight;
+        double totalAddWeight = 0.0;
+        double totalMinusWeight = 0.0;
+
+        // Get today's date without time
+        DateTime today = DateTime.now();
+        DateTime currentDateOnly = DateTime(today.year, today.month, today.day);
+
+        // Iterate over weight history documents
+        for (var historyDoc in weightHistorySnapshot.docs) {
+          var historyData = historyDoc.data() as Map<String, dynamic>;
+          String operation = historyData['operation'] ?? '';
+          double weightChange = (historyData['weight'] ?? 0.0).toDouble();
+          Timestamp timestamp = historyData['timestamp'] as Timestamp;
+          DateTime historyDate = timestamp.toDate();
+
+          // Extract only the date part
+          DateTime historyDateOnly =
+              DateTime(historyDate.year, historyDate.month, historyDate.day);
+
+          // Compare only the date part
+          if (historyDateOnly == currentDateOnly) {
+            if (operation == 'add') {
+              totalAddWeight += weightChange;
+            } else if (operation == 'minus') {
+              totalMinusWeight += weightChange;
+            }
+          }
+        }
+
+        // Calculate the previous weight
+        previousWeight = currentWeight - totalAddWeight + totalMinusWeight;
+
+        // Add the inventory item with the calculated previous weight
+        fetchedInventory.add({
+          'id': itemId,
+          'category': category,
+          'type': type,
+          'weight': currentWeight,
+          'previous_weight': previousWeight,
+        });
+      }
 
       setState(() {
         inventory = fetchedInventory;
-        filteredInventory = inventory; // Initially show all inventory items
+        filteredInventory = inventory;
       });
     } catch (e) {
       print('Error fetching inventory: $e');
@@ -215,7 +263,8 @@ class _InventoryState extends State<Inventory> {
                           children: [
                             title('Category', 2),
                             title('Type', 2),
-                            title('Weight', 1),
+                            title('Previous Weight', 1),
+                            title('Current Weight', 1),
                             title('Details', 1),
                           ],
                         ),
@@ -313,11 +362,13 @@ class _InventoryState extends State<Inventory> {
   }
 
   // Custom CheckboxTile for each inventory item
+  // Custom CheckboxTile for each inventory item
   Widget _buildCustomCheckboxTile(Map<String, dynamic> item) {
     String itemId = item['id'] ?? 'N/A';
     String category = item['category'] ?? 'N/A';
     String type = item['type'] ?? 'N/A';
-    String weight = item['weight'].toStringAsFixed(2) ?? 'N/A';
+    String previousWeight = (item['previous_weight'] ?? 0.0).toStringAsFixed(2);
+    String currentWeight = (item['weight'] ?? 0.0).toStringAsFixed(2);
 
     if (_selectedOptions[itemId] == null) {
       _selectedOptions[itemId] = false;
@@ -350,7 +401,14 @@ class _InventoryState extends State<Inventory> {
           Expanded(
             flex: 1,
             child: Text(
-              weight,
+              previousWeight,
+              style: const TextStyle(fontSize: 16),
+            ),
+          ),
+          Expanded(
+            flex: 1,
+            child: Text(
+              currentWeight,
               style: const TextStyle(fontSize: 16),
             ),
           ),

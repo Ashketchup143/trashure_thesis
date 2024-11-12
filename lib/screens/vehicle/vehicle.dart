@@ -354,7 +354,7 @@ class _VehicleState extends State<Vehicle> {
   Future<List<Map<String, dynamic>>> _fetchDrivers() async {
     QuerySnapshot snapshot = await FirebaseFirestore.instance
         .collection('employees')
-        .where('position', isEqualTo: 'Driver')
+        .where('position', isEqualTo: 'driver')
         .get();
 
     return snapshot.docs.map((doc) {
@@ -434,7 +434,10 @@ class _VehicleState extends State<Vehicle> {
 
     QuerySnapshot snapshot = await FirebaseFirestore.instance
         .collection('employees')
-        .where('position', isEqualTo: 'Driver')
+        .where('position', whereIn: [
+      'driver',
+      'contractual driver'
+    ]) // Fetch both types of drivers
         .get();
 
     drivers = snapshot.docs
@@ -464,10 +467,12 @@ class _VehicleState extends State<Vehicle> {
                 items: drivers.map<DropdownMenuItem<String>>((driver) {
                   return DropdownMenuItem<String>(
                     value: driver['id'],
-                    child: Text(driver['name']),
+                    child: Text(driver['name'] ?? 'N/A'),
                   );
                 }).toList(),
-                decoration: InputDecoration(labelText: 'Driver'),
+                decoration: InputDecoration(
+                  labelText: 'Driver',
+                ),
               ),
               actions: [
                 TextButton(

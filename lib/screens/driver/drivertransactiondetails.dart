@@ -27,6 +27,10 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
     String vehicleId = args?['vehicleId'] ?? 'Unknown';
     double overallPrice = args?['overall_price']?.toDouble() ?? 0.0;
     double overallWeight = args?['overall_weight']?.toDouble() ?? 0.0;
+    double finalOverallPrice = args?['final_overall_price']?.toDouble() ?? 0.0;
+    double finalOverallWeight =
+        args?['final_overall_weight']?.toDouble() ?? 0.0;
+    double driverShare = args?['driver_share']?.toDouble() ?? 0.0;
 
     Timestamp? timestamp = args?['date'];
     DateTime? date = timestamp?.toDate();
@@ -85,18 +89,23 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
                         fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
                 Text('Booking ID: $bookingId',
-                    style: const TextStyle(fontSize: 18)),
-                Text('Status: $status', style: const TextStyle(fontSize: 18)),
-                Text('Vehicle: $vehicle', style: const TextStyle(fontSize: 18)),
+                    style: const TextStyle(fontSize: 15)),
+                Text('Status: $status', style: const TextStyle(fontSize: 15)),
+                Text('Vehicle: $vehicle', style: const TextStyle(fontSize: 15)),
                 Text('Vehicle ID: $vehicleId',
-                    style: const TextStyle(fontSize: 18)),
-                Text('Est. Total Price: ₱${overallPrice.toStringAsFixed(2)}',
-                    style: const TextStyle(fontSize: 18)),
+                    style: const TextStyle(fontSize: 15)),
                 Text(
-                    'Est. Total Weight: ${overallWeight.toStringAsFixed(2)} kg',
-                    style: const TextStyle(fontSize: 18)),
+                    'Est. Total Price: ₱${finalOverallPrice.toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 15)),
+                Text(
+                    'Est. Total Weight: ${finalOverallWeight.toStringAsFixed(2)} kg',
+                    style: const TextStyle(fontSize: 15)),
                 Text('Date: $formattedDate',
-                    style: const TextStyle(fontSize: 18)),
+                    style: const TextStyle(fontSize: 15)),
+                Text(
+                  'Total Driver Share: ₱${driverShare.toStringAsFixed(2)}',
+                  style: const TextStyle(fontSize: 15, color: Colors.blue),
+                ),
                 const SizedBox(height: 20),
                 Expanded(
                   child: StreamBuilder(
@@ -116,10 +125,11 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
                       }
 
                       // Sorting logic for users
-                      var nonCollectedUsers = users.where((userDoc) {
+                      var otherStatusesUsers = users.where((userDoc) {
                         var userData = userDoc.data() as Map<String, dynamic>;
-                        return userData['status'] == null ||
-                            userData['status'] != 'collected';
+                        String userStatus = userData['status'] ?? 'pending';
+                        return userStatus != 'collected' &&
+                            userStatus != 'failed';
                       }).toList();
 
                       var collectedUsers = users.where((userDoc) {
@@ -127,19 +137,14 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
                         return userData['status'] == 'collected';
                       }).toList();
 
-                      collectedUsers.sort((a, b) {
-                        var aTimestamp = (a.data()
-                                as Map<String, dynamic>)['collected_timestamp']
-                            as Timestamp?;
-                        var bTimestamp = (b.data()
-                                as Map<String, dynamic>)['collected_timestamp']
-                            as Timestamp?;
-                        return aTimestamp
-                                ?.compareTo(bTimestamp ?? Timestamp.now()) ??
-                            0;
-                      });
+                      var failedUsers = users.where((userDoc) {
+                        var userData = userDoc.data() as Map<String, dynamic>;
+                        return userData['status'] == 'failed';
+                      }).toList();
 
-                      var sortedUsers = nonCollectedUsers + collectedUsers;
+// Concatenate lists: other statuses first, collected second, failed last
+                      var sortedUsers =
+                          otherStatusesUsers + collectedUsers + failedUsers;
 
                       return ListView.builder(
                         itemCount: sortedUsers.length,
@@ -180,7 +185,11 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
 
                           return Card(
                             margin: const EdgeInsets.all(10),
-                            color: isCollected ? Colors.lightGreen[100] : null,
+                            color: isCollected
+                                ? Colors.lightGreen[100]
+                                : (userStatus == 'failed'
+                                    ? Colors.red[100]
+                                    : null), // Red for failed status
                             child: ExpansionTile(
                               title: Text('$firstName $lastName',
                                   style: const TextStyle(
@@ -192,7 +201,7 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
                                 'Total Price: ₱$totalPrice\n'
                                 'Calculated Total Price: ₱${calculatedTotalPrice.toStringAsFixed(2)}\n'
                                 'Total Weight: ${totalWeight.toStringAsFixed(2)} kg\n'
-                                'Driver Share: ₱${((((((totalPrice ?? 0.0) / (1 - 0.20)) + 40) - (totalPrice ?? 0.0)) * 0.25).toStringAsFixed(2))}\n'
+                                'Driver Share: ₱${((((((totalPrice ?? 0.0) / (1 - 0.30)) + 40) - (totalPrice ?? 0.0)) * 0.30).toStringAsFixed(2))}\n'
                                 '${userStatus == 'collected' ? 'Collected: $collectedDate' : ''}',
                               ),
                               children: [

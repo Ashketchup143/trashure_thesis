@@ -3,9 +3,11 @@ import 'package:flutter/foundation.dart';
 class UserModel with ChangeNotifier {
   String _userName = '';
   String _userRole = ''; // Add role as a field
+  String _userId = '';
 
   String get userName => _userName;
-  String get userRole => _userRole; // Getter for role
+  String get userRole => _userRole;
+  String get userId => _userId; // Getter for role
 
   void setUserName(String userName) {
     _userName = userName;
@@ -15,5 +17,10 @@ class UserModel with ChangeNotifier {
   void setUserRole(String userRole) {
     _userRole = userRole; // Update the role
     notifyListeners(); // Notify listeners when role changes
+  }
+
+  void setUserId(String userId) {
+    _userId = userId;
+    notifyListeners(); // Notify listeners when username changes
   }
 }

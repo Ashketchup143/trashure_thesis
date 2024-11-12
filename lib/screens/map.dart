@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:provider/provider.dart';
+import 'package:trashure_thesis/user_model.dart';
 
 class Maps extends StatefulWidget {
   final String bookingId;
@@ -15,11 +17,13 @@ class Maps extends StatefulWidget {
 class _MapsState extends State<Maps> {
   List<Marker> _markers = <Marker>[];
   String? hoveredUserId;
+  Marker? _driverMarker;
 
   @override
   void initState() {
     super.initState();
     _fetchUserLocations();
+    _listenToDriverLocation();
   }
 
   // Function to fetch user locations from Firestore
@@ -68,6 +72,43 @@ class _MapsState extends State<Maps> {
     });
   }
 
+  // Function to listen to the driver's location
+  void _listenToDriverLocation() {
+    final userRole = Provider.of<UserModel>(context, listen: false).userRole;
+    final userId = Provider.of<UserModel>(context, listen: false).userId;
+
+    // Only track the driver's location if the user role is 'driver'
+    if (userRole == 'driver') {
+      FirebaseFirestore.instance
+          .collection('drivers')
+          .doc(userId)
+          .snapshots()
+          .listen((snapshot) {
+        if (snapshot.exists) {
+          var data = snapshot.data() as Map<String, dynamic>;
+          GeoPoint? location = data['location'];
+
+          if (location != null) {
+            LatLng driverLatLng = LatLng(location.latitude, location.longitude);
+
+            // Update the driver marker
+            setState(() {
+              _driverMarker = Marker(
+                point: driverLatLng,
+                builder: (ctx) => const Icon(
+                  Icons.directions_car,
+                  color: Colors.blue,
+                  size: 40,
+                ),
+                anchorPos: AnchorPos.align(AnchorAlign.top),
+              );
+            });
+          }
+        }
+      });
+    }
+  }
+
   // Function to display the popup in the top left
   Widget _getPopupForMarker() {
     if (hoveredUserId == null) return const SizedBox();
@@ -92,8 +133,8 @@ class _MapsState extends State<Maps> {
         String address = userData['address'] ?? 'Unknown Address';
 
         return Positioned(
-          top: 30, // Distance from the top of the screen
-          left: 30, // Distance from the left of the screen
+          top: 30,
+          left: 30,
           child: Container(
             padding: const EdgeInsets.all(8),
             width: 200,
@@ -159,7 +200,10 @@ class _MapsState extends State<Maps> {
                           'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
                       subdomains: ['a', 'b', 'c'],
                     ),
-                    MarkerLayer(markers: _markers),
+                    MarkerLayer(markers: [
+                      ..._markers,
+                      if (_driverMarker != null) _driverMarker!,
+                    ]),
                   ],
                 ),
               ),

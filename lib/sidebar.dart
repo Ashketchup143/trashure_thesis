@@ -152,7 +152,8 @@ class _SidebarState extends State<Sidebar> {
           _buildUsersTile(),
           _buildBookingsTile(), // Updated Bookings Tile with dropdown
 
-          _buildInventoryTile(),
+          _buildHoverableListTile(
+              20, Icons.dashboard_outlined, 'Inventory', '/inventory'),
 
           if (hasFullAccess)
             _buildFinanceTile(), // Add finance only if full access
@@ -309,8 +310,8 @@ class _SidebarState extends State<Sidebar> {
         if (_isBookingsExpanded) ...[
           _buildsecondHoverableListTile(
               24, Icons.list_alt_outlined, 'Pending', '/bookings'),
-          _buildsecondHoverableListTile(25, Icons.check_circle_outline,
-              'Collected', '/collectedbookings'),
+          _buildsecondHoverableListTile(
+              25, Icons.check_circle_outline, 'Receiving', '/receiving'),
           _buildsecondHoverableListTile(
               26, Icons.done_all_outlined, 'Completed', '/completedbookings'),
         ],

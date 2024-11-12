@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart'; // Import intl package for date formatting
+import 'package:intl/intl.dart';
+import 'package:trashure_thesis/screens/driver/driverprofile.dart'; // Import intl package for date formatting
 
 class Driver extends StatefulWidget {
   const Driver({super.key});
@@ -177,9 +178,21 @@ class _DriverState extends State<Driver> {
               Navigator.pushNamed(context, '/drivertransactions');
             },
           ),
-          SizedBox(
-            width: 10,
-          )
+
+          IconButton(
+            icon: Icon(
+              Icons.account_circle, // Profile icon
+              color: Colors.white,
+              size: 30, // Set icon size
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const DriverProfileScreen()),
+              ); // Navigate to profile screen
+            },
+          ),
         ],
       ),
       body: Container(
@@ -262,6 +275,9 @@ class _DriverState extends State<Driver> {
                               bookingData['overall_price'] ?? 'Not set';
                           var overallWeight =
                               bookingData['overall_weight'] ?? 'Not set';
+                          var calculatedPrice =
+                              bookingData['calculated_overall_price'] ??
+                                  'Not set';
 
                           return Card(
                             margin: const EdgeInsets.all(10),
@@ -288,9 +304,11 @@ class _DriverState extends State<Driver> {
                                             'Vehicle: ${bookingData['vehicle']}'),
                                         Text(
                                             'Vehicle ID: ${bookingData['vehicleId']}'),
-                                        Text('Overall Price: ₱${overallPrice}'),
                                         Text(
-                                            'Overall Weight: ${overallWeight} kg'),
+                                            'Overall Price: ₱${overallPrice.toStringAsFixed(2)}'),
+                                        Text(
+                                            'Overall Weight: ${overallWeight.toStringAsFixed(2)} kg'),
+                                        Text('Calculated: ${calculatedPrice}'),
                                       ],
                                     ),
                                   ),
@@ -345,7 +363,9 @@ class _DriverState extends State<Driver> {
                                             child: Text(
                                               'Collect',
                                               style: TextStyle(
-                                                  fontSize: 12), // Smaller text
+                                                  fontSize: 12,
+                                                  color: Colors
+                                                      .white), // Smaller text
                                             ),
                                           )
                                         else
@@ -365,8 +385,9 @@ class _DriverState extends State<Driver> {
                                                 child: Text(
                                                   'Revert',
                                                   style: TextStyle(
-                                                      fontSize:
-                                                          12), // Smaller text
+                                                      fontSize: 12,
+                                                      color: Colors
+                                                          .white), // Smaller text
                                                 ),
                                               ),
                                               SizedBox(height: 4),
