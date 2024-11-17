@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:trashure_thesis/screens/map.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'dart:html' as html;
+
+import 'package:trashure_thesis/user_model.dart';
 
 class DriverTransactionDetails extends StatefulWidget {
   @override
@@ -18,6 +21,8 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
 
   @override
   Widget build(BuildContext context) {
+    final String userRole =
+        Provider.of<UserModel>(context, listen: false).userRole;
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
 
@@ -187,6 +192,29 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
                                   .format(collectedTimestamp.toDate())
                               : 'N/A';
 
+                          // Determine the share percentage based on user role
+                          double sharePercentage =
+                              userRole.toLowerCase() == 'contractual driver'
+                                  ? 0.35
+                                  : 0.30;
+
+// Determine the effective total price based on the user's mode
+                          double effectiveTotalPrice = userData['mode']
+                                      ?.toString()
+                                      .toLowerCase() ==
+                                  'donate'
+                              ? userData['total_price'] ??
+                                  0.0 // Use the donated total price if mode is "donate"
+                              : (userData['status'] == 'collected'
+                                  ? userData['final_total_price'] ?? 0.0
+                                  : userData['total_price'] ?? 0.0);
+
+// Calculate the driver share using the effective total price
+                          double driverShare =
+                              ((((effectiveTotalPrice / (1 - 0.30)) + 40) -
+                                      effectiveTotalPrice) *
+                                  sharePercentage);
+
                           return Card(
                             margin: const EdgeInsets.all(10),
                             color: isCollected
@@ -205,7 +233,7 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
                                 'Total Price: ₱$totalPrice\n'
                                 'Calculated Total Price: ₱${calculatedTotalPrice.toStringAsFixed(2)}\n'
                                 'Total Weight: ${totalWeight.toStringAsFixed(2)} kg\n'
-                                'Driver Share: ₱${((((((totalPrice ?? 0.0) / (1 - 0.30)) + 40) - (totalPrice ?? 0.0)) * 0.30).toStringAsFixed(2))}\n'
+                                'Driver Share: ₱${driverShare.toStringAsFixed(2)}\n'
                                 '${userStatus == 'collected' ? 'Collected: $collectedDate' : ''}',
                               ),
                               children: [

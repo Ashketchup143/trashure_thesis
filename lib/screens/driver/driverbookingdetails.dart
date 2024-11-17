@@ -1665,10 +1665,11 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
           ? userData['final_total_weight'] ?? 0.0
           : userData['total_weight'] ?? 0.0;
 
-      // Calculate the driver share based on userRole
+      // Calculate the driver share
       double driverShare =
           ((((totalPrice / (1 - 0.30)) + 40) - totalPrice) * sharePercentage);
 
+      // Add user details
       userDetails.add(pw.Text(
         "$firstName $lastName (${userStatus.toUpperCase()})",
         style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16),
@@ -1696,6 +1697,40 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                 .format(collectedTimestamp.toDate())
             : 'N/A';
         userDetails.add(pw.Text("Collected: $collectedDate"));
+      }
+
+      // Fetch recyclables for this user
+      var recyclablesSnapshot = await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .collection('users')
+          .doc(userDoc.id)
+          .collection('recyclables')
+          .get();
+
+      if (recyclablesSnapshot.docs.isNotEmpty) {
+        userDetails.add(pw.Text(
+          "Recyclables:",
+          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+        ));
+
+        for (var recDoc in recyclablesSnapshot.docs) {
+          var recData = recDoc.data() as Map<String, dynamic>;
+          String type = recData['type'] ?? 'Unknown';
+          double weight = recData['final_weight'] ?? recData['weight'] ?? 0.0;
+          double price = recData['price'] ?? 0.0;
+          double itemPrice = recData['final_item_price'] ?? weight * price;
+
+          userDetails.add(pw.Text("  - Type: $type"));
+          userDetails
+              .add(pw.Text("    Weight: ${weight.toStringAsFixed(2)} kg"));
+          userDetails
+              .add(pw.Text("    Price: PHP ${price.toStringAsFixed(2)}"));
+          userDetails.add(
+              pw.Text("    Item Price: PHP ${itemPrice.toStringAsFixed(2)}"));
+        }
+      } else {
+        userDetails.add(pw.Text("No recyclables found."));
       }
 
       userDetails.add(pw.SizedBox(height: 10));
