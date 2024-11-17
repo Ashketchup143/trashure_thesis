@@ -104,7 +104,6 @@ class _InflowState extends State<Inflow> {
                       title('Authorized By', 2),
                       title('Customer Name', 2),
                       title('Date', 2),
-                      title('Description', 3),
                       title('Overall Total', 2),
                       title('Payment Method', 2),
                     ],
@@ -266,8 +265,8 @@ class _InflowState extends State<Inflow> {
                     Expanded(
                       flex: 2,
                       child: Text(
-                        data != null && data.containsKey('customer_name')
-                            ? data['customer_name'] ?? 'N/A'
+                        data != null && data.containsKey('representative_name')
+                            ? data['representative_name'] ?? 'N/A'
                             : 'N/A',
                         style: TextStyle(fontSize: 14),
                       ),
@@ -276,15 +275,6 @@ class _InflowState extends State<Inflow> {
                       flex: 2,
                       child:
                           Text(formattedDate, style: TextStyle(fontSize: 14)),
-                    ),
-                    Expanded(
-                      flex: 3,
-                      child: Text(
-                        data != null && data.containsKey('description')
-                            ? data['description'] ?? 'N/A'
-                            : 'N/A',
-                        style: TextStyle(fontSize: 14),
-                      ),
                     ),
                     Expanded(
                       flex: 2,

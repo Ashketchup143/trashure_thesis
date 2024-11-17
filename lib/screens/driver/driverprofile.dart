@@ -1,7 +1,11 @@
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:file_picker/file_picker.dart';
+
+import 'dart:io';
 
 class DriverProfileScreen extends StatefulWidget {
   const DriverProfileScreen({super.key});
@@ -20,6 +24,8 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
   String id = 'Loading...';
   double totalDriverShare = 0.0;
   List<Map<String, dynamic>> bookingsList = [];
+  String imageUrl = '';
+  File? _selectedImage;
 
   final TextEditingController addressController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
@@ -55,6 +61,19 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
           addressController.text = address;
         });
 
+        // Fetch image URL if the 'image' field is present
+        String imageFileName = driverData['image'] ?? '';
+        if (imageFileName.isNotEmpty) {
+          try {
+            imageUrl = await FirebaseStorage.instance
+                .ref('employee_images/$imageFileName')
+                .getDownloadURL();
+            setState(() {});
+          } catch (e) {
+            print('Error fetching image URL: $e');
+          }
+        }
+
         // Fetch the bookings associated with the driver
         await _fetchDriverBookings();
       }
@@ -73,7 +92,9 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
 
       for (var doc in bookingsSnapshot.docs) {
         var bookingData = doc.data() as Map<String, dynamic>;
-        double driverShare = (bookingData['driver_share'] ?? 0.0).toDouble();
+        double driverShare =
+            double.tryParse(bookingData['driver_share']?.toString() ?? '0.0') ??
+                0.0;
         totalShare += driverShare;
 
         Timestamp timestamp = bookingData['date'] ?? Timestamp.now();
@@ -85,8 +106,12 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
           'date': formattedDate,
           'status': bookingData['status'] ?? 'Unknown',
           'vehicle': bookingData['vehicle'] ?? 'N/A',
-          'overall_weight': bookingData['overall_weight'] ?? 'Not set',
-          'overall_price': bookingData['overall_price'] ?? 'Not set',
+          'overall_weight': double.tryParse(
+                  bookingData['overall_weight']?.toString() ?? '0.0') ??
+              0.0,
+          'overall_price': double.tryParse(
+                  bookingData['overall_price']?.toString() ?? '0.0') ??
+              0.0,
           'driver_share': driverShare,
         });
       }
@@ -131,9 +156,13 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        iconTheme: IconThemeData(color: Colors.white),
         automaticallyImplyLeading: true,
         backgroundColor: Colors.green,
-        title: const Text('Driver Profile'),
+        title: const Text(
+          'Driver Profile',
+          style: TextStyle(color: Colors.white),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
@@ -158,13 +187,28 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               children: [
                 Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: Text(
-                    'Driver: $name',
-                    style: const TextStyle(
-                      color: Colors.green,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 50,
+                        backgroundColor: Colors.grey.shade300,
+                        backgroundImage:
+                            imageUrl.isNotEmpty ? NetworkImage(imageUrl) : null,
+                        child: imageUrl.isEmpty
+                            ? const Icon(Icons.person,
+                                size: 50, color: Colors.white)
+                            : null,
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        'Driver: $name',
+                        style: const TextStyle(
+                          color: Colors.green,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 Padding(
@@ -247,11 +291,14 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                                     Text('Status: ${booking['status']}'),
                                     Text('Vehicle: ${booking['vehicle']}'),
                                     Text(
-                                        'Overall Weight: ${booking['overall_weight'].toStringAsFixed(2)} kg'),
+                                      'Overall Weight: ${booking['overall_weight'] is double ? booking['overall_weight'].toStringAsFixed(2) : 'N/A'} kg',
+                                    ),
                                     Text(
-                                        'Overall Price: ₱${booking['overall_price'].toStringAsFixed(2)}'),
+                                      'Overall Price: ₱${booking['overall_price'] is double ? booking['overall_price'].toStringAsFixed(2) : 'N/A'}',
+                                    ),
                                     Text(
-                                        'Driver Share: ₱${booking['driver_share'].toStringAsFixed(2)}'),
+                                      'Driver Share: ₱${booking['driver_share'] is double ? booking['driver_share'].toStringAsFixed(2) : 'N/A'}',
+                                    ),
                                   ],
                                 ),
                               ),
@@ -276,6 +323,19 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Display selected image preview
+              _selectedImage != null
+                  ? Image.file(
+                      _selectedImage!,
+                      height: 100,
+                      width: 100,
+                      fit: BoxFit.cover,
+                    )
+                  : const Icon(Icons.person, size: 100),
+              TextButton(
+                onPressed: _pickImage,
+                child: const Text('Choose Image'),
+              ),
               TextField(
                 controller: phoneController,
                 decoration: const InputDecoration(labelText: 'Contact Number'),
@@ -293,7 +353,10 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
-                await _updateDriverInfo();
+                if (_selectedImage != null) {
+                  await _uploadImage(); // Upload image to Firebase Storage
+                }
+                await _updateDriverInfo(); // Update other profile info
                 Navigator.of(context).pop();
               },
               child: const Text('Save'),
@@ -302,5 +365,43 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
         );
       },
     );
+  }
+
+  // Function to pick an image using file_picker
+  Future<void> _pickImage() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+    );
+
+    if (result != null && result.files.single.path != null) {
+      setState(() {
+        _selectedImage = File(result.files.single.path!);
+      });
+    }
+  }
+
+  // Function to upload the selected image to Firebase Storage
+  Future<void> _uploadImage() async {
+    try {
+      final storageRef = FirebaseStorage.instance.ref().child(
+          'employee_images/${FirebaseAuth.instance.currentUser?.uid}.jpg');
+
+      await storageRef.putFile(_selectedImage!);
+
+      // Update Firestore with the file name or path
+      await FirebaseFirestore.instance.collection('employees').doc(id).update({
+        'image': '${FirebaseAuth.instance.currentUser?.uid}.jpg',
+      });
+
+      // Retrieve and update the image URL in the UI
+      imageUrl = await storageRef.getDownloadURL();
+      setState(() {});
+    } catch (e) {
+      print('Error uploading image: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to upload image.')),
+      );
+    }
   }
 }

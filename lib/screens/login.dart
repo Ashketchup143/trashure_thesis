@@ -31,10 +31,6 @@ class _LoginState extends State<Login> {
 
         // Special handling for the master user (super admin)
         if (_emailController.text.trim() == 'anmlim@addu.edu.ph') {
-          // Provider.of<UserModel>(context, listen: false)
-          //     .setUserName('Super Admin'); // Set the username
-          // Provider.of<UserModel>(context, listen: false)
-          //     .setUserRole('admin'); // Set role as 'admin'
           Navigator.pushReplacementNamed(context, '/dashboard');
           return;
         }
@@ -46,48 +42,78 @@ class _LoginState extends State<Login> {
             .get();
 
         if (employeeSnapshot.docs.isNotEmpty) {
-          // User exists in employees collection
           var employeeData =
               employeeSnapshot.docs.first.data() as Map<String, dynamic>;
           String employeeId = employeeSnapshot.docs.first.id;
           String userName = employeeData['name'] ?? userCredential.user!.email!;
           String position = employeeData['position'] ?? 'employee';
 
-          // Set the username and position in the UserModel
+          // Set the username and role in UserModel
           Provider.of<UserModel>(context, listen: false).setUserName(userName);
           Provider.of<UserModel>(context, listen: false)
               .setUserRole(position.toLowerCase());
           Provider.of<UserModel>(context, listen: false)
               .setUserId(employeeId.toLowerCase());
 
+          // Navigate based on role
           if (position.toLowerCase() == 'driver' ||
               position.toLowerCase() == 'contractual driver') {
-            // Navigate to the driver dashboard if the user is a driver
-            Navigator.pushReplacementNamed(
-              context,
-              '/driver',
-              arguments: {
-                'name': userName,
-                'id': employeeId,
-              },
-            );
+            Navigator.pushReplacementNamed(context, '/driver', arguments: {
+              'name': userName,
+              'id': employeeId,
+            });
           } else {
-            // Navigate to the regular dashboard for other roles
             Navigator.pushReplacementNamed(context, '/dashboard');
           }
         } else {
-          // No document found in the employees collection with the given email
+          // No employee found with the given email
           await _auth.signOut();
           setState(() {
             _errorMessage = 'You are not authorized to access this system.';
           });
         }
       } on FirebaseAuthException catch (e) {
-        setState(() {
-          _errorMessage = e.message ?? 'An error occurred during login';
-        });
+        // Handle specific Firebase authentication errors
+        switch (e.code) {
+          case 'user-not-found':
+            setState(() {
+              _errorMessage = 'No user found with this email.';
+            });
+            break;
+          case 'wrong-password':
+            setState(() {
+              _errorMessage = 'Incorrect password. Please try again.';
+            });
+            break;
+          case 'invalid-email':
+            setState(() {
+              _errorMessage = 'The email address is not valid.';
+            });
+            break;
+          case 'user-disabled':
+            setState(() {
+              _errorMessage = 'This user account has been disabled.';
+            });
+            break;
+          case 'too-many-requests':
+            setState(() {
+              _errorMessage = 'Too many requests. Please try again later.';
+            });
+            break;
+          case 'network-request-failed':
+            setState(() {
+              _errorMessage =
+                  'Network error. Please check your internet connection.';
+            });
+            break;
+          default:
+            setState(() {
+              _errorMessage = 'Authentication error: ${e.message}';
+            });
+            break;
+        }
       } catch (e) {
-        // Handle other errors, such as network issues
+        // Handle any other errors
         setState(() {
           _errorMessage = 'An unexpected error occurred: $e';
         });
@@ -126,7 +152,7 @@ class _LoginState extends State<Login> {
                   height: 150,
                 ),
                 const Text(
-                  'Login',
+                  'Admin / Driver Login',
                   style: TextStyle(
                     fontSize: 28.0,
                   ),
@@ -210,7 +236,7 @@ class _LoginState extends State<Login> {
                       height: 300,
                     ),
                     const Text(
-                      'Login',
+                      'Admin / Driver Login',
                       style: TextStyle(
                         fontSize: 28.0,
                       ),

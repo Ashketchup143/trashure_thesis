@@ -53,6 +53,8 @@ class _DashboardState extends State<Dashboard> {
                 _buildTodaysCollectedBookingsTable(),
                 const SizedBox(height: 20),
                 _buildMostRecentInflowTable(),
+                const SizedBox(height: 20),
+                _buildMostRecentOutflowTable(),
               ],
             ),
           ),
@@ -193,55 +195,155 @@ class _DashboardState extends State<Dashboard> {
             borderRadius: BorderRadius.circular(8.0),
           ),
           padding: const EdgeInsets.all(8.0),
-          child: StreamBuilder<QuerySnapshot>(
-            stream: _firestore
-                .collection('inflow')
-                .orderBy('date', descending: true)
-                .limit(5)
-                .snapshots(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              var inflows = snapshot.data!.docs;
-              if (inflows.isEmpty) {
-                return Center(child: Text("No recent inflows."));
-              }
-              return ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: inflows.length,
-                itemBuilder: (context, index) {
-                  var inflowData =
-                      inflows[index].data() as Map<String, dynamic>;
-                  var date = (inflowData['date'] as Timestamp).toDate();
-                  var formattedDate = DateFormat('yyyy-MM-dd').format(date);
-                  return ExpansionTile(
-                    title: Row(
-                      children: [
-                        Expanded(
-                            flex: 2,
-                            child: Text(inflowData['authorized_by'] ?? 'N/A')),
-                        Expanded(
-                            flex: 2,
-                            child: Text(inflowData['customer_name'] ?? 'N/A')),
-                        Expanded(flex: 2, child: Text(formattedDate)),
-                        Expanded(
-                            flex: 2,
-                            child: Text(
-                                'PHP ${inflowData['overall_total']?.toStringAsFixed(2) ?? '0.00'}')),
-                        Expanded(
-                            flex: 2,
-                            child: Text(inflowData['payment_method'] ?? 'N/A')),
-                      ],
-                    ),
-                    children: [
-                      _buildSoldItems(inflows[index].id),
-                    ],
+          child: Column(
+            children: [
+              // Header Row
+              Row(
+                children: const [
+                  Expanded(flex: 2, child: Text('Authorized By')),
+                  Expanded(flex: 2, child: Text('Customer Name')),
+                  Expanded(flex: 2, child: Text('Date')),
+                  Expanded(flex: 2, child: Text('Total')),
+                  Expanded(flex: 2, child: Text('Payment Method')),
+                ],
+              ),
+              const Divider(),
+              StreamBuilder<QuerySnapshot>(
+                stream: _firestore
+                    .collection('inflow')
+                    .orderBy('date', descending: true)
+                    .limit(5)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  var inflows = snapshot.data!.docs;
+                  if (inflows.isEmpty) {
+                    return const Center(child: Text("No recent inflows."));
+                  }
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: inflows.length,
+                    itemBuilder: (context, index) {
+                      var inflowData =
+                          inflows[index].data() as Map<String, dynamic>;
+                      var date = (inflowData['date'] as Timestamp).toDate();
+                      var formattedDate = DateFormat('yyyy-MM-dd').format(date);
+                      return ExpansionTile(
+                        title: Row(
+                          children: [
+                            Expanded(
+                                flex: 2,
+                                child:
+                                    Text(inflowData['authorized_by'] ?? 'N/A')),
+                            Expanded(
+                                flex: 2,
+                                child:
+                                    Text(inflowData['customer_name'] ?? 'N/A')),
+                            Expanded(flex: 2, child: Text(formattedDate)),
+                            Expanded(
+                                flex: 2,
+                                child: Text(
+                                    'PHP ${inflowData['overall_total']?.toStringAsFixed(2) ?? '0.00'}')),
+                            Expanded(
+                                flex: 2,
+                                child: Text(
+                                    inflowData['payment_method'] ?? 'N/A')),
+                          ],
+                        ),
+                        children: [
+                          _buildSoldItems(inflows[index].id),
+                        ],
+                      );
+                    },
                   );
                 },
-              );
-            },
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMostRecentOutflowTable() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Most Recent Outflows',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.green,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey),
+            borderRadius: BorderRadius.circular(8.0),
+          ),
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            children: [
+              // Header Row
+              Row(
+                children: const [
+                  Expanded(flex: 2, child: Text('Category')),
+                  Expanded(flex: 2, child: Text('Date')),
+                  Expanded(flex: 2, child: Text('Price')),
+                  Expanded(flex: 2, child: Text('Employee')),
+                ],
+              ),
+              const Divider(),
+              StreamBuilder<QuerySnapshot>(
+                stream: _firestore
+                    .collection('outflow')
+                    .orderBy('date', descending: true)
+                    .limit(5)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  var outflows = snapshot.data!.docs;
+                  if (outflows.isEmpty) {
+                    return const Center(child: Text("No recent outflows."));
+                  }
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: outflows.length,
+                    itemBuilder: (context, index) {
+                      var outflowData =
+                          outflows[index].data() as Map<String, dynamic>;
+                      var date = (outflowData['date'] as Timestamp).toDate();
+                      var formattedDate = DateFormat('yyyy-MM-dd').format(date);
+                      return ListTile(
+                        title: Row(
+                          children: [
+                            Expanded(
+                                flex: 2,
+                                child: Text(outflowData['category'] ?? 'N/A')),
+                            Expanded(flex: 2, child: Text(formattedDate)),
+                            Expanded(
+                                flex: 2,
+                                child: Text(
+                                    'PHP ${outflowData['price']?.toStringAsFixed(2) ?? '0.00'}')),
+                            Expanded(
+                                flex: 2,
+                                child: Text(outflowData['employee'] ?? 'N/A')),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ],
           ),
         ),
       ],

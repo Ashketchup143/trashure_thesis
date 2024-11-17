@@ -14,10 +14,20 @@ class _AddInventoryModalState extends State<AddInventoryModal> {
       FirebaseFirestore.instance.collection('products');
   List<Map<String, dynamic>> productsList = [];
   String errorMessage = "";
+  List<String> categoriesList = [];
+  String? selectedCategory;
 
+  double totalWeight = 0.0;
+  double totalPrice = 0.0;
   @override
   void initState() {
     super.initState();
+    fetchCategories().then((categories) {
+      setState(() {
+        categoriesList = categories;
+      });
+    });
+
     fetchProducts().then((products) {
       setState(() {
         productsList = products;
@@ -43,6 +53,17 @@ class _AddInventoryModalState extends State<AddInventoryModal> {
     }).toList();
   }
 
+  Future<List<String>> fetchCategories() async {
+    QuerySnapshot snapshot = await _productsCollection.get();
+
+    Set<String> categories = snapshot.docs
+        .map((doc) =>
+            (doc.data() as Map<String, dynamic>)['category'] as String? ??
+            'Other')
+        .toSet();
+    return categories.toList();
+  }
+
   Future<double> _fetchLatestPrice(String productId) async {
     QuerySnapshot priceSnapshot = await _productsCollection
         .doc(productId)
@@ -60,6 +81,7 @@ class _AddInventoryModalState extends State<AddInventoryModal> {
   void addProduct() {
     setState(() {
       selectedProducts.add({
+        'category': null,
         'productId': null,
         'weightController': TextEditingController(),
         'price': 0.0, // Default price as 0.0
@@ -169,6 +191,7 @@ class _AddInventoryModalState extends State<AddInventoryModal> {
 
     String userName = Provider.of<UserModel>(context, listen: false).userName;
 
+    // Add document to 'onsite_collections' collection
     DocumentReference onsiteCollectionRef =
         await FirebaseFirestore.instance.collection('onsite_collections').add({
       'overall_price': overallPrice,
@@ -177,11 +200,14 @@ class _AddInventoryModalState extends State<AddInventoryModal> {
       'authorized_by': userName,
     });
 
+    // Add each recyclable item to the 'recyclables' subcollection of 'onsite_collections'
     for (var recyclable in recyclables) {
       await onsiteCollectionRef.collection('recyclables').add(recyclable);
     }
 
-    await FirebaseFirestore.instance.collection('outflow').add({
+    // Add document to 'outflow' collection
+    DocumentReference outflowRef =
+        await FirebaseFirestore.instance.collection('outflow').add({
       'collectionId': onsiteCollectionRef.id,
       'category': 'onsite collection',
       'date': FieldValue.serverTimestamp(),
@@ -191,16 +217,27 @@ class _AddInventoryModalState extends State<AddInventoryModal> {
       'weight': overallWeight,
     });
 
+    // Add each recyclable item to the 'recyclables' subcollection of 'outflow'
+    for (var recyclable in recyclables) {
+      await outflowRef.collection('recyclables').add({
+        'type': recyclable['type'],
+        'weight': recyclable['weight'],
+        'price': recyclable['price'],
+        'category': recyclable['category'],
+      });
+    }
+
+    // Show success dialog
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Success'),
+          title: const Text('Success'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+              const Text(
                   'You have successfully added the following items to the inventory:'),
               const SizedBox(height: 10),
               ...recyclables.map((recyclable) => Text(
@@ -218,7 +255,7 @@ class _AddInventoryModalState extends State<AddInventoryModal> {
                 Navigator.of(context)
                     .pop(); // Close the modal after confirmation
               },
-              child: Text('OK'),
+              child: const Text('OK'),
             ),
           ],
         );
@@ -272,6 +309,31 @@ class _AddInventoryModalState extends State<AddInventoryModal> {
                 errorMessage,
                 style: const TextStyle(color: Colors.red),
               ),
+            Container(
+              padding: const EdgeInsets.all(8.0),
+              alignment: Alignment.centerRight,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    'Total Weight: ${totalWeight.toStringAsFixed(2)} kg',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 5),
+                  Text(
+                    'Total Price: ₱${totalPrice.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -279,93 +341,118 @@ class _AddInventoryModalState extends State<AddInventoryModal> {
   }
 
   Widget _buildProductSelection(int index) {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: fetchProducts(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    // Calculate the total price and weight for all selected products
+    double totalPrice = selectedProducts.fold(0.0, (sum, product) {
+      double weight =
+          double.tryParse(product['weightController']?.text ?? '0') ?? 0.0;
+      double price = product['price'] ?? 0.0;
+      return sum + (weight * price);
+    });
 
-        var products = snapshot.data!
-            .where((product) => !selectedProducts.any((selected) =>
-                selected['productId'] == product['product_id'] &&
-                selected['productId'] != selectedProducts[index]['productId']))
-            .toList();
+    double totalWeight = selectedProducts.fold(0.0, (sum, product) {
+      return sum +
+          (double.tryParse(product['weightController']?.text ?? '0') ?? 0.0);
+    });
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Category Dropdown
+        InputDecorator(
+          decoration: InputDecoration(
+            labelText: 'Select Product',
+            border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          ),
+          child: DropdownButton<String>(
+            value: selectedProducts[index]['category'],
+            hint: Text('Select Category'),
+            isExpanded: true,
+            underline: SizedBox(),
+            items: categoriesList.map((category) {
+              return DropdownMenuItem<String>(
+                value: category,
+                child: Text(category),
+              );
+            }).toList(),
+            onChanged: (selectedCategory) {
+              setState(() {
+                selectedProducts[index]['category'] = selectedCategory;
+                selectedProducts[index]['productId'] =
+                    null; // Reset product selection
+              });
+            },
+          ),
+        ),
+        SizedBox(height: 10),
+
+        // Product Dropdown
+        InputDecorator(
+          decoration: InputDecoration(
+            labelText: 'Select Product',
+            border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          ),
+          child: DropdownButton<String>(
+            value: selectedProducts[index]['productId'],
+            hint: Text('Select Product'),
+            isExpanded: true,
+            underline: SizedBox(),
+            items: productsList.where((product) {
+              return product['category'] == selectedProducts[index]['category'];
+            }).map((product) {
+              return DropdownMenuItem<String>(
+                value: product['product_id'],
+                child: Text("${product['product_name']}"),
+              );
+            }).toList(),
+            onChanged: (selectedProductId) async {
+              double latestPrice = await _fetchLatestPrice(selectedProductId!);
+
+              setState(() {
+                selectedProducts[index]['productId'] = selectedProductId;
+                selectedProducts[index]['price'] = latestPrice;
+              });
+            },
+          ),
+        ),
+        SizedBox(height: 10),
+
+        // Latest Price Display
+        Text(
+          'Price per unit: ₱${selectedProducts[index]['price'].toStringAsFixed(2)}',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+        ),
+        SizedBox(height: 5),
+
+        // Weight Input and Total Price Display
+        Row(
           children: [
-            DropdownButton<String>(
-              value: selectedProducts[index]['productId'],
-              hint: const Text('Select Product'),
-              isExpanded: true,
-              items: products.map((product) {
-                return DropdownMenuItem<String>(
-                  value: product['product_id'],
-                  child: Text(
-                    "${product['product_name'].toString().toLowerCase()} (${product['category'].toString().toLowerCase()})",
-                  ),
-                );
-              }).toList(),
-              onChanged: (selectedProductId) async {
-                double latestPrice =
-                    await _fetchLatestPrice(selectedProductId!);
-
-                setState(() {
-                  selectedProducts[index]['productId'] = selectedProductId;
-                  selectedProducts[index]['price'] = latestPrice;
-                });
-              },
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: selectedProducts[index]['weightController'],
-                    decoration: const InputDecoration(
-                      labelText: 'Weight (kg)',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.number,
-                    onChanged: (value) {
-                      setState(() {}); // Recalculate total when weight changes
-                    },
-                  ),
+            Expanded(
+              child: TextFormField(
+                controller: selectedProducts[index]['weightController'],
+                decoration: InputDecoration(
+                  labelText: 'Weight (kg)',
+                  border: OutlineInputBorder(),
                 ),
-                IconButton(
-                  onPressed: () {
-                    _removeProduct(index);
-                  },
-                  icon: const Icon(Icons.delete),
-                  color: Colors.red,
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            if (selectedProducts[index]['productId'] != null &&
-                selectedProducts[index]['price'] != 0.0)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Price per unit: ₱${selectedProducts[index]['price'].toStringAsFixed(2)}',
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    'Total: ₱${_calculateTotalPrice(index).toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
-                    ),
-                  ),
-                ],
+                keyboardType: TextInputType.number,
+                onChanged: (value) {
+                  setState(() {
+                    _calculateTotals(); // Recalculate totals when weight changes
+                  });
+                },
               ),
-            const SizedBox(height: 10),
+            ),
+            SizedBox(width: 10),
+            Text(
+              'Total: ₱${_calculateTotalPrice(index).toStringAsFixed(2)}',
+              style:
+                  TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+            ),
           ],
-        );
-      },
+        ),
+        SizedBox(height: 10),
+      ],
     );
   }
 
@@ -375,5 +462,20 @@ class _AddInventoryModalState extends State<AddInventoryModal> {
         0;
     double pricePerUnit = selectedProducts[index]['price'];
     return weight * pricePerUnit;
+  }
+
+  void _calculateTotals() {
+    totalWeight = selectedProducts.fold(0.0, (sum, product) {
+      double weight =
+          double.tryParse(product['weightController']?.text ?? '0') ?? 0.0;
+      return sum + weight;
+    });
+
+    totalPrice = selectedProducts.fold(0.0, (sum, product) {
+      double weight =
+          double.tryParse(product['weightController']?.text ?? '0') ?? 0.0;
+      double price = product['price'] ?? 0.0;
+      return sum + (weight * price);
+    });
   }
 }

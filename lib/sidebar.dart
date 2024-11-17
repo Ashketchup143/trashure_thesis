@@ -155,8 +155,7 @@ class _SidebarState extends State<Sidebar> {
           _buildHoverableListTile(
               20, Icons.dashboard_outlined, 'Inventory', '/inventory'),
 
-          if (hasFullAccess)
-            _buildFinanceTile(), // Add finance only if full access
+          _buildFinanceTile(),
           _buildHoverableListTile(
               10, Icons.settings_outlined, 'Products', '/products'),
           _buildHoverableListTile(
@@ -364,18 +363,18 @@ class _SidebarState extends State<Sidebar> {
     return Column(
       children: [
         MouseRegion(
-          onEnter: (_) => setState(() => _hoveredIndex = 9),
+          onEnter: (_) => setState(() => _hoveredIndex = 40),
           onExit: (_) => setState(() => _hoveredIndex = -1),
           child: Container(
             height: 70,
-            color: _hoveredIndex == 9
+            color: _hoveredIndex == 40
                 ? Color(0xFF4CAF4F)
                 : Colors.transparent, // Changes color on hover
             child: Center(
               child: ListTile(
                 leading: Icon(
                   Icons.payment_outlined,
-                  color: _hoveredIndex == 9 ? Colors.white : Color(0xFF4CAF4F),
+                  color: _hoveredIndex == 40 ? Colors.white : Color(0xFF4CAF4F),
                 ),
                 title: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -384,7 +383,7 @@ class _SidebarState extends State<Sidebar> {
                       'Finance',
                       style: GoogleFonts.poppins(
                         textStyle: TextStyle(
-                          color: _hoveredIndex == 9
+                          color: _hoveredIndex == 40
                               ? Colors.white
                               : Color(0xFF4CAF4F),
                           fontWeight: FontWeight.w600,
@@ -400,15 +399,15 @@ class _SidebarState extends State<Sidebar> {
                         });
                       },
                       child: Container(
-                        height: 60,
-                        width: 60,
+                        height: 60, // Adjust height as needed
+                        width: 60, // Adjust width as needed
                         color: Colors.transparent,
                         child: Center(
                           child: Icon(
                             _isFinanceExpanded
                                 ? Icons.expand_less
                                 : Icons.expand_more,
-                            color: _hoveredIndex == 9
+                            color: _hoveredIndex == 40
                                 ? Colors.white
                                 : Color(0xFF4CAF4F),
                           ),
@@ -423,9 +422,11 @@ class _SidebarState extends State<Sidebar> {
         ),
         if (_isFinanceExpanded) ...[
           _buildsecondHoverableListTile(
-              12, Icons.money_off_outlined, 'Expenses', '/outflow'),
+              31, Icons.attach_money_outlined, 'Finance', '/finance'),
           _buildsecondHoverableListTile(
-              13, Icons.monetization_on_outlined, 'Revenue', '/inflow'),
+              32, Icons.money_off_outlined, 'Expenses', '/outflow'),
+          _buildsecondHoverableListTile(
+              33, Icons.monetization_on_outlined, 'Revenue', '/inflow'),
         ],
       ],
     );

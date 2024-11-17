@@ -27,6 +27,8 @@ class _BookingState extends State<Booking> {
 
   String? selectedDriver;
   String? selectedVehicle;
+  String? selectedDriverPosition;
+
   Map<String, bool> _selectedOptions = {};
 
   List<DocumentSnapshot> filteredBookings = [];
@@ -993,9 +995,22 @@ class _BookingState extends State<Booking> {
 
       if (driversSnapshot.docs.isNotEmpty) {
         var recentDriverData = driversSnapshot.docs.first.data();
-        setState(() {
-          selectedDriver = recentDriverData['driverid'];
-        });
+        var driverId = recentDriverData['driverid'];
+
+        // Fetch the driver's details, including position
+        var driverDoc = await FirebaseFirestore.instance
+            .collection('employees')
+            .doc(driverId)
+            .get();
+
+        if (driverDoc.exists) {
+          var driverData = driverDoc.data() as Map<String, dynamic>;
+          setState(() {
+            selectedDriver = driverId;
+            selectedDriverPosition =
+                driverData['position'] ?? 'Unknown Position';
+          });
+        }
       }
     } catch (e) {
       print('Error fetching most recent driver: $e');
@@ -1047,13 +1062,75 @@ class _BookingState extends State<Booking> {
     }
 
     bool conflictDetected = false;
+    String conflictMessage = "";
+    final timeFormat = DateFormat('hh:mm a');
+    var selectedSchedules = _selectedOptions.keys
+        .where((key) => _selectedOptions[key] == true)
+        .toList();
+
     try {
-      var selectedSchedules = _selectedOptions.keys
-          .where((key) => _selectedOptions[key] == true)
-          .toList();
+      // Check for conflicts within the selected bookings themselves
+      for (int i = 0; i < selectedSchedules.length; i++) {
+        var scheduleIdA = selectedSchedules[i];
+        DocumentSnapshot bookingDocA = await FirebaseFirestore.instance
+            .collection('bookings')
+            .doc(scheduleIdA)
+            .get();
+        var bookingDataA = bookingDocA.data() as Map<String, dynamic>;
 
-      final timeFormat = DateFormat('hh:mm a');
+        DateTime dateA = bookingDataA['date'].toDate();
+        DateTime startA = timeFormat.parse(bookingDataA['start_time']);
+        DateTime endA = timeFormat.parse(bookingDataA['end_time']);
 
+        for (int j = i + 1; j < selectedSchedules.length; j++) {
+          var scheduleIdB = selectedSchedules[j];
+          DocumentSnapshot bookingDocB = await FirebaseFirestore.instance
+              .collection('bookings')
+              .doc(scheduleIdB)
+              .get();
+          var bookingDataB = bookingDocB.data() as Map<String, dynamic>;
+
+          DateTime dateB = bookingDataB['date'].toDate();
+          DateTime startB = timeFormat.parse(bookingDataB['start_time']);
+          DateTime endB = timeFormat.parse(bookingDataB['end_time']);
+
+          // Check if the bookings have the same date and overlapping time
+          bool isSameDay = dateA.isAtSameMomentAs(dateB);
+          bool timesOverlap = startA.isBefore(endB) && endA.isAfter(startB);
+
+          if (isSameDay && timesOverlap) {
+            conflictDetected = true;
+            conflictMessage =
+                "Selected bookings have conflicting times on ${_formatDate(dateA)} from ${bookingDataA['start_time']} - ${bookingDataA['end_time']} and ${bookingDataB['start_time']} - ${bookingDataB['end_time']}.";
+            break;
+          }
+        }
+
+        if (conflictDetected) break;
+      }
+
+      if (conflictDetected) {
+        await showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Conflict Detected'),
+              content: Text(conflictMessage),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+        return; // Exit if there are conflicts among selected bookings
+      }
+
+      // Check for conflicts with other bookings assigned to the selected driver
       for (var scheduleId in selectedSchedules) {
         DocumentSnapshot bookingDoc = await FirebaseFirestore.instance
             .collection('bookings')
@@ -1076,12 +1153,17 @@ class _BookingState extends State<Booking> {
           DateTime conflictStartTime =
               timeFormat.parse(conflictData['start_time']);
           DateTime conflictEndTime = timeFormat.parse(conflictData['end_time']);
+          String conflictBookingId = conflictDoc.id;
+
+          if (conflictBookingId == scheduleId) continue;
 
           bool timesOverlap = bookingStartTime.isBefore(conflictEndTime) &&
               bookingEndTime.isAfter(conflictStartTime);
 
           if (timesOverlap) {
             conflictDetected = true;
+            conflictMessage =
+                "The selected driver is already booked for a conflicting schedule on ${_formatDate(bookingDate)} from ${conflictData['start_time']} to ${conflictData['end_time']}.";
             break;
           }
         }
@@ -1095,8 +1177,7 @@ class _BookingState extends State<Booking> {
           builder: (BuildContext context) {
             return AlertDialog(
               title: const Text('Conflict Detected'),
-              content: const Text(
-                  'The selected driver is already assigned to another booking on the same date and overlapping time. Please choose a different driver or time.'),
+              content: Text(conflictMessage),
               actions: [
                 TextButton(
                   onPressed: () {
@@ -1109,6 +1190,7 @@ class _BookingState extends State<Booking> {
           },
         );
       } else {
+        // Proceed with updating driver and vehicle if no conflicts are found
         for (var scheduleId in selectedSchedules) {
           var vehicleDoc = await FirebaseFirestore.instance
               .collection('vehicles')
@@ -1123,7 +1205,7 @@ class _BookingState extends State<Booking> {
           var driverData = driverDoc.data() as Map<String, dynamic>;
 
           var vehicleName =
-              "${vehicleData['brand']} ${vehicleData['model']} ${vehicleData['vehicle_type']}";
+              "${vehicleData['brand']} ${vehicleData['model']} (${vehicleData['vehicle_type']})";
           var driverName = driverData['name'];
 
           await FirebaseFirestore.instance
@@ -1134,6 +1216,7 @@ class _BookingState extends State<Booking> {
             'vehicleId': selectedVehicle,
             'driver': driverName,
             'driverId': selectedDriver,
+            'position': driverData['position'] ?? 'Unknown Position',
           });
         }
 
@@ -1297,35 +1380,43 @@ class _BookingState extends State<Booking> {
                       style: const TextStyle(fontSize: 14)))),
           Expanded(
             flex: 1,
-            child: Center(
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.map, size: 18),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => Maps(bookingId: scheduleId)),
-                      );
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.info_outline, size: 18),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => BookingDetails(
-                            bookingId: scheduleId,
-                            bookingData: bookingData,
-                          ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  padding: EdgeInsets.zero, // This removes the default padding
+                  constraints:
+                      BoxConstraints(), // This removes additional constraints
+                  icon: const Icon(Icons.map, size: 18),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => Maps(bookingId: scheduleId)),
+                    );
+                  },
+                ),
+                SizedBox(
+                  width: 10,
+                ),
+                IconButton(
+                  padding: EdgeInsets.zero, // This removes the default padding
+                  constraints:
+                      BoxConstraints(), // This removes additional constraints
+                  icon: const Icon(Icons.info_outline, size: 18),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => BookingDetails(
+                          bookingId: scheduleId,
+                          bookingData: bookingData,
                         ),
-                      );
-                    },
-                  ),
-                ],
-              ),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
           ),
         ],

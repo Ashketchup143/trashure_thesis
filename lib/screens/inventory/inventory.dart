@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:trashure_thesis/screens/addinventorymodal.dart';
+import 'package:trashure_thesis/screens/inventory/inventorydetails.dart';
 import 'package:trashure_thesis/sidebar.dart';
 import 'package:provider/provider.dart';
 import 'package:trashure_thesis/user_model.dart';
@@ -257,18 +258,19 @@ class _InventoryState extends State<Inventory> {
                   child: Column(
                     children: [
                       // Inventory Titles
+
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 8.0),
                         child: Row(
                           children: [
                             title('Category', 2),
                             title('Type', 2),
-                            title('Previous Weight', 1),
                             title('Current Weight', 1),
                             title('Details', 1),
                           ],
                         ),
                       ),
+
                       const Divider(
                           height: 1, color: Colors.black), // Separator line
                       const SizedBox(height: 10),
@@ -362,12 +364,10 @@ class _InventoryState extends State<Inventory> {
   }
 
   // Custom CheckboxTile for each inventory item
-  // Custom CheckboxTile for each inventory item
   Widget _buildCustomCheckboxTile(Map<String, dynamic> item) {
     String itemId = item['id'] ?? 'N/A';
     String category = item['category'] ?? 'N/A';
     String type = item['type'] ?? 'N/A';
-    String previousWeight = (item['previous_weight'] ?? 0.0).toStringAsFixed(2);
     String currentWeight = (item['weight'] ?? 0.0).toStringAsFixed(2);
 
     if (_selectedOptions[itemId] == null) {
@@ -401,23 +401,23 @@ class _InventoryState extends State<Inventory> {
           Expanded(
             flex: 1,
             child: Text(
-              previousWeight,
-              style: const TextStyle(fontSize: 16),
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: Text(
               currentWeight,
               style: const TextStyle(fontSize: 16),
             ),
           ),
-          Expanded(
-            flex: 1,
+          Center(
             child: IconButton(
               icon: const Icon(Icons.info_outline),
               onPressed: () {
-                // Handle navigation to item details
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => InventoryDetails(
+                      itemId: item['id'],
+                      itemType: item['type'],
+                    ),
+                  ),
+                );
               },
             ),
           ),
@@ -462,6 +462,8 @@ class _InventoryState extends State<Inventory> {
       final TextEditingController companyNameController =
           TextEditingController();
       final TextEditingController referenceNumberController =
+          TextEditingController();
+      final TextEditingController deliveryFeeController =
           TextEditingController();
       String selectedPaymentMethod = 'Cash';
       final Map<String, TextEditingController> weightControllers = {};
@@ -561,6 +563,18 @@ class _InventoryState extends State<Inventory> {
                               border: OutlineInputBorder(),
                             ),
                           ),
+                        const SizedBox(height: 10),
+                        // Delivery Fee Field
+                        TextField(
+                          controller: deliveryFeeController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Delivery Fee (₱)',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
                         const SizedBox(height: 20),
                         Expanded(
                           child: SingleChildScrollView(
@@ -653,7 +667,8 @@ class _InventoryState extends State<Inventory> {
                                       companyNameController,
                                       descriptionController,
                                       selectedPaymentMethod,
-                                      referenceNumberController);
+                                      referenceNumberController,
+                                      deliveryFeeController);
                                   Navigator.of(context)
                                       .pop(); // Close the modal after processing
                                 }
@@ -719,6 +734,7 @@ class _InventoryState extends State<Inventory> {
       TextEditingController companyNameController,
       TextEditingController descriptionController,
       String selectedPaymentMethod,
+      TextEditingController deliveryFeeController,
       TextEditingController referenceNumberController) async {
     double overallTotal = 0.0;
     List<Map<String, dynamic>> soldItems = [];
@@ -785,5 +801,36 @@ class _InventoryState extends State<Inventory> {
     for (var soldItem in soldItems) {
       await inflowRef.collection('sold').add(soldItem);
     }
+    // Check if delivery fee is greater than 0 and create outflow document
+    double deliveryFee = double.tryParse(deliveryFeeController.text) ?? 0.0;
+    if (deliveryFee > 0) {
+      try {
+        await _addOutflowDocument(
+          authorizedBy: authorizedBy,
+          deliveryFee: deliveryFee,
+        );
+        print("Outflow document created successfully for delivery fee.");
+      } catch (e) {
+        print("Error creating outflow document: $e");
+      }
+    }
+  }
+
+  Future<void> _addOutflowDocument({
+    required String authorizedBy,
+    required double deliveryFee,
+  }) async {
+    Map<String, dynamic> outflowData = {
+      'authorized_by': authorizedBy,
+      'amount': deliveryFee,
+      'timestamp': FieldValue.serverTimestamp(),
+      'category': 'Delivery Fee',
+    };
+
+    print("Attempting to create outflow document with data: $outflowData");
+
+    await FirebaseFirestore.instance.collection('outflow').add(outflowData);
+
+    print("Outflow document created successfully with data: $outflowData");
   }
 }

@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:trashure_thesis/screens/addusermodal.dart';
 import 'package:trashure_thesis/screens/map.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'dart:html' as html; // Import for web-based download and display
+import 'dart:html' as html;
+
+import 'package:trashure_thesis/user_model.dart'; // Import for web-based download and display
 
 class DriverBookingDetails extends StatefulWidget {
   @override
@@ -22,10 +25,13 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
 
   @override
   Widget build(BuildContext context) {
+    final String userRole =
+        Provider.of<UserModel>(context, listen: false).userRole;
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
 
     String bookingId = args?['bookingId'] ?? 'Unknown';
+    String location = args?['location'] ?? 'Unknown';
     String status = (args?['status'] ?? 'unknown').trim().toLowerCase();
     String vehicle = args?['vehicle'] ?? 'Unknown';
     String vehicleId = args?['vehicleId'] ?? 'Unknown';
@@ -61,7 +67,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                 icon: const Icon(Icons.print),
                 onPressed: () {
                   _generatePdf(context, bookingId, status, vehicle, vehicleId,
-                      overallWeight, overallPrice, formattedDate);
+                      overallWeight, overallPrice, formattedDate, userRole);
                 },
               ),
             ],
@@ -153,6 +159,8 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                         ),
                         const SizedBox(height: 10),
                         Text('Booking ID: $bookingId',
+                            style: const TextStyle(fontSize: 15)),
+                        Text('Location: $location',
                             style: const TextStyle(fontSize: 15)),
                         Text('Status: $status',
                             style: const TextStyle(fontSize: 15)),
@@ -320,6 +328,28 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                           .format(collectedTimestamp.toDate())
                                       : 'N/A';
 
+                                  // Determine the share percentage based on userRole
+                                  double sharePercentage =
+                                      userRole == 'contractual driver'
+                                          ? 0.35
+                                          : 0.30;
+
+// Check if the user is in donate mode
+                                  double effectiveTotalPrice =
+                                      userData['mode'] == 'donate'
+                                          ? userData['total_price'] ?? 0.0
+                                          : (userData['status'] == 'collected'
+                                              ? userData['final_total_price'] ??
+                                                  0.0
+                                              : userData['total_price'] ?? 0.0);
+                                  print(
+                                      'User Role: $userRole'); // Add this to check the fetched userRole
+// Calculate the driver share
+                                  double driverShare =
+                                      ((((totalPrice / (1 - 0.30)) + 40) -
+                                              totalPrice) *
+                                          sharePercentage);
+
                                   return Card(
                                     margin: const EdgeInsets.all(10),
                                     color: isCollected
@@ -338,7 +368,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                         'Total Price: ₱${totalPrice.toStringAsFixed(2)}\n'
                                         'Calculated Total Price: ₱${calculatedTotalPrice.toStringAsFixed(2)}\n'
                                         'Total Weight: ${totalWeight.toStringAsFixed(2)} kg\n'
-                                        'Driver Share: ₱${((((((totalPrice ?? 0.0) / (1 - 0.30)) + 40) - (totalPrice ?? 0.0)) * 0.30).toStringAsFixed(2))}\n'
+                                        'Driver Share: ₱${driverShare.toStringAsFixed(2)}\n'
                                         '${userStatus == 'collected' ? 'Collected: $collectedDate' : ''}',
                                       ),
                                       children: [
@@ -662,7 +692,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                               await _showFinalCollectedConfirmation(bookingId);
                             },
                             child: const Text(
-                              'Mark Booking as Collected',
+                              'Mark All Bookings as Collected',
                               style: TextStyle(color: Colors.white),
                             ),
                             style: ElevatedButton.styleFrom(
@@ -847,103 +877,163 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
   }
 
   Future<void> _markAsCollected(String bookingId, String userId) async {
-    var recyclablesSnapshot = await FirebaseFirestore.instance
-        .collection('bookings')
-        .doc(bookingId)
-        .collection('users')
-        .doc(userId)
-        .collection('recyclables')
-        .get();
+    try {
+      // Fetch the recyclables for the user
+      var recyclablesSnapshot = await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .collection('users')
+          .doc(userId)
+          .collection('recyclables')
+          .get();
 
-    double finalTotalPrice = 0.0;
-    double finalTotalWeight = 0.0;
+      double finalTotalPrice = 0.0;
+      double finalTotalWeight = 0.0;
+      var batch = FirebaseFirestore.instance.batch();
 
-    var batch = FirebaseFirestore.instance.batch();
+      // Calculate totals and update recyclables
+      for (var rec in recyclablesSnapshot.docs) {
+        var recyclableData = rec.data() as Map<String, dynamic>;
+        String recyclableId = rec.id;
 
-    for (var rec in recyclablesSnapshot.docs) {
-      var recyclableData = rec.data() as Map<String, dynamic>;
-      String recyclableId = rec.id;
+        // Calculate final weight and item price
+        double finalWeight =
+            updatedWeights[recyclableId] ?? recyclableData['weight'];
+        double price = recyclableData['price'] ?? 0.0;
+        double finalItemPrice = finalWeight * price;
 
-      // Calculate final weight and final item price
-      double finalWeight =
-          updatedWeights[recyclableId] ?? recyclableData['weight'];
-      double price = recyclableData['price'] ?? 0.0;
-      double finalItemPrice = finalWeight * price;
+        // Accumulate total price and weight
+        finalTotalPrice += finalItemPrice;
+        finalTotalWeight += finalWeight;
 
-      // Sum up the final item prices and final weights
-      finalTotalPrice += finalItemPrice;
-      finalTotalWeight += finalWeight;
+        // Update each recyclable document with the final weight and item price
+        batch.update(
+          rec.reference,
+          {
+            'final_weight': finalWeight,
+            'final_item_price': finalItemPrice,
+          },
+        );
+      }
 
-      // Update each recyclable with final weight and final item price
-      batch.update(
-        rec.reference,
-        {
+      // Calculate the final calculated total price
+      double finalCalculatedTotalPrice = finalTotalPrice - 40;
+
+      // Fetch user data
+      var userDoc = await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .collection('users')
+          .doc(userId)
+          .get();
+      var userData = userDoc.data() as Map<String, dynamic>;
+
+      String firstName = userData['firstName'] ?? 'Unknown';
+      String userStatus = userData['status'] ?? 'pending';
+
+      // Check if the user is a guest
+      bool isGuest = firstName == "Guest";
+
+      // Update the user's document
+      var userRef = FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .collection('users')
+          .doc(userId);
+
+      batch.update(userRef, {
+        'status': 'collected',
+        'final_total_price': finalTotalPrice,
+        'final_total_weight': finalTotalWeight,
+        'final_calculated_total_price': finalCalculatedTotalPrice,
+        'collected_timestamp': Timestamp.now(),
+      });
+
+      // If the user is not a guest, update their status in the main `users` collection
+      if (!isGuest) {
+        var mainUserRef =
+            FirebaseFirestore.instance.collection('users').doc(userId);
+        batch.update(mainUserRef, {'status': 'done'});
+      }
+      // Add new document to the `outflow` collection
+      var bookingDoc = await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .get();
+      var bookingData = bookingDoc.data() as Map<String, dynamic>;
+
+      String vehicle = bookingData['vehicle'] ?? 'Unknown Vehicle';
+      String vehicleId = bookingData['vehicleId'] ?? 'Unknown Vehicle ID';
+      String employee = bookingData['driver'] ?? 'Unknown Driver';
+      String employeeId = bookingData['driverId'] ?? 'Unknown Driver ID';
+
+      // Create the outflow document
+      DocumentReference outflowRef =
+          await FirebaseFirestore.instance.collection('outflow').add({
+        'date': Timestamp.now(),
+        'price': finalCalculatedTotalPrice,
+        'weight': finalTotalWeight,
+        'vehicle': vehicle,
+        'vehicleId': vehicleId,
+        'employee': employee,
+        'employeeId': employeeId,
+        'bookingId': bookingId,
+        'status': 'collected',
+        'category': isGuest ? 'guest booking' : 'booking',
+      });
+
+      // Add recyclables as a subcollection under the outflow document
+      for (var rec in recyclablesSnapshot.docs) {
+        var recyclableData = rec.data() as Map<String, dynamic>;
+        String recyclableId = rec.id;
+
+        double finalWeight =
+            updatedWeights[recyclableId] ?? recyclableData['weight'];
+        double price = recyclableData['price'] ?? 0.0;
+        double finalItemPrice = finalWeight * price;
+        String type = recyclableData['type'] ?? 'Unknown Type';
+
+        await outflowRef.collection('recyclables').add({
+          'recyclableId': recyclableId,
+          'type': type,
           'final_weight': finalWeight,
+          'price': price,
           'final_item_price': finalItemPrice,
-        },
+        });
+      }
+
+      await batch.commit();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'User marked as collected successfully, including guest users.',
+          ),
+        ),
+      );
+    } catch (e) {
+      print("Error in markAsCollected: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to mark user as collected. Please try again.'),
+        ),
       );
     }
-
-    // Calculate the final_calculated_total_price as final_total_price - 40
-    double finalCalculatedTotalPrice = finalTotalPrice - 40;
-
-    // Now update the user's document with final_total_price, final_total_weight, collected status, and final_calculated_total_price
-    var userRef = FirebaseFirestore.instance
-        .collection('bookings')
-        .doc(bookingId)
-        .collection('users')
-        .doc(userId);
-
-    batch.update(userRef, {
-      'status': 'collected',
-      'final_total_price': finalTotalPrice, // Store the final total price
-      'final_total_weight': finalTotalWeight, // Store the final total weight
-      'final_calculated_total_price':
-          finalCalculatedTotalPrice, // Store the final calculated total price
-      'collected_timestamp':
-          Timestamp.now(), // Add collected timestamp for the user
-    });
-
-    // Update the status of each user in the users collection to "collected"
-    await _updateUsersStatusToCollected(bookingId);
-
-    // Add new document to the `outflow` collection
-    var bookingDoc = await FirebaseFirestore.instance
-        .collection('bookings')
-        .doc(bookingId)
-        .get();
-    var bookingData = bookingDoc.data() as Map<String, dynamic>;
-
-    String vehicle = bookingData['vehicle'] ?? 'Unknown Vehicle';
-    String vehicleId = bookingData['vehicleId'] ?? 'Unknown Vehicle ID';
-    String employee = bookingData['driver'] ?? 'Unknown Driver';
-    String employeeId = bookingData['driverId'] ?? 'Unknown Driver ID';
-
-    await FirebaseFirestore.instance.collection('outflow').add({
-      'date': Timestamp.now(),
-      'price': finalCalculatedTotalPrice,
-      'weight': finalTotalWeight,
-      'vehicle': vehicle,
-      'vehicleId': vehicleId,
-      'employee': employee,
-      'employeeId': employeeId,
-      'bookingId': bookingId,
-      'status': 'collected',
-      'category': 'booking',
-    });
-
-    await batch.commit();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text(
-              'User marked as collected, total price and weight calculated, and outflow recorded')),
-    );
   }
 
   Future<void> _showFinalCollectedConfirmation(String bookingId) async {
     bool hasUncollectedUsers = false;
     bool allUsersProcessed = true;
+    final String userRole =
+        Provider.of<UserModel>(context, listen: false).userRole;
+
+    // Text controllers for input fields
+    TextEditingController endingMileageController = TextEditingController();
+    TextEditingController fuelPaymentController = TextEditingController();
+
+    // Validation flags
+    bool isEndingMileageEmpty = false;
+    bool isFuelPaymentEmpty = false;
 
     // Fetch all users within the booking
     var usersSnapshot = await FirebaseFirestore.instance
@@ -986,69 +1076,139 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
         },
       );
     } else {
-      // Show confirmation dialog to mark the booking as collected
+      // Show confirmation dialog with additional required fields
       bool confirmed = await showDialog(
         context: context,
         builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text('Mark Booking as Completed'),
-            content: const Text(
-                'Are you sure you want to mark the entire booking as completed?'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop(false); // Cancel
-                },
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop(true); // Confirm
-                },
-                child: const Text('Confirm'),
-              ),
-            ],
+          return StatefulBuilder(
+            builder: (context, setState) {
+              return AlertDialog(
+                title: const Text('Mark Booking as Completed'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                        'Please fill in the required fields to proceed.'),
+                    const SizedBox(height: 10),
+                    // Input field for ending mileage
+                    TextField(
+                      controller: endingMileageController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Ending Mileage',
+                        border: const OutlineInputBorder(),
+                        errorText: isEndingMileageEmpty
+                            ? 'This field is required'
+                            : null,
+                      ),
+                      onChanged: (value) {
+                        setState(() {
+                          isEndingMileageEmpty = value.isEmpty;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    // Input field for fuel payment (only visible for driver role)
+                    if (userRole.toLowerCase() == 'driver')
+                      TextField(
+                        controller: fuelPaymentController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: 'Payment for Fuel (PHP)',
+                          border: const OutlineInputBorder(),
+                          errorText: isFuelPaymentEmpty
+                              ? 'This field is required'
+                              : null,
+                        ),
+                        onChanged: (value) {
+                          setState(() {
+                            isFuelPaymentEmpty = value.isEmpty;
+                          });
+                        },
+                      ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(false); // Cancel
+                    },
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      // Check if required fields are filled
+                      setState(() {
+                        isEndingMileageEmpty =
+                            endingMileageController.text.isEmpty;
+                        isFuelPaymentEmpty =
+                            userRole.toLowerCase() == 'driver' &&
+                                fuelPaymentController.text.isEmpty;
+                      });
+
+                      // Proceed only if both fields are filled
+                      if (!isEndingMileageEmpty && !isFuelPaymentEmpty) {
+                        Navigator.of(context).pop(true); // Confirm
+                      }
+                    },
+                    child: const Text('Confirm'),
+                  ),
+                ],
+              );
+            },
           );
         },
       );
 
       if (confirmed) {
-        await _finalizeBookingCollection(bookingId, usersSnapshot);
+        await _finalizeBookingCollection(
+          bookingId,
+          usersSnapshot,
+          userRole,
+          endingMileageController.text,
+          fuelPaymentController.text,
+        );
       }
     }
   }
 
   Future<void> _finalizeBookingCollection(
-      String bookingId, QuerySnapshot usersSnapshot) async {
+    String bookingId,
+    QuerySnapshot usersSnapshot,
+    String userRole,
+    String endingMileage,
+    String fuelPayment,
+  ) async {
     // Calculate the total final overall price, final overall weight, and total driver share
     double finalOverallPrice = 0.0;
     double finalOverallWeight = 0.0;
     double totalDriverShare = 0.0;
+    double sharePercentage =
+        userRole.toLowerCase() == 'contractual driver' ? 0.35 : 0.30;
 
     for (var userDoc in usersSnapshot.docs) {
       var userData = userDoc.data() as Map<String, dynamic>;
       double finalTotalPrice = userData['final_total_price'] ?? 0.0;
       double finalTotalWeight = userData['final_total_weight'] ?? 0.0;
 
-      // Calculate the driver share for each user
       double driverShare =
-          ((((finalTotalPrice / (1 - 0.30)) + 40) - finalTotalPrice) * 0.30);
+          ((((finalTotalPrice / (1 - 0.30)) + 40) - finalTotalPrice) *
+              sharePercentage);
 
-      // Accumulate the totals
       finalOverallPrice += finalTotalPrice;
       finalOverallWeight += finalTotalWeight;
       totalDriverShare += driverShare;
     }
 
-    // Update the booking document with the final overall price, weight, and driver share
+    // Update the booking document with the ending mileage and other details
     var bookingRef =
         FirebaseFirestore.instance.collection('bookings').doc(bookingId);
     await bookingRef.update({
       'status': 'collected',
       'final_overall_price': finalOverallPrice,
       'final_overall_weight': finalOverallWeight,
-      'driver_share':
-          totalDriverShare.toStringAsFixed(2), // Add the total driver share
+      'driver_share': totalDriverShare.toStringAsFixed(2),
+      'ending_mileage': double.tryParse(endingMileage) ?? 0.0,
     });
 
     // Fetch booking data for outflow entry
@@ -1060,7 +1220,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
     String employee = bookingData['driver'] ?? 'Unknown Driver';
     String employeeId = bookingData['driverId'] ?? 'Unknown Driver ID';
 
-    // Add a new document to the outflow collection for the driver share
+    // Add outflow entry for driver share
     await FirebaseFirestore.instance.collection('outflow').add({
       'date': Timestamp.now(),
       'price': double.parse(totalDriverShare.toStringAsFixed(2)),
@@ -1073,37 +1233,27 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
       'category': 'driver share',
     });
 
-    // Add the outflow entry for total
-    // var bookingDoc = await FirebaseFirestore.instance
-    //     .collection('bookings')
-    //     .doc(bookingId)
-    //     .get();
-    // var bookingData = bookingDoc.data() as Map<String, dynamic>;
-
-    // String vehicle = bookingData['vehicle'] ?? 'Unknown';
-    // String vehicleId = bookingData['vehicleId'] ?? 'Unknown';
-    // String employee = bookingData['driver'] ?? 'Unknown';
-    // String employeeId = bookingData['driverId'] ?? 'Unknown';
-
-    // await FirebaseFirestore.instance.collection('outflow').add({
-    //   'date': Timestamp.now(),
-    //   'price': finalOverallPrice,
-    //   'weight': finalOverallWeight,
-    //   'vehicle': vehicle,
-    //   'vehicleId': vehicleId,
-    //   'employee': employee,
-    //   'employeeId': employeeId,
-    //   'bookingId': bookingId,
-    //   'status': 'collected',
-    //   'category': 'booking',
-    // });
+    // Add outflow entry for fuel payment if applicable
+    if (userRole.toLowerCase() == 'driver' && fuelPayment.isNotEmpty) {
+      double fuelPrice = double.tryParse(fuelPayment) ?? 0.0;
+      await FirebaseFirestore.instance.collection('outflow').add({
+        'date': Timestamp.now(),
+        'price': fuelPrice,
+        'vehicle': vehicle,
+        'vehicleId': vehicleId,
+        'employee': employee,
+        'employeeId': employeeId,
+        'bookingId': bookingId,
+        'status': 'collected',
+        'category': 'fuel',
+      });
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         backgroundColor: Colors.green,
         content: Text(
-          'Booking marked as collected. Final overall price, weight, and driver share updated.',
-        ),
+            'Booking marked as collected. Final overall price, weight, driver share, and fuel payment updated.'),
       ),
     );
 
@@ -1364,11 +1514,13 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
     double overallPrice,
     double overallWeight,
     String formattedDate,
+    String userRole,
   ) async {
     final pdf = pw.Document();
 
     // Collect user details asynchronously
-    List<pw.Widget> userDetails = await _generateUserDetails(bookingId);
+    List<pw.Widget> userDetails =
+        await _generateUserDetails(bookingId, userRole);
 
     // Fetch users data to calculate total calculated price and weight
     var usersSnapshot = await FirebaseFirestore.instance
@@ -1379,25 +1531,39 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
 
     double totalCalculatedPrice = 0.0;
     double totalCalculatedWeight = 0.0;
+    double totalDriverShare = 0.0;
 
     // Loop through each user and add up calculated/collected prices and weights
     for (var userDoc in usersSnapshot.docs) {
       var userData = userDoc.data() as Map<String, dynamic>;
       String userStatus = userData['status'] ?? 'pending';
 
-      if (userStatus == 'collected') {
-        totalCalculatedPrice += userData['final_calculated_total_price'] ?? 0.0;
-        totalCalculatedWeight += userData['final_total_weight'] ?? 0.0;
-      } else {
-        totalCalculatedPrice += userData['calculated_total_price'] ?? 0.0;
-        totalCalculatedWeight += userData['total_weight'] ?? 0.0;
-      }
+      double totalPrice = userStatus == 'collected'
+          ? userData['final_total_price'] ?? 0.0
+          : userData['total_price'] ?? 0.0;
+      double calculatedTotalPrice = userStatus == 'collected'
+          ? userData['final_calculated_total_price'] ?? 0.0
+          : userData['calculated_total_price'] ?? 0.0;
+      double totalWeight = userStatus == 'collected'
+          ? userData['final_total_weight'] ?? 0.0
+          : userData['total_weight'] ?? 0.0;
+
+      double sharePercentage =
+          userRole.toLowerCase() == 'contractual driver' ? 0.35 : 0.30;
+      double driverShare =
+          ((((totalPrice / (1 - 0.30)) + 40) - totalPrice) * sharePercentage);
+
+      // Sum up the totals
+      totalCalculatedPrice += calculatedTotalPrice;
+      totalCalculatedWeight += totalWeight;
+      totalDriverShare += driverShare;
     }
 
     // Calculate the differences
     double priceDifference = totalCalculatedPrice - overallPrice;
     double weightDifference = totalCalculatedWeight - overallWeight;
 
+    // Add the booking summary and user details to the PDF
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
@@ -1411,54 +1577,42 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
           pw.Text("Status: ${status[0].toUpperCase() + status.substring(1)}"),
           pw.Text("Vehicle: $vehicle"),
           pw.Text("Vehicle ID: $vehicleId"),
+          pw.SizedBox(height: 10),
 
-          // Display for Est. Total Price
+          // Display Estimated and Calculated Prices and Weights
           pw.Row(
             children: [
               pw.Text(
-                'Est. Total Price: Php${overallPrice.toStringAsFixed(2)} ',
-                style: pw.TextStyle(fontSize: 18),
+                'Est. Total Price: PHP ${overallPrice.toStringAsFixed(2)} ',
               ),
               pw.Text(
                 '${priceDifference >= 0 ? '+' : ''}${priceDifference.toStringAsFixed(2)}',
                 style: pw.TextStyle(
-                  fontSize: 18,
                   color: priceDifference >= 0 ? PdfColors.green : PdfColors.red,
                 ),
               ),
             ],
           ),
-
-          // Display for Actual Calculated Price
           pw.Text(
-            'Actual Calculated Price: Php${totalCalculatedPrice.toStringAsFixed(2)}',
-            style: pw.TextStyle(fontSize: 18),
+            'Actual Calculated Price: PHP ${totalCalculatedPrice.toStringAsFixed(2)}',
           ),
-
-          // Display for Est. Total Weight
           pw.Row(
             children: [
               pw.Text(
                 'Est. Total Weight: ${overallWeight.toStringAsFixed(2)} kg ',
-                style: pw.TextStyle(fontSize: 18),
               ),
               pw.Text(
                 '${weightDifference >= 0 ? '+' : ''}${weightDifference.toStringAsFixed(2)} kg',
                 style: pw.TextStyle(
-                  fontSize: 18,
                   color:
                       weightDifference >= 0 ? PdfColors.green : PdfColors.red,
                 ),
               ),
             ],
           ),
-
-          // Display for Actual Calculated Weight
           pw.Text(
             'Actual Calculated Weight: ${totalCalculatedWeight.toStringAsFixed(2)} kg',
-            style: pw.TextStyle(fontSize: 18),
           ),
-
           pw.Text("Date: $formattedDate"),
           pw.SizedBox(height: 20),
           pw.Text(
@@ -1471,18 +1625,16 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
       ),
     );
 
-    // Convert PDF to Uint8List
+    // Convert PDF to Uint8List and open in a new tab
     final pdfBytes = await pdf.save();
-
-    // Create a Blob and open in a new tab
     final blob = html.Blob([pdfBytes], 'application/pdf');
     final url = html.Url.createObjectUrlFromBlob(blob);
     html.window.open(url, '_blank');
     html.Url.revokeObjectUrl(url); // Clean up the object URL
   }
 
-// Modify _generateUserDetails to include all details shown in the app
-  Future<List<pw.Widget>> _generateUserDetails(String bookingId) async {
+  Future<List<pw.Widget>> _generateUserDetails(
+      String bookingId, String userRole) async {
     List<pw.Widget> userDetails = [];
 
     var usersSnapshot = await FirebaseFirestore.instance
@@ -1491,6 +1643,9 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
         .collection('users')
         .get();
 
+    double sharePercentage =
+        userRole.toLowerCase() == 'contractual driver' ? 0.35 : 0.30;
+
     for (var userDoc in usersSnapshot.docs) {
       var userData = userDoc.data() as Map<String, dynamic>;
       String firstName = userData['firstName'] ?? 'Unknown';
@@ -1498,26 +1653,24 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
       String address = userData['address'] ?? 'Unknown';
       String email = userData['email'] ?? 'Unknown';
       String contact = userData['contact'] ?? 'Unknown';
-      double totalPrice = userData['status'] == 'collected'
+      String userStatus = userData['status'] ?? 'pending';
+
+      double totalPrice = userStatus == 'collected'
           ? userData['final_total_price'] ?? 0.0
           : userData['total_price'] ?? 0.0;
-      double totalWeight = userData['status'] == 'collected'
-          ? userData['final_total_weight'] ?? 0.0
-          : userData['total_weight'] ?? 0.0;
-      double calculatedTotalPrice = userData['status'] == 'collected'
+      double calculatedTotalPrice = userStatus == 'collected'
           ? userData['final_calculated_total_price'] ?? 0.0
           : userData['calculated_total_price'] ?? 0.0;
+      double totalWeight = userStatus == 'collected'
+          ? userData['final_total_weight'] ?? 0.0
+          : userData['total_weight'] ?? 0.0;
 
-      Timestamp? collectedTimestamp = userData['collected_timestamp'];
-      String collectedDate = collectedTimestamp != null
-          ? DateFormat('MM/dd/yyyy, HH:mm').format(collectedTimestamp.toDate())
-          : 'N/A';
-
-      String userStatus = userData['status'] ?? 'pending';
-      bool isCollected = userStatus == 'collected';
+      // Calculate the driver share based on userRole
+      double driverShare =
+          ((((totalPrice / (1 - 0.30)) + 40) - totalPrice) * sharePercentage);
 
       userDetails.add(pw.Text(
-        "$firstName $lastName",
+        "$firstName $lastName (${userStatus.toUpperCase()})",
         style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16),
       ));
 
@@ -1533,40 +1686,19 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
           "Calculated Total Price: PHP ${calculatedTotalPrice.toStringAsFixed(2)}"));
       userDetails
           .add(pw.Text("Total Weight: ${totalWeight.toStringAsFixed(2)} kg"));
-      if (isCollected) {
+      userDetails
+          .add(pw.Text("Driver Share: PHP ${driverShare.toStringAsFixed(2)}"));
+
+      if (userStatus == 'collected') {
+        Timestamp? collectedTimestamp = userData['collected_timestamp'];
+        String collectedDate = collectedTimestamp != null
+            ? DateFormat('MM/dd/yyyy, HH:mm')
+                .format(collectedTimestamp.toDate())
+            : 'N/A';
         userDetails.add(pw.Text("Collected: $collectedDate"));
       }
 
       userDetails.add(pw.SizedBox(height: 10));
-
-      var recyclablesSnapshot = await FirebaseFirestore.instance
-          .collection('bookings')
-          .doc(bookingId)
-          .collection('users')
-          .doc(userDoc.id)
-          .collection('recyclables')
-          .get();
-
-      for (var recDoc in recyclablesSnapshot.docs) {
-        var recData = recDoc.data();
-        String type = recData['type'] ?? 'Unknown';
-        double weight = isCollected
-            ? recData['final_weight'] ?? recData['weight']
-            : recData['weight'];
-        double price = recData['price'] ?? 0.0;
-        double itemPrice = isCollected
-            ? recData['final_item_price'] ?? weight * price
-            : weight * price;
-
-        userDetails.add(pw.Text(" - Type: $type"));
-        userDetails.add(pw.Text(" - Weight: ${weight.toStringAsFixed(2)} kg"));
-        userDetails
-            .add(pw.Text(" - Price per kg: PHP ${price.toStringAsFixed(2)}"));
-        userDetails
-            .add(pw.Text(" - Item Price: PHP ${itemPrice.toStringAsFixed(2)}"));
-        userDetails.add(pw.SizedBox(height: 5));
-      }
-
       userDetails.add(pw.Divider());
     }
 

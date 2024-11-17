@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:trashure_thesis/user_model.dart';
+import 'package:geolocator/geolocator.dart';
 
 class Maps extends StatefulWidget {
   final String bookingId;
@@ -18,12 +19,17 @@ class _MapsState extends State<Maps> {
   List<Marker> _markers = <Marker>[];
   String? hoveredUserId;
   Marker? _driverMarker;
+  LatLng initialCenter = const LatLng(7.0800, 125.6200); // Default fallback
+  final MapController _mapController = MapController();
 
   @override
   void initState() {
     super.initState();
+    _requestLocationPermission();
+    _checkLocationService();
     _fetchUserLocations();
     _listenToDriverLocation();
+    _updateDriverLocation();
   }
 
   // Function to fetch user locations from Firestore
@@ -34,45 +40,52 @@ class _MapsState extends State<Maps> {
         .collection('users')
         .get();
 
-    List<Marker> markers = usersSnapshot.docs.map((userDoc) {
+    List<Marker> markers = [];
+
+    for (var userDoc in usersSnapshot.docs) {
       var userData = userDoc.data() as Map<String, dynamic>;
       GeoPoint? location = userData['location'];
       String firstName = userData['firstName'] ?? 'Unknown';
       String lastName = userData['lastName'] ?? 'Unknown';
       String userId = userDoc.id;
 
+      // Only add markers for users who have a valid location
       if (location != null) {
-        return Marker(
-          point: LatLng(location.latitude, location.longitude),
-          builder: (ctx) {
-            return GestureDetector(
-              onTap: () {
-                setState(() {
-                  hoveredUserId = userId;
-                });
-              },
-              child: const Icon(Icons.location_on, color: Colors.red, size: 40),
-            );
-          },
-          anchorPos: AnchorPos.align(AnchorAlign.top),
-          key: Key(userId),
+        markers.add(
+          Marker(
+            point: LatLng(location.latitude, location.longitude),
+            builder: (ctx) {
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    hoveredUserId = userId;
+                  });
+                },
+                child:
+                    const Icon(Icons.location_on, color: Colors.red, size: 40),
+              );
+            },
+            anchorPos: AnchorPos.align(AnchorAlign.top),
+            key: Key(userId),
+          ),
         );
-      }
-      return Marker(
-        point: const LatLng(0, 0),
-        builder: (ctx) =>
-            const Icon(Icons.location_on, color: Colors.grey, size: 40),
-        anchorPos: AnchorPos.align(AnchorAlign.top),
-        key: Key(userId),
-      );
-    }).toList();
 
-    setState(() {
-      _markers = markers;
-    });
+        print(
+            'Driver location: Latitude: ${location.latitude}, Longitude: ${location.longitude}');
+      }
+    }
+
+    // Update the markers and animate the map to the first marker's location
+    if (markers.isNotEmpty) {
+      setState(() {
+        _markers = markers;
+      });
+      _mapController.move(
+          markers.first.point, 15.0); // Move map to the first user's location
+    }
   }
 
-  // Function to listen to the driver's location
+  // Function to listen to the driver's GPS location
   void _listenToDriverLocation() {
     final userRole = Provider.of<UserModel>(context, listen: false).userRole;
     final userId = Provider.of<UserModel>(context, listen: false).userId;
@@ -91,21 +104,45 @@ class _MapsState extends State<Maps> {
           if (location != null) {
             LatLng driverLatLng = LatLng(location.latitude, location.longitude);
 
-            // Update the driver marker
+            // Update the driver marker with a blue car icon
             setState(() {
               _driverMarker = Marker(
                 point: driverLatLng,
                 builder: (ctx) => const Icon(
                   Icons.directions_car,
-                  color: Colors.blue,
+                  color: Colors.blue, // Blue color for the driver marker
                   size: 40,
                 ),
                 anchorPos: AnchorPos.align(AnchorAlign.top),
               );
+
+              // // Optionally, move the map to the driver's current location
+              // _mapController.move(driverLatLng, 15.0);
             });
           }
         }
       });
+    }
+  }
+
+  Future<void> _checkLocationService() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+
+    if (!serviceEnabled) {
+      print("Location services are disabled.");
+      // Optionally, show a dialog to notify the user
+      _showEnableLocationDialog();
+    } else {
+      print("Location services are enabled.");
+    }
+  }
+
+  Future<void> _requestLocationPermission() async {
+    LocationPermission permission = await Geolocator.checkPermission();
+
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      permission = await Geolocator.requestPermission();
     }
   }
 
@@ -161,8 +198,80 @@ class _MapsState extends State<Maps> {
     );
   }
 
+  void _updateDriverLocation() {
+    final userRole = Provider.of<UserModel>(context, listen: false).userRole;
+    final userId = Provider.of<UserModel>(context, listen: false).userId;
+
+    if (userRole == 'driver' || userRole == 'contractual driver') {
+      Geolocator.getPositionStream().listen((Position position) async {
+        print(
+            "GPS Position Stream: Latitude: ${position.latitude}, Longitude: ${position.longitude}");
+        GeoPoint newLocation = GeoPoint(position.latitude, position.longitude);
+
+        DocumentReference driverDoc =
+            FirebaseFirestore.instance.collection('drivers').doc(userId);
+
+        var docSnapshot = await driverDoc.get();
+        print("Driver document snapshot: ${docSnapshot.data()}");
+
+        if (!docSnapshot.exists ||
+            (docSnapshot.data() as Map<String, dynamic>?)?['location'] ==
+                null) {
+          print("Setting new driver location in Firestore.");
+          await driverDoc
+              .set({'location': newLocation}, SetOptions(merge: true));
+        } else {
+          print("Updating existing driver location in Firestore.");
+          await driverDoc.update({'location': newLocation});
+        }
+
+        // Update the map marker without changing the map center
+        print("Updating driver marker on the map.");
+        setState(() {
+          _driverMarker = Marker(
+            point: LatLng(position.latitude, position.longitude),
+            builder: (ctx) => const Icon(
+              Icons.directions_car,
+              color: Colors.blue,
+              size: 40,
+            ),
+            anchorPos: AnchorPos.align(AnchorAlign.top),
+          );
+        });
+
+        // _mapController.move(
+        //     LatLng(position.latitude, position.longitude), 15.0);
+      });
+    }
+  }
+
+  void _showEnableLocationDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Location Services Disabled"),
+          content: Text("Please enable location services to continue."),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text("OK"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Determine the initial center of the map based on the first user's location
+    LatLng initialCenter = _markers.isNotEmpty
+        ? _markers.first.point
+        : const LatLng(7.0800, 125.6200); // Fallback if no markers are found
+
     return Scaffold(
       appBar: AppBar(
         iconTheme: const IconThemeData(color: Colors.white),
@@ -184,29 +293,30 @@ class _MapsState extends State<Maps> {
                 borderRadius: BorderRadius.circular(25),
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(25),
-                child: FlutterMap(
-                  options: MapOptions(
-                    center: _markers.isNotEmpty
-                        ? _markers.first.point
-                        : const LatLng(7.0800, 125.6200),
-                    zoom: 15.0,
-                    maxZoom: 18.0,
-                    minZoom: 5.0,
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate:
-                          'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      subdomains: ['a', 'b', 'c'],
+                  borderRadius: BorderRadius.circular(24),
+                  child: FlutterMap(
+                    mapController: _mapController,
+                    options: MapOptions(
+                      center: initialCenter, // Use the updated initial center
+                      zoom: 13.0,
+                      maxZoom: 18.0,
+                      minZoom: 5.0,
                     ),
-                    MarkerLayer(markers: [
-                      ..._markers,
-                      if (_driverMarker != null) _driverMarker!,
-                    ]),
-                  ],
-                ),
-              ),
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        subdomains: ['a', 'b', 'c'],
+                      ),
+                      MarkerLayer(
+                        markers: [
+                          ..._markers,
+                          if (_driverMarker != null)
+                            _driverMarker!, // Include the driver marker
+                        ],
+                      ),
+                    ],
+                  )),
             ),
           ),
           if (hoveredUserId != null)

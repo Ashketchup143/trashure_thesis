@@ -66,7 +66,7 @@ class MyApp extends StatelessWidget {
           '/vehicleinformation': (context) => VehicleInformation(),
           '/userinformation': (context) => UserInformation(),
           // '/map': (context) => Maps(),
-          // '/finance': (context) => Finance(),
+          '/finance': (context) => Finance(),
           '/inflow': (context) => Inflow(),
           '/outflow': (context) => Outflow(),
           '/products': (context) => Products(),

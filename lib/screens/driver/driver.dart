@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:trashure_thesis/screens/driver/driverprofile.dart'; // Import intl package for date formatting
+import 'package:provider/provider.dart';
+import 'package:trashure_thesis/screens/driver/driverprofile.dart';
+import 'package:trashure_thesis/user_model.dart'; // Import intl package for date formatting
 
 class Driver extends StatefulWidget {
   const Driver({super.key});
@@ -17,10 +19,20 @@ class _DriverState extends State<Driver> {
   bool isCollecting = false; // Flag to check if any booking is collecting
 
   @override
+  @override
   void initState() {
     super.initState();
-    _fetchDriverData(); // Fetch driver data when the page initializes
-    // _checkIfCollecting(); // Check if any booking has status "collecting"
+    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+      if (user == null) {
+        // User is signed out, redirect to login page
+        Navigator.pushReplacementNamed(context, '/');
+      } else {
+        // User is signed in, fetch driver data and check status
+        _fetchDriverData();
+        _checkIfCollecting();
+        _fetchDriverProviderData();
+      }
+    });
   }
 
   // Function to fetch the logged-in driver’s information from Firebase
@@ -46,6 +58,66 @@ class _DriverState extends State<Driver> {
     }
   }
 
+  Future<void> _fetchDriverProviderData() async {
+    // Get the current user from FirebaseAuth
+    User? user = FirebaseAuth.instance.currentUser;
+
+    if (user != null) {
+      // Retrieve email from the authenticated user
+      String email = user.email ?? 'Unknown';
+
+      // Get the UserModel instance using Provider
+      final userModel = Provider.of<UserModel>(context, listen: false);
+
+      // If the UserModel already has the necessary data, use it directly
+      if (userModel.userName.isNotEmpty && userModel.userId.isNotEmpty) {
+        setState(() {
+          name = userModel.userName;
+          id = userModel.userId;
+        });
+        print('Fetched data from Provider: Name: $name, ID: $id');
+        return;
+      }
+
+      // Otherwise, query Firestore to get the driver's information based on their email
+      try {
+        QuerySnapshot driverSnapshot = await FirebaseFirestore.instance
+            .collection('employees')
+            .where('email_address', isEqualTo: email.trim())
+            .get();
+
+        if (driverSnapshot.docs.isNotEmpty) {
+          var driverData =
+              driverSnapshot.docs.first.data() as Map<String, dynamic>;
+
+          // Extract driver details
+          String driverName = driverData['name'] ?? 'Unknown Driver';
+          String driverId = driverSnapshot.docs.first.id;
+          String position = driverData['position'] ?? 'employee';
+
+          // Update the Provider with fetched data
+          userModel.setUserName(driverName);
+          userModel.setUserId(driverId);
+          userModel.setUserRole(position.toLowerCase());
+
+          // Update local state with fetched data
+          setState(() {
+            name = driverName;
+            id = driverId;
+          });
+
+          print('Fetched data from Firestore: Name: $name, ID: $id');
+        } else {
+          print('Driver not found in Firestore.');
+        }
+      } catch (e) {
+        print('Error fetching driver data: $e');
+      }
+    } else {
+      print('No authenticated user found.');
+    }
+  }
+
   // Function to check if any booking already has the status "collecting"
   Future<void> _checkIfCollecting() async {
     QuerySnapshot collectingSnapshot = await FirebaseFirestore.instance
@@ -61,6 +133,8 @@ class _DriverState extends State<Driver> {
 
   Future<void> _logout() async {
     try {
+      // Clear the user data in UserModel
+      Provider.of<UserModel>(context, listen: false).clearUserData();
       await FirebaseAuth.instance.signOut(); // Sign out from Firebase
       // await Future.delayed(Duration(milliseconds: 500)); // Add a brief delay
       Navigator.pushReplacementNamed(context, '/'); // Navigate to login page
@@ -93,13 +167,30 @@ class _DriverState extends State<Driver> {
 
   // Function to show a confirmation modal before changing status to "collecting"
   Future<void> _showCollectConfirmation(String bookingId) async {
+    TextEditingController mileageController = TextEditingController();
+
     bool confirmed = await showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text('Collect Recyclables'),
-          content: Text(
-              'Are you going to collect the recyclables for this booking?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                  'Are you going to collect the recyclables for this booking?'),
+              const SizedBox(height: 16),
+              // Starting Mileage Input Field
+              TextField(
+                controller: mileageController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Enter Starting Mileage',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
           actions: [
             TextButton(
               onPressed: () {
@@ -118,8 +209,45 @@ class _DriverState extends State<Driver> {
       },
     );
 
-    if (confirmed == true) {
-      await _updateBookingStatus(bookingId, 'collecting');
+    // Check if the user confirmed and provided a mileage value
+    if (confirmed == true && mileageController.text.isNotEmpty) {
+      double? startingMileage = double.tryParse(mileageController.text);
+
+      if (startingMileage != null) {
+        await _updateBookingStatusWithMileage(
+            bookingId, 'collecting', startingMileage);
+      } else {
+        // Show error if mileage input is invalid
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content:
+                  Text('Invalid mileage input. Please enter a valid number.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _updateBookingStatusWithMileage(
+      String bookingId, String newStatus, double startingMileage) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .update({
+        'status': newStatus,
+        'starting_mileage': startingMileage,
+      });
+      _checkIfCollecting(); // Recheck if a booking is set to "collecting"
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content:
+                Text('Booking updated successfully with starting mileage.')),
+      );
+    } catch (e) {
+      print('Error updating booking: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update booking. Please try again.')),
+      );
     }
   }
 
@@ -272,12 +400,22 @@ class _DriverState extends State<Driver> {
                           var bookingStatus =
                               bookingData['status'] ?? 'Unknown';
                           var overallPrice =
-                              bookingData['overall_price'] ?? 'Not set';
+                              (bookingData['overall_price'] is num)
+                                  ? bookingData['overall_price']
+                                  : 0.0;
                           var overallWeight =
-                              bookingData['overall_weight'] ?? 'Not set';
+                              (bookingData['overall_weight'] is num)
+                                  ? bookingData['overall_weight']
+                                  : 0.0;
+                          var location = bookingData['location'] ?? null;
                           var calculatedPrice =
                               bookingData['calculated_overall_price'] ??
                                   'Not set';
+
+                          // Skip this card if overallWeight is zero
+                          if (overallWeight == 0) {
+                            return SizedBox.shrink(); // Return an empty widget
+                          }
 
                           return Card(
                             margin: const EdgeInsets.all(10),
@@ -298,6 +436,7 @@ class _DriverState extends State<Driver> {
                                               fontWeight: FontWeight.bold),
                                         ),
                                         SizedBox(height: 4),
+                                        Text('Location: $location'),
                                         Text('Booking ID: $bookingId'),
                                         Text('Status: $bookingStatus'),
                                         Text(
@@ -307,15 +446,17 @@ class _DriverState extends State<Driver> {
                                         Text(
                                             'Overall Price: ₱${overallPrice.toStringAsFixed(2)}'),
                                         Text(
-                                            'Overall Weight: ${overallWeight.toStringAsFixed(2)} kg'),
-                                        Text('Calculated: ${calculatedPrice}'),
+                                          'Overall Weight: ${overallWeight.toStringAsFixed(2)} kg',
+                                        ),
+                                        Text('Calculated: ₱$calculatedPrice'),
+                                        if (bookingData
+                                            .containsKey('starting_mileage'))
+                                          Text(
+                                              'Starting Mileage: ${bookingData['starting_mileage']} km'),
                                       ],
                                     ),
                                   ),
-                                  SizedBox(
-                                      width: 10), // Spacing between columns
-
-                                  // Column for IconButton and Status Buttons
+                                  SizedBox(width: 10),
                                   Expanded(
                                     flex: 1,
                                     child: Column(
@@ -331,6 +472,8 @@ class _DriverState extends State<Driver> {
                                               arguments: {
                                                 'bookingId': bookingId,
                                                 'status': bookingData['status'],
+                                                'location':
+                                                    bookingData['location'],
                                                 'vehicle':
                                                     bookingData['vehicle'],
                                                 'vehicleId':
@@ -344,28 +487,24 @@ class _DriverState extends State<Driver> {
                                             );
                                           },
                                         ),
-                                        SizedBox(
-                                            height:
-                                                50), // Spacing between buttons
+                                        SizedBox(height: 50),
                                         if (bookingStatus != 'collecting')
                                           ElevatedButton(
                                             onPressed: isCollecting
-                                                ? _showErrorModal // Show modal if another booking is collecting
+                                                ? _showErrorModal
                                                 : () {
                                                     _showCollectConfirmation(
                                                         bookingId);
                                                   },
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.green,
-                                              minimumSize: Size(
-                                                  80, 30), // Set button size
+                                              minimumSize: Size(80, 30),
                                             ),
                                             child: Text(
                                               'Collect',
                                               style: TextStyle(
                                                   fontSize: 12,
-                                                  color: Colors
-                                                      .white), // Smaller text
+                                                  color: Colors.white),
                                             ),
                                           )
                                         else
@@ -379,15 +518,13 @@ class _DriverState extends State<Driver> {
                                                 style: ElevatedButton.styleFrom(
                                                   backgroundColor:
                                                       Colors.redAccent,
-                                                  minimumSize: Size(80,
-                                                      30), // Set button size
+                                                  minimumSize: Size(80, 30),
                                                 ),
                                                 child: Text(
                                                   'Revert',
                                                   style: TextStyle(
                                                       fontSize: 12,
-                                                      color: Colors
-                                                          .white), // Smaller text
+                                                      color: Colors.white),
                                                 ),
                                               ),
                                               SizedBox(height: 4),

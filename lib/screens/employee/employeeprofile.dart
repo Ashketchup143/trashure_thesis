@@ -11,7 +11,6 @@ class EmployeeProfileScreen extends StatefulWidget {
 
 class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
   late TextEditingController _nameController;
-  late TextEditingController _positionController;
   late TextEditingController _addressController;
   late TextEditingController _birthDateController;
   late TextEditingController _contactController;
@@ -29,11 +28,13 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
   List<Map<String, dynamic>> _dailyTimeRecords = [];
   List<Map<String, dynamic>> _bookings = [];
 
+  List<String> _positionsList = [];
+  String? _selectedPosition;
+
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController();
-    _positionController = TextEditingController();
     _addressController = TextEditingController();
     _birthDateController = TextEditingController();
     _contactController = TextEditingController();
@@ -41,6 +42,8 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
     _salaryController = TextEditingController();
     _expTimeInController = TextEditingController();
     _expTimeOutController = TextEditingController();
+    // Fetch positions list
+    _fetchPositions();
   }
 
   @override
@@ -56,7 +59,7 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
 
         // Set initial values of the controllers with the employee data
         _nameController.text = employee!['name'] ?? '';
-        _positionController.text = employee!['position'] ?? '';
+        _selectedPosition ??= employee!['position'];
         _addressController.text = employee!['address'] ?? '';
         _birthDateController.text = employee!['birth_date'] ?? '';
         _contactController.text = employee!['contact_number'] ?? '';
@@ -69,10 +72,31 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
         _fetchDailyTimeRecords(employee!['id']);
 
         // If the employee is a driver, fetch bookings
-        if (employee!['position'] == 'Driver') {
+        if (employee!['position'].toLowerCase() == 'driver' ||
+            employee!['position'].toLowerCase() == 'contractual driver') {
           _fetchDriverBookings(employee!['id']);
         }
       }
+    }
+  }
+
+  Future<void> _fetchPositions() async {
+    try {
+      QuerySnapshot snapshot =
+          await FirebaseFirestore.instance.collection('positions').get();
+
+      List<String> tempPositionsList = [];
+      for (var doc in snapshot.docs) {
+        var data = doc.data() as Map<String, dynamic>;
+        tempPositionsList.add(data['position_name']);
+      }
+
+      setState(() {
+        _positionsList = tempPositionsList;
+        // Set the selected position if not already set
+      });
+    } catch (e) {
+      print('Error fetching positions: $e');
     }
   }
 
@@ -173,7 +197,6 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
   // Compare values to determine if data has changed
   bool _hasChanged() {
     return _nameController.text != originalEmployeeData!['name'] ||
-        _positionController.text != originalEmployeeData!['position'] ||
         _addressController.text != originalEmployeeData!['address'] ||
         _birthDateController.text != originalEmployeeData!['birth_date'] ||
         _contactController.text != originalEmployeeData!['contact_number'] ||
@@ -201,7 +224,7 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
           .doc(employeeId)
           .update({
         'name': _nameController.text,
-        'position': _positionController.text,
+        'position': _selectedPosition,
         'address': _addressController.text,
         'birth_date': _birthDateController.text,
         'contact_number': _contactController.text,
@@ -216,7 +239,7 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
         _isEditing = false;
         originalEmployeeData = {
           'name': _nameController.text,
-          'position': _positionController.text,
+          'position': _selectedPosition,
           'address': _addressController.text,
           'birth_date': _birthDateController.text,
           'contact_number': _contactController.text,
@@ -259,143 +282,212 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        iconTheme: IconThemeData(color: Colors.white),
-        title: Text(
-          'Employee Profile',
-          style: GoogleFonts.poppins(textStyle: TextStyle(color: Colors.white)),
-        ),
-        backgroundColor: Colors.green,
-        actions: [
-          if (employee != null)
-            Row(
-              children: [
-                IconButton(
-                  icon: Icon(
-                    Icons.delete,
-                    color: Colors.red,
+        appBar: AppBar(
+          iconTheme: IconThemeData(color: Colors.white),
+          title: Text(
+            'Employee Profile',
+            style:
+                GoogleFonts.poppins(textStyle: TextStyle(color: Colors.white)),
+          ),
+          backgroundColor: Colors.green,
+          actions: [
+            if (employee != null)
+              Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.delete,
+                      color: Colors.red,
+                    ),
+                    onPressed: () async {
+                      bool? confirm = await showDialog(
+                        context: context,
+                        builder: (BuildContext context) {
+                          return AlertDialog(
+                            title: Text('Confirmation'),
+                            content: Text(
+                                'Are you sure you want to set this employee to inactive?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.of(context).pop(false);
+                                },
+                                child: Text('No'),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.of(context).pop(true);
+                                },
+                                child: Text('Yes'),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+
+                      if (confirm == true) {
+                        await FirebaseFirestore.instance
+                            .collection('employees')
+                            .doc(employee!['id'])
+                            .update({'status': 'inactive'});
+
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text('Employee status updated to inactive'),
+                        ));
+                      }
+                    },
                   ),
-                  onPressed: () async {
-                    bool? confirm = await showDialog(
-                      context: context,
-                      builder: (BuildContext context) {
-                        return AlertDialog(
-                          title: Text('Confirmation'),
-                          content: Text(
-                              'Are you sure you want to set this employee to inactive?'),
-                          actions: [
-                            TextButton(
-                              onPressed: () {
-                                Navigator.of(context).pop(false);
-                              },
-                              child: Text('No'),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.of(context).pop(true);
-                              },
-                              child: Text('Yes'),
-                            ),
-                          ],
-                        );
-                      },
-                    );
+                  IconButton(
+                    icon: Icon(_isEditing ? Icons.save : Icons.edit),
+                    onPressed: () {
+                      if (_isEditing && employee != null) {
+                        _saveChanges(employee!['id']);
+                      } else {
+                        _toggleEdit();
+                      }
+                    },
+                  ),
+                ],
+              ),
+          ],
+        ),
+        body: _isLoading
+            ? Center(child: CircularProgressIndicator())
+            : Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: SingleChildScrollView(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (employee != null)
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Display Employee Image
+                              if (employee != null &&
+                                  employee!['imageUrl'] != null &&
+                                  employee!['imageUrl'].isNotEmpty)
+                                ClipOval(
+                                  child: Image.network(
+                                    employee!['imageUrl'],
+                                    width: 150,
+                                    height: 150,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return const Icon(
+                                          Icons.image_not_supported,
+                                          size: 150);
+                                    },
+                                  ),
+                                )
+                              else
+                                const Center(
+                                  child: Icon(Icons.person, size: 150),
+                                ),
+                              SizedBox(height: 16),
 
-                    if (confirm == true) {
-                      await FirebaseFirestore.instance
-                          .collection('employees')
-                          .doc(employee!['id'])
-                          .update({'status': 'inactive'});
+                              _buildProfileField('Employee ID', employee!['id'],
+                                  isEditable: false),
+                              SizedBox(height: 16),
+                              _buildProfileField('Name', _nameController.text,
+                                  controller: _nameController),
+                              SizedBox(height: 16),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    flex: 1,
+                                    child: Text(
+                                      'Position:',
+                                      style: GoogleFonts.poppins(
+                                        textStyle: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 2,
+                                    child: _isEditing
+                                        ? DropdownButtonFormField<String>(
+                                            value: _selectedPosition,
+                                            items:
+                                                _positionsList.map((position) {
+                                              return DropdownMenuItem<String>(
+                                                value: position,
+                                                child: Text(position),
+                                              );
+                                            }).toList(),
+                                            onChanged: (value) {
+                                              setState(() {
+                                                _selectedPosition = value!;
+                                              });
+                                            },
+                                            decoration: const InputDecoration(
+                                              border: OutlineInputBorder(),
+                                            ),
+                                          )
+                                        : Text(
+                                            _selectedPosition ?? '',
+                                            style: GoogleFonts.poppins(
+                                              textStyle:
+                                                  const TextStyle(fontSize: 16),
+                                            ),
+                                          ),
+                                  ),
+                                ],
+                              ),
 
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text('Employee status updated to inactive'),
-                      ));
-                    }
-                  },
-                ),
-                IconButton(
-                  icon: Icon(_isEditing ? Icons.save : Icons.edit),
-                  onPressed: () {
-                    if (_isEditing && employee != null) {
-                      _saveChanges(employee!['id']);
-                    } else {
-                      _toggleEdit();
-                    }
-                  },
-                ),
-              ],
-            ),
-        ],
-      ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (employee != null)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildProfileField('Employee ID', employee!['id'],
-                              isEditable: false),
-                          SizedBox(height: 16),
-                          _buildProfileField('Name', _nameController.text,
-                              controller: _nameController),
-                          SizedBox(height: 16),
-                          _buildProfileField(
-                              'Position', _positionController.text,
-                              controller: _positionController),
-                          SizedBox(height: 16),
-                          _buildProfileField('Address', _addressController.text,
-                              controller: _addressController),
-                          SizedBox(height: 16),
-                          _buildProfileField(
-                              'Birth Date', _birthDateController.text,
-                              controller: _birthDateController),
-                          SizedBox(height: 16),
-                          _buildProfileField(
-                              'Contact Number', _contactController.text,
-                              controller: _contactController),
-                          SizedBox(height: 16),
-                          _buildProfileField(
-                              'Email Address', _emailController.text,
-                              controller: _emailController),
-                          SizedBox(height: 16),
-                          _buildProfileField(
-                              'Salary Per Hour', _salaryController.text,
-                              controller: _salaryController),
-                          SizedBox(height: 16),
-                          _buildProfileField(
-                              'Expected Time In', _expTimeInController.text,
-                              controller: _expTimeInController),
-                          SizedBox(height: 16),
-                          _buildProfileField(
-                              'Expected Time Out', _expTimeOutController.text,
-                              controller: _expTimeOutController),
-                        ],
-                      ),
-                    SizedBox(height: 16),
-
-                    // Display Daily Time Records for all employees
-                    Container(
-                      height: MediaQuery.of(context).size.height * .3,
-                      decoration: BoxDecoration(border: Border.all()),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Daily Time Records',
-                            style: GoogleFonts.poppins(
-                                textStyle: TextStyle(
-                                    fontSize: 18, fontWeight: FontWeight.bold)),
+                              SizedBox(height: 16),
+                              _buildProfileField(
+                                  'Address', _addressController.text,
+                                  controller: _addressController),
+                              SizedBox(height: 16),
+                              _buildProfileField(
+                                  'Birth Date', _birthDateController.text,
+                                  controller: _birthDateController),
+                              SizedBox(height: 16),
+                              _buildProfileField(
+                                  'Contact Number', _contactController.text,
+                                  controller: _contactController),
+                              SizedBox(height: 16),
+                              _buildProfileField(
+                                  'Email Address', _emailController.text,
+                                  controller: _emailController),
+                              SizedBox(height: 16),
+                              _buildProfileField(
+                                  'Salary Per Hour', _salaryController.text,
+                                  controller: _salaryController),
+                              SizedBox(height: 16),
+                              _buildProfileField(
+                                  'Expected Time In', _expTimeInController.text,
+                                  controller: _expTimeInController),
+                              SizedBox(height: 16),
+                              _buildProfileField('Expected Time Out',
+                                  _expTimeOutController.text,
+                                  controller: _expTimeOutController),
+                            ],
                           ),
-                          Expanded(
-                            // Wrap with Expanded to make the ListView scrollable
-                            child: _dailyTimeRecords.isNotEmpty
-                                ? ListView.builder(
+                        SizedBox(height: 16),
+
+                        // Display Daily Time Records for all employees
+                        if (_dailyTimeRecords.isNotEmpty)
+                          Container(
+                            height: MediaQuery.of(context).size.height * .3,
+                            decoration: BoxDecoration(border: Border.all()),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Daily Time Records',
+                                  style: GoogleFonts.poppins(
+                                      textStyle: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold)),
+                                ),
+                                Expanded(
+                                  child: ListView.builder(
                                     itemCount: _dailyTimeRecords.length,
                                     itemBuilder: (context, index) {
                                       final record = _dailyTimeRecords[index];
@@ -419,116 +511,114 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
                                         ),
                                       );
                                     },
-                                  )
-                                : Text('No time records available'),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ],
-                      ),
-                    ),
+                        SizedBox(
+                          height: 20,
+                        ),
+                        if (_bookings.isNotEmpty &&
+                            (employee!['position'].toLowerCase() == 'driver' ||
+                                employee!['position'].toLowerCase() ==
+                                    'contractual driver'))
+                          SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.3,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey)),
+                              padding: const EdgeInsets.all(8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Assigned Bookings',
+                                    style: GoogleFonts.poppins(
+                                        textStyle: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold)),
+                                  ),
+                                  Expanded(
+                                    child: ListView.builder(
+                                      itemCount: _bookings.length,
+                                      itemBuilder: (context, index) {
+                                        final booking = _bookings[index];
+                                        Map<String, dynamic> bookingData = {
+                                          'booking_id': booking['booking_id'] ??
+                                              'No Booking ID',
+                                          'vehicle': booking['vehicle'] ??
+                                              'No Vehicle',
+                                          'overall_price':
+                                              booking['overall_price'] ?? 0.0,
+                                          'overall_weight':
+                                              booking['overall_weight'] ?? 0.0,
+                                          'date': booking['date'] ??
+                                              Timestamp.now(),
+                                          'status':
+                                              booking['status'] ?? 'No Status',
+                                        };
 
-// Only display bookings if the employee is a driver
-                    if (employee!['position'] == 'Driver')
-                      SizedBox(
-                        height: 20,
-                      ),
-                    Container(
-                      height: MediaQuery.of(context).size.height * .3,
-                      decoration:
-                          BoxDecoration(border: Border.all(color: Colors.grey)),
-                      padding: EdgeInsets.all(8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Assigned Bookings',
-                            style: GoogleFonts.poppins(
-                                textStyle: TextStyle(
-                                    fontSize: 18, fontWeight: FontWeight.bold)),
-                          ),
-                          Expanded(
-                            // Wrap with Expanded to make the ListView scrollable
-                            child: _bookings.isNotEmpty
-                                ? ListView.builder(
-                                    itemCount: _bookings.length,
-                                    itemBuilder: (context, index) {
-                                      final booking = _bookings[index];
-                                      Map<String, dynamic> bookingData = {
-                                        'booking_id': booking['booking_id'] ??
-                                            'No Booking ID',
-                                        'vehicle':
-                                            booking['vehicle'] ?? 'No Vehicle',
-                                        'overall_price':
-                                            booking['overall_price'] ?? 0.0,
-                                        'overall_weight':
-                                            booking['overall_weight'] ?? 0.0,
-                                        'date':
-                                            booking['date'] ?? Timestamp.now(),
-                                        'status':
-                                            booking['status'] ?? 'No Status',
-                                      };
+                                        String bookingId =
+                                            booking['booking_id'] ??
+                                                'No Booking ID';
+                                        String vehicle =
+                                            booking['vehicle'] ?? 'No Vehicle';
+                                        double overallPrice =
+                                            booking['overall_price'] ?? 0.0;
+                                        double overallWeight =
+                                            booking['overall_weight'] ?? 0.0;
+                                        Timestamp dateTimestamp =
+                                            booking['date'] ?? Timestamp.now();
+                                        String status =
+                                            booking['status'] ?? 'No Status';
 
-                                      String bookingId =
-                                          booking['booking_id'] ??
-                                              'No Booking ID';
-                                      String vehicle =
-                                          booking['vehicle'] ?? 'No Vehicle';
-                                      double overallPrice =
-                                          booking['overall_price'] ?? 0.0;
-                                      double overallWeight =
-                                          booking['overall_weight'] ?? 0.0;
-                                      Timestamp dateTimestamp =
-                                          booking['date'] ?? Timestamp.now();
-                                      String status =
-                                          booking['status'] ?? 'No Status';
-
-                                      return ListTile(
-                                        title: Text(
-                                          "Booking ID: $bookingId",
-                                          style: TextStyle(
-                                              fontWeight: FontWeight.bold),
-                                        ),
-                                        subtitle: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                                "Date: ${formatDate(dateTimestamp)} (${formatDayOfWeek(dateTimestamp)})"),
-                                            Text("Vehicle: $vehicle"),
-                                            Text(
-                                                "Overall Price: ₱${overallPrice.toStringAsFixed(2)}"),
-                                            Text(
-                                                "Overall Weight: ${overallWeight.toStringAsFixed(2)} kg"),
-                                            Text("Status: $status"),
-                                          ],
-                                        ),
-                                        trailing: IconButton(
-                                          icon: Icon(Icons.info_outline),
-                                          onPressed: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) =>
-                                                    BookingDetails(
-                                                  bookingId: bookingId,
-                                                  bookingData: bookingData,
+                                        return ListTile(
+                                          title: Text(
+                                            "Booking ID: $bookingId",
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.bold),
+                                          ),
+                                          subtitle: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                  "Date: ${formatDate(dateTimestamp)} (${formatDayOfWeek(dateTimestamp)})"),
+                                              Text("Vehicle: $vehicle"),
+                                              Text(
+                                                  "Overall Price: ₱${overallPrice.toStringAsFixed(2)}"),
+                                              Text(
+                                                  "Overall Weight: ${overallWeight.toStringAsFixed(2)} kg"),
+                                              Text("Status: $status"),
+                                            ],
+                                          ),
+                                          trailing: IconButton(
+                                            icon:
+                                                const Icon(Icons.info_outline),
+                                            onPressed: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (context) =>
+                                                      BookingDetails(
+                                                    bookingId: bookingId,
+                                                    bookingData: bookingData,
+                                                  ),
                                                 ),
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      );
-                                    },
-                                  )
-                                : Text('No bookings available'),
+                                              );
+                                            },
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-    );
+                      ]),
+                )));
   }
 
   // Helper widget to build each profile field with optional editing

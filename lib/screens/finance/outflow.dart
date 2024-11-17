@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:trashure_thesis/screens/finance/outflow_details.dart';
 import 'package:trashure_thesis/sidebar.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -80,8 +81,7 @@ class _OutflowState extends State<Outflow> {
                     child: TextField(
                       controller: _searchController,
                       decoration: const InputDecoration(
-                        hintText:
-                            'Search by category, name, vehicle, or status',
+                        hintText: "Search by category, name, or vehicle",
                         border: InputBorder.none,
                         prefixIcon: Icon(Icons.search),
                       ),
@@ -142,9 +142,7 @@ class _OutflowState extends State<Outflow> {
                       title('Category', 2),
                       title('Date', 2),
                       title('Price', 2),
-                      title('Weight', 2),
                       title('Employee', 2),
-                      title('Status', 2),
                       title('Vehicle', 2),
                     ],
                   ),
@@ -202,8 +200,10 @@ class _OutflowState extends State<Outflow> {
                                 itemBuilder: (context, index) {
                                   final outflowData = outflowList[index].data()
                                       as Map<String, dynamic>;
-                                  String category =
-                                      outflowData['category'] ?? '';
+                                  String category = outflowData['category']
+                                          .toString()
+                                          .toLowerCase() ??
+                                      '';
                                   Timestamp? timestamp = outflowData['date'];
                                   String formattedDate = timestamp != null
                                       ? DateFormat('MM/dd/yyyy, hh:mm a')
@@ -230,12 +230,27 @@ class _OutflowState extends State<Outflow> {
                                         _buildText(formattedDate, 2),
                                         _buildText(
                                             '₱${price.toStringAsFixed(2)}', 2),
-                                        _buildText(
-                                            '${weight.toStringAsFixed(2)} kg',
-                                            2),
                                         _buildText(employee, 2),
-                                        _buildText(status, 2),
                                         _buildText(vehicle, 2),
+                                        IconButton(
+                                          icon: const Icon(Icons.info_outline,
+                                              color: Colors.blue),
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    OutflowDetails(
+                                                  outflowData: {
+                                                    ...outflowData,
+                                                    'id': outflowList[index]
+                                                        .id, // Include the document ID
+                                                  },
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
                                       ],
                                     ),
                                   );
@@ -326,8 +341,13 @@ class _OutflowState extends State<Outflow> {
     final TextEditingController _detailsController = TextEditingController();
     String? selectedCategory;
     String? selectedVehicle;
-    Timestamp? selectedDate;
-    final List<String> categories = ['Fuel', 'Vehicle Maintenance', 'Etc.'];
+    String? selectedDriver;
+    final List<String> categories = [
+      'Fuel',
+      'Vehicle Maintenance',
+      'Delivery Fee',
+      'Etc.',
+    ];
 
     showDialog(
       context: context,
@@ -340,6 +360,7 @@ class _OutflowState extends State<Outflow> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Category Dropdown
                     DropdownButtonFormField<String>(
                       decoration: const InputDecoration(
                         labelText: 'Category',
@@ -359,33 +380,8 @@ class _OutflowState extends State<Outflow> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
-                      decoration: const InputDecoration(
-                        labelText: 'Select Date',
-                        border: OutlineInputBorder(),
-                      ),
-                      readOnly: true,
-                      onTap: () async {
-                        DateTime? pickedDate = await showDatePicker(
-                          context: context,
-                          initialDate: DateTime.now(),
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2030),
-                        );
-                        if (pickedDate != null) {
-                          setState(() {
-                            selectedDate = Timestamp.fromDate(pickedDate);
-                          });
-                        }
-                      },
-                      controller: TextEditingController(
-                        text: selectedDate != null
-                            ? DateFormat('MM/dd/yyyy')
-                                .format(selectedDate!.toDate())
-                            : '',
-                      ),
-                    ),
-                    const SizedBox(height: 16),
+
+                    // Price Input
                     TextFormField(
                       controller: _priceController,
                       decoration: const InputDecoration(
@@ -395,8 +391,11 @@ class _OutflowState extends State<Outflow> {
                       keyboardType: TextInputType.number,
                     ),
                     const SizedBox(height: 16),
+
+                    // Vehicle Dropdown for Fuel, Delivery Fee, and Vehicle Maintenance
                     if (selectedCategory == 'Fuel' ||
-                        selectedCategory == 'Vehicle Maintenance')
+                        selectedCategory == 'Vehicle Maintenance' ||
+                        selectedCategory == 'Delivery Fee')
                       StreamBuilder<QuerySnapshot>(
                         stream: FirebaseFirestore.instance
                             .collection('vehicles')
@@ -429,6 +428,44 @@ class _OutflowState extends State<Outflow> {
                             },
                           );
                         },
+                      ),
+                    const SizedBox(height: 16),
+
+                    // Driver Dropdown for Fuel and Delivery Fee
+                    if (selectedCategory == 'Fuel' ||
+                        selectedCategory == 'Delivery Fee')
+                      StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('employees')
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) {
+                            return const CircularProgressIndicator();
+                          }
+                          var employees = snapshot.data?.docs ?? [];
+                          return DropdownButtonFormField<String>(
+                            decoration: const InputDecoration(
+                              labelText: 'Select Driver',
+                              border: OutlineInputBorder(),
+                            ),
+                            value: selectedDriver,
+                            items: employees.map((doc) {
+                              var employeeData =
+                                  doc.data() as Map<String, dynamic>;
+                              String employeeName =
+                                  employeeData['name'] ?? 'Unnamed';
+                              return DropdownMenuItem<String>(
+                                value: doc.id,
+                                child: Text(employeeName),
+                              );
+                            }).toList(),
+                            onChanged: (newValue) {
+                              setState(() {
+                                selectedDriver = newValue;
+                              });
+                            },
+                          );
+                        },
                       )
                     else if (selectedCategory == 'Etc.')
                       TextFormField(
@@ -439,6 +476,8 @@ class _OutflowState extends State<Outflow> {
                         ),
                       ),
                     const SizedBox(height: 16),
+
+                    // Employee Name (Read-only)
                     TextFormField(
                       readOnly: true,
                       decoration: const InputDecoration(
@@ -461,9 +500,13 @@ class _OutflowState extends State<Outflow> {
                   onPressed: () async {
                     double price =
                         double.tryParse(_priceController.text) ?? 0.0;
-                    if (selectedDate == null ||
-                        selectedCategory == null ||
-                        price <= 0) {
+
+                    if (selectedCategory == null ||
+                        price <= 0 ||
+                        ((selectedCategory == 'Fuel' ||
+                                selectedCategory == 'Delivery Fee') &&
+                            (selectedVehicle == null ||
+                                selectedDriver == null))) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                             content:
@@ -471,25 +514,38 @@ class _OutflowState extends State<Outflow> {
                       );
                       return;
                     }
+
+                    // Prepare the outflow data
                     Map<String, dynamic> outflowData = {
                       'category': selectedCategory,
-                      'date': selectedDate,
+                      'date': FieldValue
+                          .serverTimestamp(), // Use current date and time
                       'price': price,
                       'employee': userName ?? 'Admin',
                       'status': 'Pending',
                     };
-                    if ((selectedCategory == 'Fuel' ||
-                            selectedCategory == 'Vehicle Maintenance') &&
-                        selectedVehicle != null) {
+
+                    // Add vehicle and driver fields if applicable
+                    if (selectedCategory == 'Fuel' ||
+                        selectedCategory == 'Delivery Fee') {
+                      outflowData['vehicle'] = selectedVehicle;
+                      outflowData['driver'] = selectedDriver;
+                    } else if (selectedCategory == 'Vehicle Maintenance') {
                       outflowData['vehicle'] = selectedVehicle;
                     } else if (selectedCategory == 'Etc.') {
                       outflowData['details'] = _detailsController.text;
                     }
-                    await _firestore.collection('outflow').add(outflowData);
+
+                    // Save to Firestore
+                    await FirebaseFirestore.instance
+                        .collection('outflow')
+                        .add(outflowData);
+
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                           content: Text('Outflow added successfully!')),
                     );
+
                     Navigator.of(context).pop();
                   },
                   child: const Text('Add'),
@@ -584,11 +640,7 @@ class _OutflowState extends State<Outflow> {
               style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
           pw.Text('Date', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
           pw.Text('Price', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Text('Weight',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
           pw.Text('Employee',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Text('Status',
               style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
           pw.Text('Vehicle',
               style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
@@ -607,10 +659,7 @@ class _OutflowState extends State<Outflow> {
             pw.Text(DateFormat('MM/dd/yyyy, hh:mm a').format(date)),
             pw.Text(
                 'PHP ${outflowData['price']?.toStringAsFixed(2) ?? '0.00'}'),
-            pw.Text(
-                '${outflowData['weight']?.toStringAsFixed(2) ?? '0.00'} kg'),
             pw.Text(outflowData['employee'] ?? 'N/A'),
-            pw.Text(outflowData['status'] ?? 'N/A'),
             pw.Text(outflowData['vehicle'] ?? 'N/A'),
           ],
         ),
@@ -668,13 +717,11 @@ class _OutflowState extends State<Outflow> {
 
       final date = (data['date'] as Timestamp?)?.toDate();
       final category = data['category']?.toString().toLowerCase() ?? '';
-      final status = data['status']?.toString().toLowerCase() ?? '';
       final employee = data['employee']?.toString().toLowerCase() ?? '';
       final vehicle = data['vehicle']?.toString().toLowerCase() ?? '';
 
       // Apply search filter
       final matchesSearch = category.contains(searchText) ||
-          status.contains(searchText) ||
           employee.contains(searchText) ||
           vehicle.contains(searchText);
 

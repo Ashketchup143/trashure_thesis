@@ -49,6 +49,23 @@ class BookingDetails extends StatelessWidget {
             Text("Driver: ${bookingData['driver'] ?? 'No Driver Assigned'}"),
             Text("Vehicle: ${bookingData['vehicle'] ?? 'No Vehicle Assigned'}"),
             Text("Status: ${bookingData['status'] ?? 'No Status'}"),
+            // Display Starting and Ending Mileage if the status is 'collected' or 'completed'
+            if (bookingData['status'] == 'collected' ||
+                bookingData['status'] == 'completed') ...[
+              Text(
+                "Driver Share: ${bookingData['driver_share'] ?? 'N/A'}",
+                style: const TextStyle(),
+              ),
+              Text(
+                "Starting Mileage: ${bookingData['starting_mileage']?.toStringAsFixed(2) ?? 'N/A'} km",
+                style: const TextStyle(),
+              ),
+              Text(
+                "Ending Mileage: ${bookingData['ending_mileage']?.toStringAsFixed(2) ?? 'N/A'} km",
+                style: const TextStyle(),
+              ),
+            ],
+
             const SizedBox(height: 20),
             Expanded(
               child: Container(
@@ -134,6 +151,39 @@ class BookingDetails extends StatelessWidget {
           return sum + itemPrice;
         });
 
+        double calculatedTotalPrice = bookingData['status'] == 'collected' ||
+                bookingData['status'] == 'completed'
+            ? userData['final_calculated_total_price'] ?? 0.0
+            : userData['calculated_total_price'] ?? 0.0;
+
+// Determine the share percentage based on the driver's position
+        double sharePercentage = 0.30; // Default to 30%
+        if (bookingData['position']?.toString().toLowerCase() ==
+            'contractual driver') {
+          sharePercentage = 0.35; // Set to 35% if the driver is contractual
+        }
+
+// Determine the effective total price based on the user's mode
+        double effectiveTotalPrice;
+        if (userData['mode']?.toString().toLowerCase() == 'donate') {
+          // If mode is 'donate', use the user's total price
+          effectiveTotalPrice = userData['total_price'] ?? 0.0;
+        } else {
+          // Otherwise, use the calculated total price or final total price based on the status
+          effectiveTotalPrice = bookingData['status'] == 'collected' ||
+                  bookingData['status'] == 'completed'
+              ? userData['final_total_price'] ?? 0.0
+              : userData['total_price'] ?? 0.0;
+        }
+
+// Calculate the driver share using the effective total price
+        double driverShare =
+            ((((effectiveTotalPrice / (1 - 0.30)) + 40) - effectiveTotalPrice) *
+                sharePercentage);
+
+// Round the driver share to two decimal places
+        driverShare = double.parse(driverShare.toStringAsFixed(2));
+
         return ExpansionTile(
           title: Row(
             children: [
@@ -153,6 +203,12 @@ class BookingDetails extends StatelessWidget {
               Expanded(
                 flex: 2,
                 child: Center(
+                  child: Text(userData['status'] ?? 'No Status'),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Center(
                   child: Text("${userTotalWeight.toStringAsFixed(2)} kg"),
                 ),
               ),
@@ -160,6 +216,18 @@ class BookingDetails extends StatelessWidget {
                 flex: 2,
                 child: Center(
                   child: Text("₱${userTotalPrice.toStringAsFixed(2)}"),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Center(
+                  child: Text("₱${calculatedTotalPrice.toStringAsFixed(2)}"),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Center(
+                  child: Text("₱${driverShare.toStringAsFixed(2)}"),
                 ),
               ),
             ],
@@ -213,26 +281,80 @@ class BookingDetails extends StatelessWidget {
             ? bookingData['final_overall_weight'] ?? 0.0
             : bookingData['overall_weight'] ?? 0.0;
 
-        return Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Column(
-            children: [
-              Text(
-                "Overall Weight for Booking: ${overallWeight.toStringAsFixed(2)} kg",
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+        // Initialize total calculated price, total user weight, and total user price
+        double totalCalculatedPrice = 0.0;
+        double totalUserWeight = 0.0;
+        double totalUserPrice = 0.0;
+
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('bookings')
+              .doc(bookingId)
+              .collection('users')
+              .snapshots(),
+          builder: (context, userSnapshot) {
+            if (!userSnapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            var users = userSnapshot.data?.docs ?? [];
+            for (var userDoc in users) {
+              var userData = userDoc.data() as Map<String, dynamic>;
+
+              // Get calculated_total_price or final_calculated_total_price based on status
+              double calculatedTotalPrice =
+                  bookingData['status'] == 'collected' ||
+                          bookingData['status'] == 'completed'
+                      ? userData['final_calculated_total_price'] ?? 0.0
+                      : userData['calculated_total_price'] ?? 0.0;
+
+              // Sum up the total calculated price
+              totalCalculatedPrice += calculatedTotalPrice;
+
+              // Sum up the user's total weight and total price
+              double userWeight = bookingData['status'] == 'collected' ||
+                      bookingData['status'] == 'completed'
+                  ? userData['final_total_weight'] ?? 0.0
+                  : userData['total_weight'] ?? 0.0;
+              double userPrice = bookingData['status'] == 'collected' ||
+                      bookingData['status'] == 'completed'
+                  ? userData['final_total_price'] ?? 0.0
+                  : userData['total_price'] ?? 0.0;
+
+              totalUserWeight += userWeight;
+              totalUserPrice += userPrice;
+            }
+
+            return Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                children: [
+                  Text(
+                    "Overall Weight for Booking: ${totalUserWeight.toStringAsFixed(2)} kg",
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    "Overall Total Price for Booking: ₱${totalUserPrice.toStringAsFixed(2)}",
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    "Total Calculated Price for Booking: ₱${totalCalculatedPrice.toStringAsFixed(2)}",
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
               ),
-              Text(
-                "Overall Total Price for Booking: ₱${overallPrice.toStringAsFixed(2)}",
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -244,8 +366,11 @@ class BookingDetails extends StatelessWidget {
         title('Name', 3),
         title('Email', 3),
         title('Address', 3),
+        title('Status', 2),
         title('Weight (kg)', 2),
         title('Total (₱)', 2),
+        title('Calculated Price (₱)', 2), // New column for Calculated Price
+        title('Driver Share (₱)', 2), // New column for Driver Share
       ],
     );
   }

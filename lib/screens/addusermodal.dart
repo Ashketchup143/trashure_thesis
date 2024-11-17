@@ -206,6 +206,7 @@ class _AddUserModalState extends State<AddUserModal> {
             SizedBox(height: 20),
 
             // Display Total Weight and Total Price below "Add Another Product" button
+            // Display Total Weight, Total Price, and Calculated Total Price
             Divider(),
             Text(
               'Total Weight: ${totalWeight.toStringAsFixed(2)} kg',
@@ -215,7 +216,17 @@ class _AddUserModalState extends State<AddUserModal> {
               'Total Price: ₱${totalPrice.toStringAsFixed(2)}',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
+            Text(
+              'Calculated Total (Total - 40): ₱${(totalPrice - 40).toStringAsFixed(2)}',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: Colors.green, // Highlight the calculated total in green
+              ),
+            ),
             Divider(),
+            SizedBox(height: 20),
+
             SizedBox(height: 20),
 
             ElevatedButton(

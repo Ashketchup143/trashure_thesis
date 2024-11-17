@@ -25,12 +25,16 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
     String status = args?['status'] ?? 'Unknown';
     String vehicle = args?['vehicle'] ?? 'Unknown';
     String vehicleId = args?['vehicleId'] ?? 'Unknown';
-    double overallPrice = args?['overall_price']?.toDouble() ?? 0.0;
-    double overallWeight = args?['overall_weight']?.toDouble() ?? 0.0;
-    double finalOverallPrice = args?['final_overall_price']?.toDouble() ?? 0.0;
+    double overallPrice =
+        double.tryParse(args?['overall_price']?.toString() ?? '') ?? 0.0;
+    double overallWeight =
+        double.tryParse(args?['overall_weight']?.toString() ?? '') ?? 0.0;
+    double finalOverallPrice =
+        double.tryParse(args?['final_overall_price']?.toString() ?? '') ?? 0.0;
     double finalOverallWeight =
-        args?['final_overall_weight']?.toDouble() ?? 0.0;
-    double driverShare = args?['driver_share']?.toDouble() ?? 0.0;
+        double.tryParse(args?['final_overall_weight']?.toString() ?? '') ?? 0.0;
+    double driverShare =
+        double.tryParse(args?['driver_share']?.toString() ?? '') ?? 0.0;
 
     Timestamp? timestamp = args?['date'];
     DateTime? date = timestamp?.toDate();

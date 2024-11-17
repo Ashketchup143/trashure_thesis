@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:trashure_thesis/screens/booking/bookingdetails.dart';
+import 'package:trashure_thesis/screens/map.dart';
 import 'package:trashure_thesis/sidebar.dart';
 
 class Receiving extends StatefulWidget {
@@ -75,73 +77,76 @@ class _ReceivingState extends State<Receiving> {
                     ),
                   ],
                 ),
-                SizedBox(height: 20),
-                // Titles Row
 
-                SizedBox(height: 10),
+                SizedBox(height: 25),
                 // List of bookings with StreamBuilder inside Container
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
                       border: Border.all(),
                     ),
-                    child: Column(
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            border:
-                                Border(bottom: BorderSide(color: Colors.black)),
-                          ),
-                          child: Row(
-                            children: [
-                              title('Booking ID', 3),
-                              title('Date', 2),
-                              title('Driver', 2),
-                              title('Vehicle', 2),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          child: StreamBuilder<QuerySnapshot>(
-                            stream: FirebaseFirestore.instance
-                                .collection('bookings')
-                                .orderBy('date',
-                                    descending: false) // Order by date
-                                .snapshots(),
-                            builder: (context, snapshot) {
-                              if (!snapshot.hasData) {
-                                return Center(
-                                    child: CircularProgressIndicator());
-                              }
-                              var bookings = snapshot.data?.docs ?? [];
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('bookings')
+                          .orderBy('date', descending: false)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) {
+                          return const Center(
+                              child: CircularProgressIndicator());
+                        }
 
-                              // Filter bookings to include only 'collected' status
-                              var collectedBookings = bookings.where((doc) {
-                                var data = doc.data() as Map<String, dynamic>?;
-                                return data?['status'] == 'collected' &&
-                                    _matchesSearchQuery(data);
-                              }).toList();
+                        var bookings = snapshot.data?.docs ?? [];
 
-                              if (collectedBookings.isEmpty) {
-                                return Center(
-                                    child: Text('No collected bookings found'));
-                              }
+                        // Filter bookings to include only 'collected' status
+                        var collectedBookings = bookings.where((doc) {
+                          var data = doc.data() as Map<String, dynamic>?;
+                          return data?['status'] == 'collected' &&
+                              _matchesSearchQuery(data);
+                        }).toList();
 
-                              return ListView(
-                                shrinkWrap:
-                                    true, // Ensure ListView doesn't overflow
-                                children: collectedBookings.map((doc) {
+                        if (collectedBookings.isEmpty) {
+                          return const Center(
+                              child: Text('No collected bookings found'));
+                        }
+
+                        return Column(
+                          children: [
+                            Container(
+                              decoration: const BoxDecoration(
+                                border: Border(
+                                    bottom: BorderSide(color: Colors.black)),
+                              ),
+                              child: Row(
+                                children: [
+                                  title('Booking ID', 2),
+                                  title('Date', 3),
+                                  title('Location', 2),
+                                  title('Driver', 2),
+                                  title('Vehicle', 2),
+                                  title('OA. Price', 1),
+                                  title('OA. Weight', 1),
+                                  title('Details', 1),
+                                ],
+                              ),
+                            ),
+                            Expanded(
+                              child: ListView.builder(
+                                itemCount: collectedBookings.length,
+                                physics: const BouncingScrollPhysics(),
+                                itemBuilder: (context, index) {
+                                  var doc = collectedBookings[index];
                                   var bookingData =
                                       doc.data() as Map<String, dynamic>;
                                   var bookingId = doc.id;
                                   return _buildExpansionTile(
                                       bookingId, bookingData);
-                                }).toList(),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
+                                },
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -157,32 +162,98 @@ class _ReceivingState extends State<Receiving> {
   Widget _buildExpansionTile(
       String bookingId, Map<String, dynamic> bookingData) {
     Map<String, TextEditingController> inputControllers = {};
-    Map<String, double> totalWeights = {}; // To accumulate total weights
-    Map<String, double> differences = {}; // Store the difference values
+    Map<String, double> totalWeights = {};
+    Map<String, double> differences = {};
 
     return ExpansionTile(
       title: Row(
         children: [
-          Expanded(flex: 3, child: Text('Booking ID: $bookingId')),
+          Expanded(flex: 2, child: Text('Booking ID: $bookingId')),
           Expanded(
-            flex: 2,
+            flex: 3,
             child: Text(
               bookingData['date'] != null
-                  ? DateFormat('MMMM d, yyyy')
-                      .format(bookingData['date'].toDate())
+                  ? "${DateFormat('MMMM d, yyyy').format(bookingData['date'].toDate())}, "
+                      "${bookingData['start_time'] ?? 'N/A'} - ${bookingData['end_time'] ?? 'N/A'}"
                   : 'No Date',
             ),
           ),
-          Expanded(flex: 2, child: Text(bookingData['driver'] ?? 'No Driver')),
           Expanded(
             flex: 2,
-            child: Text(bookingData['vehicle'] ?? 'No Vehicle'),
+            child:
+                Center(child: Text(bookingData['location'] ?? 'No Location')),
+          ),
+          Expanded(
+              flex: 2,
+              child: Center(child: Text(bookingData['driver'] ?? 'No Driver'))),
+          Expanded(
+            flex: 2,
+            child: Center(child: Text(bookingData['vehicle'] ?? 'No Vehicle')),
+          ),
+          Expanded(
+            flex: 1,
+            child: Center(
+              child: Text(
+                bookingData['overall_price'] != null
+                    ? '₱${bookingData['overall_price'].toStringAsFixed(2)}'
+                    : '₱0',
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 1,
+            child: Center(
+              child: Text(
+                bookingData['overall_weight'] != null
+                    ? '${bookingData['overall_weight'].toStringAsFixed(2)} kg'
+                    : 'N/A',
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 1,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: BoxConstraints(),
+                  icon: const Icon(Icons.map, size: 18),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => Maps(bookingId: bookingId)),
+                    );
+                  },
+                ),
+                SizedBox(
+                  width: 10,
+                ),
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: BoxConstraints(),
+                  icon: const Icon(Icons.info_outline, size: 18),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => BookingDetails(
+                          bookingId: bookingId,
+                          bookingData: bookingData,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ],
       ),
       children: [
         SizedBox(
-          height: 350, // Set a fixed height for scrollable content
+          height: 350,
           child: Column(
             children: [
               Expanded(
@@ -213,9 +284,8 @@ class _ReceivingState extends State<Receiving> {
                         var recyclableData =
                             recyclableDoc.data() as Map<String, dynamic>;
 
-                        String type = (recyclableData['type'] ?? 'unknown')
-                            .toString()
-                            .toLowerCase();
+                        String type =
+                            (recyclableData['type'] ?? 'unknown').toString();
                         double weight =
                             (recyclableData['final_weight'] ?? 0).toDouble();
 
@@ -238,18 +308,16 @@ class _ReceivingState extends State<Receiving> {
 
                         return ListView(
                           shrinkWrap: true,
-                          children: [
-                            ...totalWeights.entries.map((entry) {
-                              String type = entry.key;
-                              double totalWeight = entry.value;
-                              return _buildRecyclableInputTile(
-                                type,
-                                totalWeight,
-                                inputControllers[type]!,
-                                differences,
-                              );
-                            }).toList(),
-                          ],
+                          children: totalWeights.entries.map((entry) {
+                            String type = entry.key;
+                            double totalWeight = entry.value;
+                            return _buildRecyclableInputTile(
+                              type,
+                              totalWeight,
+                              inputControllers[type]!,
+                              differences,
+                            );
+                          }).toList(),
                         );
                       },
                     );
@@ -261,14 +329,12 @@ class _ReceivingState extends State<Receiving> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF4CAF4F),
                 ),
-                onPressed: () {
+                onPressed: () async {
                   showInventoryTransferModal(context, totalWeights, () async {
                     await addWeightsToInventory(
                         totalWeights, inputControllers, bookingId);
-
                     await checkForSignificantDifferenceAndReport(
                         bookingId, totalWeights, inputControllers, bookingData);
-
                     await updateBookingStatus(bookingId);
                   });
                 },
@@ -693,7 +759,6 @@ Expanded title(String title, int flex) {
       decoration: BoxDecoration(
         border: Border(
           right: BorderSide(color: Colors.black),
-          bottom: BorderSide(color: Colors.black),
         ),
       ),
       child: Center(
