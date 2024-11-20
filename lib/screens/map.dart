@@ -91,9 +91,9 @@ class _MapsState extends State<Maps> {
     final userId = Provider.of<UserModel>(context, listen: false).userId;
 
     // Only track the driver's location if the user role is 'driver'
-    if (userRole == 'driver') {
+    if (userRole == 'driver' || userRole == 'contractual driver') {
       FirebaseFirestore.instance
-          .collection('drivers')
+          .collection('employees')
           .doc(userId)
           .snapshots()
           .listen((snapshot) {
@@ -209,7 +209,7 @@ class _MapsState extends State<Maps> {
         GeoPoint newLocation = GeoPoint(position.latitude, position.longitude);
 
         DocumentReference driverDoc =
-            FirebaseFirestore.instance.collection('drivers').doc(userId);
+            FirebaseFirestore.instance.collection('employees').doc(userId);
 
         var docSnapshot = await driverDoc.get();
         print("Driver document snapshot: ${docSnapshot.data()}");

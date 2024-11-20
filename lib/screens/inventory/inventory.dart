@@ -564,18 +564,6 @@ class _InventoryState extends State<Inventory> {
                             ),
                           ),
                         const SizedBox(height: 10),
-                        // Delivery Fee Field
-                        TextField(
-                          controller: deliveryFeeController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Delivery Fee (₱)',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        const SizedBox(height: 20),
                         Expanded(
                           child: SingleChildScrollView(
                             child: Column(

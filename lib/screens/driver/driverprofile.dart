@@ -187,63 +187,62 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               children: [
                 Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 50,
-                        backgroundColor: Colors.grey.shade300,
-                        backgroundImage:
-                            imageUrl.isNotEmpty ? NetworkImage(imageUrl) : null,
-                        child: imageUrl.isEmpty
-                            ? const Icon(Icons.person,
-                                size: 50, color: Colors.white)
-                            : null,
-                      ),
-                      const SizedBox(width: 16),
-                      Text(
-                        'Driver: $name',
-                        style: const TextStyle(
-                          color: Colors.green,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                  child: CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.grey.shade300,
+                    backgroundImage:
+                        imageUrl.isNotEmpty ? NetworkImage(imageUrl) : null,
+                    child: imageUrl.isEmpty
+                        ? const Icon(Icons.person,
+                            size: 50, color: Colors.white)
+                        : null,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Padding(
+                  padding: const EdgeInsets.only(left: 16.0),
+                  child: Text(
+                    'Driver: $name',
+                    style: const TextStyle(
+                      color: Colors.green,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 Padding(
                   padding: const EdgeInsets.only(left: 16.0),
                   child: Text(
                     'Email: $email',
-                    style: const TextStyle(fontSize: 18),
+                    style: const TextStyle(fontSize: 14),
                   ),
                 ),
                 Padding(
                   padding: const EdgeInsets.only(left: 16.0, top: 8),
                   child: Text(
                     'Phone: $phone',
-                    style: const TextStyle(fontSize: 18),
+                    style: const TextStyle(fontSize: 14),
                   ),
                 ),
                 Padding(
                   padding: const EdgeInsets.only(left: 16.0, top: 8),
                   child: Text(
                     'Address: $address',
-                    style: const TextStyle(fontSize: 18),
+                    style: const TextStyle(fontSize: 14),
                   ),
                 ),
                 Padding(
                   padding: const EdgeInsets.only(left: 16.0, top: 8),
                   child: Text(
                     'Birth Date: $birthDate',
-                    style: const TextStyle(fontSize: 18),
+                    style: const TextStyle(fontSize: 14),
                   ),
                 ),
                 Padding(
                   padding: const EdgeInsets.only(left: 16.0, top: 8),
                   child: Text(
                     'Status: $status',
-                    style: const TextStyle(fontSize: 18),
+                    style: const TextStyle(fontSize: 14),
                   ),
                 ),
                 Padding(
@@ -251,7 +250,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                   child: Text(
                     'Total Driver Share: ₱${totalDriverShare.toStringAsFixed(2)}',
                     style: const TextStyle(
-                      fontSize: 18,
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
                       color: Colors.green,
                     ),
@@ -262,7 +261,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                   padding: EdgeInsets.all(16.0),
                   child: Text(
                     'Bookings:',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
                 Expanded(

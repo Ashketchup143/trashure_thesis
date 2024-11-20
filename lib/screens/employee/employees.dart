@@ -73,12 +73,17 @@ class _EmployeesState extends State<Employees> {
       String imageFileName = employeeData['image'] ?? '';
       String? imageUrl;
 
-      // Fetch image URL from Firebase Storage if an image filename is provided
       if (imageFileName.isNotEmpty) {
         try {
-          imageUrl = await FirebaseStorage.instance
-              .ref('employee_images/$imageFileName')
-              .getDownloadURL();
+          Reference ref =
+              FirebaseStorage.instance.ref('employee_images/$imageFileName');
+          ListResult listResult = await ref.listAll();
+          if (listResult.items.isNotEmpty) {
+            imageUrl = await ref.getDownloadURL();
+          } else {
+            print('File not found in Firebase Storage: $imageFileName');
+            imageUrl = null;
+          }
         } catch (e) {
           print('Error fetching image URL: $e');
           imageUrl = null;

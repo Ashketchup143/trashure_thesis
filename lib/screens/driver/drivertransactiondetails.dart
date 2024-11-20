@@ -66,13 +66,13 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
                 );
               },
             ),
-            IconButton(
-              icon: const Icon(Icons.print),
-              onPressed: () {
-                _generatePdf(context, bookingId, status, vehicle, vehicleId,
-                    overallPrice, overallWeight, formattedDate);
-              },
-            ),
+            // IconButton(
+            //   icon: const Icon(Icons.print),
+            //   onPressed: () {
+            //     _generatePdf(context, bookingId, status, vehicle, vehicleId,
+            //         overallPrice, overallWeight, formattedDate);
+            //   },
+            // ),
           ],
         ),
         backgroundColor: Colors.green,
