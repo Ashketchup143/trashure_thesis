@@ -30,14 +30,26 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
     String status = args?['status'] ?? 'Unknown';
     String vehicle = args?['vehicle'] ?? 'Unknown';
     String vehicleId = args?['vehicleId'] ?? 'Unknown';
-    double overallPrice =
-        double.tryParse(args?['overall_price']?.toString() ?? '') ?? 0.0;
+    String location = args?['location'] ?? 'Unknown';
+    String startTime = args?['start_time'] ?? 'Unknown';
+    String endTime = args?['end_time'] ?? 'Unknown';
+    String startingMileage =
+        (double.tryParse(args?['starting_mileage']?.toString() ?? '0.0') ?? 0.0)
+            .toStringAsFixed(2);
+    String endingMileage =
+        (double.tryParse(args?['ending_mileage']?.toString() ?? '0.0') ?? 0.0)
+            .toStringAsFixed(2);
+    // double overallPrice =
+    //     double.tryParse(args?['overall_price']?.toString() ?? '') ?? 0.0;
     double overallWeight =
         double.tryParse(args?['overall_weight']?.toString() ?? '') ?? 0.0;
-    double finalOverallPrice =
-        double.tryParse(args?['final_overall_price']?.toString() ?? '') ?? 0.0;
+    // double finalOverallPrice =
+    //     double.tryParse(args?['final_overall_price']?.toString() ?? '') ?? 0.0;
     double finalOverallWeight =
         double.tryParse(args?['final_overall_weight']?.toString() ?? '') ?? 0.0;
+    double finalCalculatedOverallPrice = double.tryParse(
+            args?['final_calculated_overall_price']?.toString() ?? '') ??
+        0.0;
     double driverShare =
         double.tryParse(args?['driver_share']?.toString() ?? '') ?? 0.0;
 
@@ -99,22 +111,34 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
                 const SizedBox(height: 10),
                 Text('Booking ID: $bookingId',
                     style: const TextStyle(fontSize: 15)),
+                Text('Location: $location',
+                    style: const TextStyle(fontSize: 15)),
                 Text('Status: $status', style: const TextStyle(fontSize: 15)),
                 Text('Vehicle: $vehicle', style: const TextStyle(fontSize: 15)),
                 Text('Vehicle ID: $vehicleId',
                     style: const TextStyle(fontSize: 15)),
+                // Text(
+                //     'Est. Total Price: ₱${finalOverallPrice.toStringAsFixed(2)}',
+                //     style: const TextStyle(fontSize: 15)),
+
                 Text(
-                    'Est. Total Price: ₱${finalOverallPrice.toStringAsFixed(2)}',
+                    'Total Calculated Price: ${finalCalculatedOverallPrice.toStringAsFixed(2)} kg',
                     style: const TextStyle(fontSize: 15)),
                 Text(
-                    'Est. Total Weight: ${finalOverallWeight.toStringAsFixed(2)} kg',
+                    'Total Weight: ${finalOverallWeight.toStringAsFixed(2)} kg',
                     style: const TextStyle(fontSize: 15)),
-                Text('Date: $formattedDate',
+                Text('Date & Time: $formattedDate, $startTime - $endTime',
                     style: const TextStyle(fontSize: 15)),
                 Text(
                   'Total Driver Share: ₱${driverShare.toStringAsFixed(2)}',
-                  style: const TextStyle(fontSize: 15, color: Colors.blue),
+                  style: const TextStyle(
+                    fontSize: 15,
+                  ),
                 ),
+                Text('Starting Mileage: $startingMileage km',
+                    style: const TextStyle(fontSize: 15)),
+                Text('Ending Mileage: $endingMileage km',
+                    style: const TextStyle(fontSize: 15)),
                 const SizedBox(height: 20),
                 Expanded(
                   child: StreamBuilder(
@@ -201,7 +225,7 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
 // Determine the effective total price based on the user's mode
                           double effectiveTotalPrice = userData['mode']
                                       ?.toString()
-                                      .toLowerCase() ==
+                                      ?.toLowerCase() ==
                                   'donate'
                               ? userData['total_price'] ??
                                   0.0 // Use the donated total price if mode is "donate"
@@ -209,11 +233,25 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
                                   ? userData['final_total_price'] ?? 0.0
                                   : userData['total_price'] ?? 0.0);
 
-// Calculate the driver share using the effective total price
-                          double driverShare =
-                              ((((effectiveTotalPrice / (1 - 0.30)) + 40) -
-                                      effectiveTotalPrice) *
-                                  sharePercentage);
+// Calculate the driver share
+                          double driverShare = 0.0;
+
+                          if (userStatus != 'failed') {
+                            if (userData['firstName'] == "Guest") {
+                              // Guest users: No subtraction of 40
+                              driverShare =
+                                  ((((effectiveTotalPrice / (1 - 0.30)) -
+                                          effectiveTotalPrice) *
+                                      sharePercentage));
+                            } else {
+                              // Non-guest users: Include subtraction of 40
+                              driverShare =
+                                  ((((effectiveTotalPrice / (1 - 0.30)) +
+                                          40 -
+                                          effectiveTotalPrice) *
+                                      sharePercentage));
+                            }
+                          }
 
                           return Card(
                             margin: const EdgeInsets.all(10),
@@ -230,7 +268,7 @@ class _DriverTransactionDetails extends State<DriverTransactionDetails> {
                                 '${firstName == "Guest" ? "" : "Address: $address\n"}'
                                 '${firstName == "Guest" ? "" : "Contact: $contact\n"}'
                                 '${firstName == "Guest" ? "" : "Email: $email\n"}'
-                                'Total Price: ₱$totalPrice\n'
+                                'Total Price: ₱${totalPrice.toStringAsFixed(2)}\n'
                                 'Calculated Total Price: ₱${calculatedTotalPrice.toStringAsFixed(2)}\n'
                                 'Total Weight: ${totalWeight.toStringAsFixed(2)} kg\n'
                                 'Driver Share: ₱${driverShare.toStringAsFixed(2)}\n'

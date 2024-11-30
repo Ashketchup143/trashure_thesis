@@ -1,3 +1,7 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -18,6 +22,8 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
   late TextEditingController _salaryController;
   late TextEditingController _expTimeInController;
   late TextEditingController _expTimeOutController;
+  Uint8List? _imageBytes;
+  String? _imageFileName;
 
   bool _isLoading = false;
   bool _isEditing = false;
@@ -210,7 +216,9 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
   void _saveChanges(String employeeId) async {
     if (!_hasChanged()) {
       _showDialog('No changes', 'No information has been changed.');
-      _isEditing = false;
+      setState(() {
+        _isEditing = false;
+      });
       return;
     }
 
@@ -219,10 +227,8 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
     });
 
     try {
-      await FirebaseFirestore.instance
-          .collection('employees')
-          .doc(employeeId)
-          .update({
+      // Prepare the data for update
+      Map<String, dynamic> updatedData = {
         'name': _nameController.text,
         'position': _selectedPosition,
         'address': _addressController.text,
@@ -232,22 +238,28 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
         'salary_per_day': _salaryController.text,
         'exp_time_in': _expTimeInController.text,
         'exp_time_out': _expTimeOutController.text,
-      });
+      };
+
+      // Update image if it has been changed
+      if (_imageBytes != null && _imageFileName != null) {
+        Reference storageReference = FirebaseStorage.instance
+            .ref()
+            .child('employee_images/$_imageFileName');
+        await storageReference.putData(_imageBytes!);
+        updatedData['image'] = _imageFileName;
+      }
+
+      // Update Firestore
+      await FirebaseFirestore.instance
+          .collection('employees')
+          .doc(employeeId)
+          .update(updatedData);
 
       _showDialog('Success', 'Employee information has been updated.');
       setState(() {
         _isEditing = false;
-        originalEmployeeData = {
-          'name': _nameController.text,
-          'position': _selectedPosition,
-          'address': _addressController.text,
-          'birth_date': _birthDateController.text,
-          'contact_number': _contactController.text,
-          'email_address': _emailController.text,
-          'salary_per_day': _salaryController.text,
-          'exp_time_in': _expTimeInController.text,
-          'exp_time_out': _expTimeOutController.text,
-        };
+        originalEmployeeData = Map<String, dynamic>.from(updatedData);
+        _imageBytes = null; // Reset image data after update
       });
     } catch (e) {
       _showDialog('Error', 'Failed to update employee information.');
@@ -347,6 +359,12 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
                       }
                     },
                   ),
+                  IconButton(
+                    icon: Icon(Icons.bar_chart, color: Colors.white),
+                    onPressed: () {
+                      // Add your report generation or navigation logic here
+                    },
+                  ),
                 ],
               ),
           ],
@@ -364,7 +382,16 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               // Display Employee Image
-                              if (employee != null &&
+                              if (_imageBytes != null)
+                                ClipOval(
+                                  child: Image.memory(
+                                    _imageBytes!,
+                                    width: 150,
+                                    height: 150,
+                                    fit: BoxFit.cover,
+                                  ),
+                                )
+                              else if (employee != null &&
                                   employee!['imageUrl'] != null &&
                                   employee!['imageUrl'].isNotEmpty)
                                 ClipOval(
@@ -384,6 +411,15 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
                                 const Center(
                                   child: Icon(Icons.person, size: 150),
                                 ),
+                              const SizedBox(height: 16),
+
+                              // Add the button conditionally when editing
+                              if (_isEditing)
+                                ElevatedButton(
+                                  onPressed: _pickImage,
+                                  child: const Text('Change Profile Picture'),
+                                ),
+
                               SizedBox(height: 16),
 
                               _buildProfileField('Employee ID', employee!['id'],
@@ -454,7 +490,9 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
                               SizedBox(height: 16),
                               _buildProfileField(
                                   'Email Address', _emailController.text,
-                                  controller: _emailController),
+                                  controller: _emailController,
+                                  isEditable: false),
+
                               SizedBox(height: 16),
                               _buildProfileField(
                                   'Salary Per Hour', _salaryController.text,
@@ -540,79 +578,65 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
                                             fontWeight: FontWeight.bold)),
                                   ),
                                   Expanded(
-                                    child: ListView.builder(
-                                      itemCount: _bookings.length,
-                                      itemBuilder: (context, index) {
-                                        final booking = _bookings[index];
-                                        Map<String, dynamic> bookingData = {
-                                          'booking_id': booking['booking_id'] ??
-                                              'No Booking ID',
-                                          'vehicle': booking['vehicle'] ??
-                                              'No Vehicle',
-                                          'overall_price':
-                                              booking['overall_price'] ?? 0.0,
-                                          'overall_weight':
-                                              booking['overall_weight'] ?? 0.0,
-                                          'date': booking['date'] ??
-                                              Timestamp.now(),
-                                          'status':
-                                              booking['status'] ?? 'No Status',
-                                        };
+                                      child: ListView.builder(
+                                    itemCount: _bookings.length,
+                                    itemBuilder: (context, index) {
+                                      final booking = _bookings[index];
 
-                                        String bookingId =
-                                            booking['booking_id'] ??
-                                                'No Booking ID';
-                                        String vehicle =
-                                            booking['vehicle'] ?? 'No Vehicle';
-                                        double overallPrice =
-                                            booking['overall_price'] ?? 0.0;
-                                        double overallWeight =
-                                            booking['overall_weight'] ?? 0.0;
-                                        Timestamp dateTimestamp =
-                                            booking['date'] ?? Timestamp.now();
-                                        String status =
-                                            booking['status'] ?? 'No Status';
+                                      // Use final values if available, fallback to the default values otherwise
+                                      String bookingId =
+                                          booking['booking_id'] ??
+                                              'No Booking ID';
+                                      String vehicle =
+                                          booking['vehicle'] ?? 'No Vehicle';
+                                      double calculatedOverallPrice = booking[
+                                              'final_calculated_overall_price'] ??
+                                          booking['calculated_overall_price'] ??
+                                          0.0; // Fallback to `calculated_overall_price` if final is not available
+                                      double overallWeight = booking[
+                                              'final_overall_weight'] ??
+                                          booking['overall_weight'] ??
+                                          0.0; // Fallback to `overall_weight` if final is not available
 
-                                        return ListTile(
-                                          title: Text(
-                                            "Booking ID: $bookingId",
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.bold),
-                                          ),
-                                          subtitle: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                  "Date: ${formatDate(dateTimestamp)} (${formatDayOfWeek(dateTimestamp)})"),
-                                              Text("Vehicle: $vehicle"),
-                                              Text(
-                                                  "Overall Price: ₱${overallPrice.toStringAsFixed(2)}"),
-                                              Text(
-                                                  "Overall Weight: ${overallWeight.toStringAsFixed(2)} kg"),
-                                              Text("Status: $status"),
-                                            ],
-                                          ),
-                                          trailing: IconButton(
-                                            icon:
-                                                const Icon(Icons.info_outline),
-                                            onPressed: () {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (context) =>
-                                                      BookingDetails(
-                                                    bookingId: bookingId,
-                                                    bookingData: bookingData,
-                                                  ),
+                                      String status =
+                                          booking['status'] ?? 'No Status';
+
+                                      return ListTile(
+                                        title: Text(
+                                          "Booking ID: $bookingId",
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold),
+                                        ),
+                                        subtitle: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text("Vehicle: $vehicle"),
+                                            Text(
+                                                "Calculated Price: ₱${calculatedOverallPrice.toStringAsFixed(2)}"),
+                                            Text(
+                                                "Overall Weight: ${overallWeight.toStringAsFixed(2)} kg"),
+                                            Text("Status: $status"),
+                                          ],
+                                        ),
+                                        trailing: IconButton(
+                                          icon: const Icon(Icons.info_outline),
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    BookingDetails(
+                                                  bookingId: bookingId,
+                                                  bookingData: booking,
                                                 ),
-                                              );
-                                            },
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      );
+                                    },
+                                  )),
                                 ],
                               ),
                             ),
@@ -662,5 +686,18 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
         ),
       ],
     );
+  }
+
+  Future<void> _pickImage() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+    );
+
+    if (result != null) {
+      setState(() {
+        _imageBytes = result.files.first.bytes;
+        _imageFileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+      });
+    }
   }
 }

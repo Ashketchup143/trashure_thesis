@@ -111,8 +111,14 @@ class _FinanceState extends State<Finance> {
                 const Spacer(),
                 ElevatedButton.icon(
                   onPressed: _printFinanceReport,
-                  icon: const Icon(Icons.print),
-                  label: const Text("Print Report"),
+                  icon: const Icon(
+                    Icons.print,
+                    color: Colors.white,
+                  ),
+                  label: const Text(
+                    "Print Report",
+                    style: TextStyle(color: Colors.white),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                   ),
@@ -479,7 +485,7 @@ class _FinanceState extends State<Finance> {
             return ListTile(
               title: Text('Item: ${soldData['type']}'),
               subtitle: Text(
-                'Price: PHP ${soldData['price']} - Weight: ${soldData['weight']} kg - Total: PHP ${soldData['item_total']}',
+                'Price: PHP ${soldData['price']} - Weight: ${soldData['weight']} kg - Total: PHP ${soldData['item_total'].toStringAsFixed(2)}',
               ),
             );
           }).toList(),
@@ -736,6 +742,9 @@ class _FinanceState extends State<Finance> {
         });
       }
     }
+    // Sort by date in descending order
+    inflowDataList.sort(
+        (a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
 
     return inflowDataList;
   }
@@ -772,6 +781,10 @@ class _FinanceState extends State<Finance> {
         });
       }
     }
+
+    // Sort by date in descending order
+    outflowDataList.sort(
+        (a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
 
     return outflowDataList;
   }

@@ -22,6 +22,15 @@ class BookingDetails extends StatelessWidget {
               style: TextStyle(color: Colors.white),
             ),
             const Spacer(),
+            // Add Reviews Icon if the status is 'collected' or 'completed'
+            if (bookingData['status'] == 'collected' ||
+                bookingData['status'] == 'completed')
+              IconButton(
+                icon: const Icon(Icons.rate_review, color: Colors.white),
+                onPressed: () {
+                  _showReviewDialog(context, bookingId);
+                },
+              ),
             IconButton(
               icon: const Icon(Icons.map),
               onPressed: () {
@@ -49,6 +58,29 @@ class BookingDetails extends StatelessWidget {
             Text("Driver: ${bookingData['driver'] ?? 'No Driver Assigned'}"),
             Text("Vehicle: ${bookingData['vehicle'] ?? 'No Vehicle Assigned'}"),
             Text("Status: ${bookingData['status'] ?? 'No Status'}"),
+            // Display number of users using StreamBuilder
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('bookings')
+                  .doc(bookingId)
+                  .collection('users')
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const CircularProgressIndicator();
+                } else if (snapshot.hasError) {
+                  return const Text(
+                    'Error fetching users',
+                    style: TextStyle(color: Colors.red),
+                  );
+                } else {
+                  final userCount = snapshot.data?.docs.length ?? 0;
+                  return Text(
+                    "Number of Users: $userCount",
+                  );
+                }
+              },
+            ),
             // Display Starting and Ending Mileage if the status is 'collected' or 'completed'
             if (bookingData['status'] == 'collected' ||
                 bookingData['status'] == 'completed') ...[
@@ -133,57 +165,62 @@ class BookingDetails extends StatelessWidget {
         }
 
         var recyclables = recyclablesSnapshot.data?.docs ?? [];
+
         double userTotalWeight = recyclables.fold(0.0, (sum, doc) {
           var data = doc.data() as Map<String, dynamic>;
-          double weight = bookingData['status'] == 'collected' ||
-                  bookingData['status'] == 'completed'
-              ? data['final_weight'] ?? 0
-              : data['weight'] ?? 0;
-          return sum + weight;
+          return sum + (data['final_weight'] ?? data['weight'] ?? 0.0);
         });
 
         double userTotalPrice = recyclables.fold(0.0, (sum, doc) {
           var data = doc.data() as Map<String, dynamic>;
-          double itemPrice = bookingData['status'] == 'collected' ||
-                  bookingData['status'] == 'completed'
-              ? data['final_item_price'] ?? 0
-              : data['item_price'] ?? 0;
-          return sum + itemPrice;
+          return sum + (data['final_item_price'] ?? data['item_price'] ?? 0.0);
         });
 
-        double calculatedTotalPrice = bookingData['status'] == 'collected' ||
-                bookingData['status'] == 'completed'
-            ? userData['final_calculated_total_price'] ?? 0.0
-            : userData['calculated_total_price'] ?? 0.0;
+// Set total price to 0 if the user is in "donate" mode
+        if (userData['mode']?.toString().toLowerCase() == 'donate') {
+          userTotalPrice = 0.0;
+        }
 
-// Determine the share percentage based on the driver's position
+        double calculatedTotalPrice =
+            userData['final_calculated_total_price'] ??
+                userData['calculated_total_price'] ??
+                0.0;
+
+        // Determine the share percentage based on the driver's position
         double sharePercentage = 0.30; // Default to 30%
         if (bookingData['position']?.toString().toLowerCase() ==
             'contractual driver') {
-          sharePercentage = 0.35; // Set to 35% if the driver is contractual
+          sharePercentage = 0.35; // Set to 35% for contractual drivers
         }
+
+// Initialize driverShare
+        double driverShare = 0.0;
 
 // Determine the effective total price based on the user's mode
-        double effectiveTotalPrice;
-        if (userData['mode']?.toString().toLowerCase() == 'donate') {
-          // If mode is 'donate', use the user's total price
-          effectiveTotalPrice = userData['total_price'] ?? 0.0;
-        } else {
-          // Otherwise, use the calculated total price or final total price based on the status
-          effectiveTotalPrice = bookingData['status'] == 'collected' ||
-                  bookingData['status'] == 'completed'
-              ? userData['final_total_price'] ?? 0.0
-              : userData['total_price'] ?? 0.0;
+        if (userData['status'] != 'failed') {
+          double effectiveTotalPrice =
+              userData['mode']?.toString().toLowerCase() == 'donate'
+                  ? userData['total_price'] ?? 0.0
+                  : userData['final_total_price'] ??
+                      userData['total_price'] ??
+                      0.0;
+
+          if (userData['firstName']?.toString().toLowerCase() == "guest") {
+            // Guest users: No addition of 40
+            driverShare =
+                ((((effectiveTotalPrice / (1 - 0.30)) - effectiveTotalPrice) *
+                    sharePercentage));
+          } else {
+            // Non-guest users: Include addition of 40
+            driverShare = ((((effectiveTotalPrice / (1 - 0.30)) +
+                    40 -
+                    effectiveTotalPrice) *
+                sharePercentage));
+          }
+
+          driverShare =
+              double.parse(driverShare.toStringAsFixed(2)); // Round off
         }
-
-// Calculate the driver share using the effective total price
-        double driverShare =
-            ((((effectiveTotalPrice / (1 - 0.30)) + 40) - effectiveTotalPrice) *
-                sharePercentage);
-
-// Round the driver share to two decimal places
-        driverShare = double.parse(driverShare.toStringAsFixed(2));
-
         return ExpansionTile(
           title: Row(
             children: [
@@ -193,12 +230,22 @@ class BookingDetails extends StatelessWidget {
                     "${userData['firstName'] ?? 'No First Name'} ${userData['lastName'] ?? 'No Last Name'}"),
               ),
               Expanded(
+                flex: 2,
+                child: Center(
+                  child: Text(
+                      userData['category'] ?? 'No Category'), // Add Category
+                ),
+              ),
+              Expanded(
                 flex: 3,
                 child: Text(userData['email'] ?? 'No Email'),
               ),
               Expanded(
-                flex: 3,
-                child: Text(userData['address'] ?? 'No Address'),
+                flex: 4,
+                child: Text(
+                  userData['address'] ?? 'No Address',
+                  style: TextStyle(fontSize: 12),
+                ),
               ),
               Expanded(
                 flex: 2,
@@ -232,117 +279,246 @@ class BookingDetails extends StatelessWidget {
               ),
             ],
           ),
-          children: recyclables.map((recyclableDoc) {
-            var recyclableData = recyclableDoc.data() as Map<String, dynamic>;
-            double weight = bookingData['status'] == 'collected' ||
-                    bookingData['status'] == 'completed'
-                ? recyclableData['final_weight'] ?? 0
-                : recyclableData['weight'] ?? 0;
-            double price = recyclableData['price'] ?? 0;
-            double itemPrice = bookingData['status'] == 'collected' ||
-                    bookingData['status'] == 'completed'
-                ? recyclableData['final_item_price'] ?? 0
-                : recyclableData['item_price'] ?? 0;
+          children: [
+            const Divider(), // Ad
 
-            return ListTile(
-              title: Text("Type: ${recyclableData['type'] ?? 'No Type'}"),
-              subtitle: Text(
-                  "Weight: $weight kg, Price: ₱${price.toStringAsFixed(2)}, Item Total: ₱${itemPrice.toStringAsFixed(2)}"),
-              trailing: bookingData['status'] == 'collected' ||
-                      bookingData['status'] == 'completed'
-                  ? null
-                  : _buildRecyclableActions(context, bookingId, userId,
-                      recyclableDoc.id, recyclableData),
-            );
-          }).toList(),
+            Column(
+              children: [
+                // Title Row for the recyclables
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          "Type",
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          "Weight (kg)",
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: Colors.black87,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          "Price (₱)",
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: Colors.black87,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          "Total (₱)",
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: Colors.black87,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(), // Add a divider for visual separation
+
+                ...recyclables.map((recyclableDoc) {
+                  var recyclableData =
+                      recyclableDoc.data() as Map<String, dynamic>;
+
+                  // Extract weight and price from recyclableData
+                  double weight = recyclableData['final_weight'] ??
+                      recyclableData['weight'] ??
+                      0.0;
+                  double price = recyclableData['price'] ?? 0.0;
+
+                  // Dynamically calculate itemPrice as weight * price
+                  double itemPrice = weight * price;
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            recyclableData['type'] ?? 'No Type',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            "${weight.toStringAsFixed(2)} kg",
+                            style: const TextStyle(fontSize: 14),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            "₱${price.toStringAsFixed(2)}",
+                            style: const TextStyle(fontSize: 14),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            "₱${itemPrice.toStringAsFixed(2)}", // Use dynamically calculated itemPrice
+                            style: const TextStyle(fontSize: 14),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+
+                if (userData['status']?.toLowerCase() == 'collected')
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text(
+                      "Collected Timestamp: ${_formatDateTime(userData['collected_timestamp'])}",
+                      style: const TextStyle(
+                          fontSize: 16,
+                          fontStyle: FontStyle.italic,
+                          color: Color.fromARGB(255, 98, 95, 95)),
+                    ),
+                  ),
+              ],
+            ),
+          ],
         );
       },
     );
   }
 
   Widget _buildOverallTotals(String bookingId) {
-    return StreamBuilder<DocumentSnapshot>(
+    return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('bookings')
           .doc(bookingId)
+          .collection('users')
           .snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
+      builder: (context, userSnapshot) {
+        if (!userSnapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        var bookingData = snapshot.data?.data() as Map<String, dynamic>;
-        double overallPrice = bookingData['status'] == 'collected' ||
-                bookingData['status'] == 'completed'
-            ? bookingData['final_overall_price'] ?? 0.0
-            : bookingData['overall_price'] ?? 0.0;
-        double overallWeight = bookingData['status'] == 'collected' ||
-                bookingData['status'] == 'completed'
-            ? bookingData['final_overall_weight'] ?? 0.0
-            : bookingData['overall_weight'] ?? 0.0;
+        var users = userSnapshot.data!.docs;
 
-        // Initialize total calculated price, total user weight, and total user price
+        double overallWeight = 0.0;
+        double overallTotalPrice = 0.0;
         double totalCalculatedPrice = 0.0;
-        double totalUserWeight = 0.0;
-        double totalUserPrice = 0.0;
+        double totalDriverShare = 0.0;
 
-        return StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('bookings')
-              .doc(bookingId)
-              .collection('users')
-              .snapshots(),
-          builder: (context, userSnapshot) {
-            if (!userSnapshot.hasData) {
+        return FutureBuilder<List<QuerySnapshot>>(
+          future: Future.wait(
+            users.map((userDoc) {
+              return FirebaseFirestore.instance
+                  .collection('bookings')
+                  .doc(bookingId)
+                  .collection('users')
+                  .doc(userDoc.id)
+                  .collection('recyclables')
+                  .get();
+            }).toList(),
+          ),
+          builder: (context, recyclablesSnapshots) {
+            if (!recyclablesSnapshots.hasData) {
               return const Center(child: CircularProgressIndicator());
             }
 
-            var users = userSnapshot.data?.docs ?? [];
-            for (var userDoc in users) {
+            for (int i = 0; i < users.length; i++) {
+              var userDoc = users[i];
               var userData = userDoc.data() as Map<String, dynamic>;
+              var recyclables = recyclablesSnapshots.data![i].docs;
 
-              // Get calculated_total_price or final_calculated_total_price based on status
-              double calculatedTotalPrice =
-                  bookingData['status'] == 'collected' ||
-                          bookingData['status'] == 'completed'
-                      ? userData['final_calculated_total_price'] ?? 0.0
-                      : userData['calculated_total_price'] ?? 0.0;
+              double userWeight = 0.0;
+              double userTotalPrice = 0.0;
 
-              // Sum up the total calculated price
-              totalCalculatedPrice += calculatedTotalPrice;
+              // Calculate totals for all recyclables of this user
+              for (var recyclableDoc in recyclables) {
+                var recyclableData =
+                    recyclableDoc.data() as Map<String, dynamic>;
 
-              // Sum up the user's total weight and total price
-              double userWeight = bookingData['status'] == 'collected' ||
-                      bookingData['status'] == 'completed'
-                  ? userData['final_total_weight'] ?? 0.0
-                  : userData['total_weight'] ?? 0.0;
-              double userPrice = bookingData['status'] == 'collected' ||
-                      bookingData['status'] == 'completed'
-                  ? userData['final_total_price'] ?? 0.0
-                  : userData['total_price'] ?? 0.0;
+                double recyclableWeight = recyclableData['final_weight'] ??
+                    recyclableData['weight'] ??
+                    0.0;
+                double recyclableItemPrice =
+                    recyclableData['final_item_price'] ??
+                        recyclableData['item_price'] ??
+                        0.0;
 
-              totalUserWeight += userWeight;
-              totalUserPrice += userPrice;
+                userWeight += recyclableWeight;
+                userTotalPrice += recyclableItemPrice;
+              }
+
+              // Skip adding the price if the user is in "donate" mode
+              if (userData['mode']?.toString().toLowerCase() != 'donate') {
+                overallTotalPrice += userTotalPrice;
+              }
+              // Update the overall totals
+              overallWeight += userWeight;
+              overallTotalPrice += userTotalPrice;
+
+              // Add the calculated total price (or final_calculated_total_price if available)
+              double userCalculatedTotalPrice =
+                  userData['final_calculated_total_price'] ??
+                      userData['calculated_total_price'] ??
+                      0.0;
+              totalCalculatedPrice += userCalculatedTotalPrice;
+
+              // Calculate and add the driver share
+              double sharePercentage = 0.30; // Default share
+              if (userData['position']?.toString().toLowerCase() ==
+                  'contractual driver') {
+                sharePercentage = 0.35; // Contractual driver share
+              }
+
+              double calculatedPrice = userData['total_price'] ??
+                  userData['final_total_price'] ??
+                  0.0;
+              // double driverShare =
+              //     ((((calculatedPrice / (1 - 0.30)) + 40) - calculatedPrice) *
+              //         sharePercentage);
+
+              // totalDriverShare += driverShare;
             }
 
+            // Render calculated totals
             return Padding(
               padding: const EdgeInsets.all(8.0),
               child: Column(
                 children: [
                   Text(
-                    "Overall Weight for Booking: ${totalUserWeight.toStringAsFixed(2)} kg",
+                    "Overall Weight for Booking: ${overallWeight.toStringAsFixed(2)} kg",
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  Text(
-                    "Overall Total Price for Booking: ₱${totalUserPrice.toStringAsFixed(2)}",
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+
                   Text(
                     "Total Calculated Price for Booking: ₱${totalCalculatedPrice.toStringAsFixed(2)}",
                     style: const TextStyle(
@@ -350,7 +526,13 @@ class BookingDetails extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  // Text(
+                  //   "Total Driver Share: ₱${totalDriverShare.toStringAsFixed(2)}",
+                  //   style: const TextStyle(
+                  //     fontSize: 18,
+                  //     fontWeight: FontWeight.bold,
+                  //   ),
+                  // ),
                 ],
               ),
             );
@@ -364,8 +546,9 @@ class BookingDetails extends StatelessWidget {
     return Row(
       children: [
         title('Name', 3),
+        title('Category', 2),
         title('Email', 3),
-        title('Address', 3),
+        title('Address', 4),
         title('Status', 2),
         title('Weight (kg)', 2),
         title('Total (₱)', 2),
@@ -487,6 +670,100 @@ class BookingDetails extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  void _showReviewDialog(BuildContext context, String bookingId) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Customer Reviews"),
+          content: SizedBox(
+            width: MediaQuery.of(context).size.width *
+                0.8, // Set a responsive width
+            height: MediaQuery.of(context).size.height *
+                0.5, // Set a responsive height
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('bookings')
+                  .doc(bookingId)
+                  .collection('customer_review')
+                  .orderBy('date', descending: true) // Sort by most recent date
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return const Center(child: Text("An error occurred."));
+                }
+
+                var reviews = snapshot.data?.docs ?? [];
+                if (reviews.isEmpty) {
+                  return const Center(child: Text("No reviews available."));
+                }
+
+                return ListView.builder(
+                  itemCount: reviews.length,
+                  itemBuilder: (context, index) {
+                    var reviewData =
+                        reviews[index].data() as Map<String, dynamic>? ?? {};
+                    String name = reviewData['name'] ?? 'Anonymous';
+                    int rating = reviewData['rating'] ?? 0;
+                    String feedback =
+                        reviewData['feedback'] ?? 'No feedback provided';
+                    DateTime? date =
+                        (reviewData['date'] as Timestamp?)?.toDate();
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Text(
+                            "Rating: $rating/5",
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          Text(
+                            "Feedback: $feedback",
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          if (date != null)
+                            Text(
+                              "Date: ${DateFormat('MMMM d, yyyy, h:mm a').format(date)}",
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          const Divider(), // Add a divider for better separation
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text("Close"),
+            ),
+          ],
+        );
+      },
     );
   }
 }

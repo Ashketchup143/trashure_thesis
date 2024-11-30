@@ -9,8 +9,6 @@ class OutflowDetails extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print("Outflow Data: $outflowData"); // Debugging print
-
     return Scaffold(
       appBar: AppBar(
         iconTheme: const IconThemeData(color: Colors.white),
@@ -26,129 +24,167 @@ class OutflowDetails extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Common Fields
-              Text(
-                'Category: ${outflowData['category'] ?? 'N/A'}',
-                style: const TextStyle(fontSize: 18),
+              _buildField('Category', outflowData['category']),
+              _buildField(
+                'Date',
+                outflowData['date'] != null
+                    ? DateFormat('MM/dd/yyyy, hh:mm a')
+                        .format(outflowData['date'].toDate())
+                    : 'N/A',
               ),
-              const SizedBox(height: 10),
-              Text(
-                'Date: ${outflowData['date'] != null ? DateFormat('MM/dd/yyyy, hh:mm a').format(outflowData['date'].toDate()) : 'N/A'}',
-                style: const TextStyle(fontSize: 18),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Price: ₱${outflowData['price']?.toStringAsFixed(2) ?? '0.00'}',
-                style: const TextStyle(fontSize: 18),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Employee: ${outflowData['employee'] ?? 'N/A'}',
-                style: const TextStyle(fontSize: 18),
-              ),
-              const SizedBox(height: 10),
-
-              // Vehicle Field for applicable categories
-              if (outflowData['category'] == 'Fuel' ||
-                  outflowData['category'] == 'Delivery Fee' ||
-                  outflowData['category'] == 'Vehicle Maintenance')
-                Text(
-                  'Vehicle: ${outflowData['vehicle'] ?? 'N/A'}',
-                  style: const TextStyle(fontSize: 18),
-                ),
-              const SizedBox(height: 10),
-
-              // Driver Field for Fuel and Delivery Fee
-              if (outflowData['category'] == 'Fuel' ||
-                  outflowData['category'] == 'Delivery Fee')
-                Text(
-                  'Driver: ${outflowData['driver'] ?? 'N/A'}',
-                  style: const TextStyle(fontSize: 18),
-                ),
-              const SizedBox(height: 10),
-
-              // Details Field for Etc. category
-              if (outflowData['category'] == 'Etc.')
-                Text(
-                  'Details: ${outflowData['details'] ?? 'N/A'}',
-                  style: const TextStyle(fontSize: 18),
-                ),
-              const SizedBox(height: 10),
-
-              // Recyclables List for Booking, Guest Booking, and Onsite Collection
-              if (outflowData['category'] == 'booking' ||
-                  outflowData['category'] == 'guest booking' ||
-                  outflowData['category'] == 'onsite collection')
-                FutureBuilder<QuerySnapshot>(
-                  future: FirebaseFirestore.instance
-                      .collection('outflow')
-                      .doc(outflowData['id']) // Ensure 'id' is correct
-                      .collection('recyclables')
-                      .get(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-
-                    if (snapshot.hasError) {
-                      print("Error: ${snapshot.error}"); // Debugging print
-                      return const Text(
-                        'Failed to load recyclables.',
-                        style: TextStyle(color: Colors.red),
-                      );
-                    }
-
-                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                      print("No recyclables found."); // Debugging print
-                      return const Text(
-                        'No recyclables found.',
-                        style: TextStyle(fontSize: 16),
-                      );
-                    }
-
-                    // Display the recyclables list
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 10),
-                        const Text(
-                          'Recyclables:',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        ...snapshot.data!.docs.map((doc) {
-                          final recyclableData =
-                              doc.data() as Map<String, dynamic>;
-                          return Card(
-                            margin: const EdgeInsets.symmetric(vertical: 5),
-                            child: ListTile(
-                              title: Text(recyclableData['type']
-                                      .toString()
-                                      .toUpperCase() ??
-                                  'Unknown Type'),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                      'Category: ${recyclableData['category'] ?? 'N/A'}'),
-                                  Text(
-                                      'Weight: ${recyclableData['weight']?.toStringAsFixed(2) ?? '0.00'} kg'),
-                                  Text(
-                                      'Price: ₱${recyclableData['price']?.toStringAsFixed(2) ?? '0.00'}'),
-                                ],
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ],
-                    );
-                  },
-                ),
+              _buildField('Price',
+                  '₱${outflowData['price']?.toStringAsFixed(2) ?? '0.00'}'),
+              _buildField('Employee', outflowData['employee'] ?? "N/A"),
+              if (_isVehicleRequired(outflowData['category']))
+                _buildField('Vehicle', outflowData['vehicle'] ?? "N/A"),
+              if (_isDriverRequired(outflowData['category']))
+                _buildField('Driver', outflowData['driver'] ?? "N/A"),
+              if (_isDetailsRequired(outflowData['category']))
+                _buildField('Details', outflowData['details'] ?? "N/A"),
+              if (_isRecyclablesCategory(outflowData['category']))
+                _buildRecyclablesList(outflowData['id']),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildField(String label, dynamic value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Text(
+        '$label: ${value ?? 'N/A'}',
+        style: const TextStyle(fontSize: 18),
+      ),
+    );
+  }
+
+  /// Helper to check if the category requires Vehicle information
+  bool _isVehicleRequired(String? category) {
+    return category == 'Additional fuel' ||
+        category == 'Vehicle Maintenance' ||
+        category == 'Delivery Fee';
+  }
+
+  /// Helper to check if the category requires Driver information
+  bool _isDriverRequired(String? category) {
+    return category == 'Additional fuel' || category == 'Delivery Fee';
+  }
+
+  /// Helper to check if the category requires additional details
+  bool _isDetailsRequired(String? category) {
+    return category == 'Etc.'; // Add other categories if necessary
+  }
+
+  /// Helper to check if the category includes recyclables
+  bool _isRecyclablesCategory(String? category) {
+    return category == 'booking' ||
+        category == 'guest booking' ||
+        category == 'onsite collection';
+  }
+
+  Widget _buildRecyclablesList(String id) {
+    return FutureBuilder<QuerySnapshot>(
+      future: FirebaseFirestore.instance
+          .collection('outflow')
+          .doc(id)
+          .collection('recyclables')
+          .get(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return const Text(
+            'Failed to load recyclables.',
+            style: TextStyle(color: Colors.red),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Text(
+            'No recyclables found.',
+            style: TextStyle(fontSize: 16),
+          );
+        }
+
+        double totalWeight = 0.0;
+        double totalPrice = 0.0;
+
+        final recyclables = snapshot.data!.docs.map((doc) {
+          final recyclableData = doc.data() as Map<String, dynamic>;
+          double weight = recyclableData.containsKey('final_weight')
+              ? (recyclableData['final_weight']?.toDouble() ?? 0.0)
+              : (recyclableData['weight']?.toDouble() ?? 0.0);
+          double price = recyclableData['price']?.toDouble() ?? 0.0;
+          double itemTotal = weight * price;
+
+          totalWeight += weight;
+          totalPrice += itemTotal;
+
+          return _buildRecyclableItem(recyclableData, weight, price, itemTotal);
+        }).toList();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 10),
+            const Text(
+              'Recyclables:',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+            ...recyclables,
+            const Divider(),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Total Weight: ${totalWeight.toStringAsFixed(2)} kg',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    'Total Price: ₱${totalPrice.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildRecyclableItem(
+      Map<String, dynamic> data, double weight, double price, double total) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 5),
+      child: ListTile(
+        title: Text(
+          data['type']?.toString().toUpperCase() ?? 'Unknown Type',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Weight: ${weight.toStringAsFixed(2)} kg'),
+            Text('Price per kg: ₱${price.toStringAsFixed(2)}'),
+            Text('Total: ₱${total.toStringAsFixed(2)}'),
+          ],
         ),
       ),
     );

@@ -54,8 +54,14 @@ class _InflowState extends State<Inflow> {
                     const Spacer(),
                     ElevatedButton.icon(
                       onPressed: () => _printInflowData(),
-                      icon: const Icon(Icons.print),
-                      label: const Text("Print"),
+                      icon: const Icon(
+                        Icons.print,
+                        color: Colors.white,
+                      ),
+                      label: const Text(
+                        "Print",
+                        style: TextStyle(color: Colors.white),
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
                       ),
@@ -101,15 +107,16 @@ class _InflowState extends State<Inflow> {
                   child: Row(
                     children: [
                       title('Select', 1),
-                      title('Authorized By', 2),
-                      title('Customer Name', 2),
-                      title('Date', 2),
-                      title('Overall Total', 2),
-                      title('Payment Method', 2),
+                      title('Authorized By', 3),
+                      title('Customer Name', 3),
+                      title('Company Name',
+                          3), // Add this line for "Company Name"
+                      title('Date', 3),
+                      title('Overall Total', 3),
+                      title('Payment Method', 3),
                     ],
                   ),
                 ),
-                // The main container for the list
                 Container(
                   height: MediaQuery.of(context).size.height * .75,
                   decoration: BoxDecoration(border: Border.all()),
@@ -141,9 +148,10 @@ class _InflowState extends State<Inflow> {
                         final authorizedBy =
                             data['authorized_by']?.toString().toLowerCase() ??
                                 '';
-                        final customerName =
-                            data['customer_name']?.toString().toLowerCase() ??
-                                '';
+                        final customerName = data['representative_name']
+                                ?.toString()
+                                .toLowerCase() ??
+                            '';
                         final description =
                             data['description']?.toString().toLowerCase() ?? '';
                         final date = (data['date'] as Timestamp?)?.toDate();
@@ -176,6 +184,7 @@ class _InflowState extends State<Inflow> {
                               },
                             ),
                           ),
+                          Divider(),
                           Container(
                             padding: const EdgeInsets.all(8.0),
                             alignment: Alignment.centerRight,
@@ -249,12 +258,12 @@ class _InflowState extends State<Inflow> {
               ),
             ),
             Expanded(
-              flex: 9, // Give the expansion tile more space
+              flex: 25, // Give the expansion tile more space
               child: ExpansionTile(
                 title: Row(
                   children: [
                     Expanded(
-                      flex: 2,
+                      flex: 3,
                       child: Text(
                         data != null && data.containsKey('authorized_by')
                             ? data['authorized_by'] ?? 'N/A'
@@ -263,7 +272,7 @@ class _InflowState extends State<Inflow> {
                       ),
                     ),
                     Expanded(
-                      flex: 2,
+                      flex: 3,
                       child: Text(
                         data != null && data.containsKey('representative_name')
                             ? data['representative_name'] ?? 'N/A'
@@ -272,12 +281,21 @@ class _InflowState extends State<Inflow> {
                       ),
                     ),
                     Expanded(
-                      flex: 2,
+                      flex: 3,
+                      child: Text(
+                        data != null && data.containsKey('company_name')
+                            ? data['company_name'] ?? 'N/A'
+                            : 'N/A',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 3,
                       child:
                           Text(formattedDate, style: TextStyle(fontSize: 14)),
                     ),
                     Expanded(
-                      flex: 2,
+                      flex: 3,
                       child: Text(
                         data != null && data.containsKey('overall_total')
                             ? data['overall_total']?.toString() ?? 'N/A'
@@ -286,7 +304,7 @@ class _InflowState extends State<Inflow> {
                       ),
                     ),
                     Expanded(
-                      flex: 2,
+                      flex: 3,
                       child: Text(
                         data != null && data.containsKey('payment_method')
                             ? data['payment_method'] ?? 'N/A'
@@ -332,7 +350,7 @@ class _InflowState extends State<Inflow> {
             return ListTile(
               title: Text('Item: ${soldData['type']}'),
               subtitle: Text(
-                  'Price: ${soldData['price']}, Weight: ${soldData['weight']}, Total: ${soldData['item_total']}'),
+                  'Price: ${soldData['price']}, Weight: ${soldData['weight']}, Total: ${soldData['item_total'].toStringAsFixed(2)}'),
             );
           },
         );
@@ -340,18 +358,27 @@ class _InflowState extends State<Inflow> {
     );
   }
 
-  // Widget to display each title
   Widget title(String text, int flex) {
     return Expanded(
       flex: flex,
       child: Container(
         height: 40,
-        decoration: BoxDecoration(border: Border(right: BorderSide())),
-        child: Center(
+        decoration: BoxDecoration(
+          color: Colors.grey.shade200, // Same background color
+          border: const Border(
+            bottom: BorderSide(color: Colors.grey), // Same bottom border style
+          ),
+        ),
+        child: Align(
+          alignment: Alignment.centerLeft,
           child: Text(
             text,
             style: GoogleFonts.roboto(
-                textStyle: TextStyle(fontWeight: FontWeight.bold)),
+              textStyle: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14, // Adjust font size as needed
+              ),
+            ),
           ),
         ),
       ),
@@ -361,169 +388,273 @@ class _InflowState extends State<Inflow> {
   void _printInflowData() async {
     final pdf = pw.Document();
 
-    // Parse the filter values
+    // Parse filter values
     final searchText = _searchController.text.toLowerCase();
     final startDate = _parseDate(_startDateController.text);
     final endDate = _parseDate(_endDateController.text);
 
-    // Fetch inflow data from Firestore
+    // Fetch inflow data
     final inflowSnapshot = await _firestore.collection('inflow').get();
     List<Map<String, dynamic>> inflowDataList = [];
     double totalOverall = 0.0;
 
-    // Filter and collect inflow documents based on search and date criteria
+    // Filter and process inflow documents
     for (var inflowDoc in inflowSnapshot.docs) {
       final inflowData = inflowDoc.data() as Map<String, dynamic>;
       final authorizedBy =
           inflowData['authorized_by']?.toString().toLowerCase() ?? '';
       final customerName =
-          inflowData['customer_name']?.toString().toLowerCase() ?? '';
-      final description =
-          inflowData['description']?.toString().toLowerCase() ?? '';
+          inflowData['representative_name']?.toString().toLowerCase() ?? '';
+      final companyName =
+          inflowData['company_name']?.toString().toLowerCase() ?? '';
       final date = (inflowData['date'] as Timestamp?)?.toDate();
 
-      // Apply search and date range filters
+      // Apply filters
       final matchesSearch = authorizedBy.contains(searchText) ||
           customerName.contains(searchText) ||
-          description.contains(searchText);
-
+          companyName.contains(searchText);
       final matchesDateRange = date != null &&
           (startDate == null || date.isAfter(startDate)) &&
           (endDate == null || date.isBefore(endDate));
 
       if (matchesSearch && matchesDateRange) {
+        // Fetch sold items for this inflow
+        final soldSnapshot = await _firestore
+            .collection('inflow')
+            .doc(inflowDoc.id)
+            .collection('sold')
+            .get();
+
+        final soldItems =
+            soldSnapshot.docs.map((soldDoc) => soldDoc.data()).toList();
+
         inflowDataList.add({
           'data': inflowData,
-          'date': date ?? DateTime.now(), // Use current date if date is null
+          'date': date ?? DateTime.now(),
+          'soldItems': soldItems, // Include sold items
           'id': inflowDoc.id,
         });
         totalOverall += inflowData['overall_total']?.toDouble() ?? 0.0;
       }
     }
 
-    // Sort inflow documents by date in ascending order
+    // Sort inflows by date
     inflowDataList.sort(
-        (a, b) => (a['date'] as DateTime).compareTo(b['date'] as DateTime));
-
-    // Build PDF content with sorted inflow documents
-    List<pw.Widget> inflowWidgets = [];
-    for (var inflowMap in inflowDataList) {
-      final inflowData = inflowMap['data'] as Map<String, dynamic>;
-      final date = inflowMap['date'] as DateTime;
-
-      // Fetch the 'sold' subcollection for each inflow document
-      final soldSnapshot = await _firestore
-          .collection('inflow')
-          .doc(inflowMap['id'])
-          .collection('sold')
-          .get();
-
-      // Convert 'sold' subcollection data into a widget list for the PDF
-      List<pw.Widget> soldItems = [];
-      for (var soldDoc in soldSnapshot.docs) {
-        final soldData = soldDoc.data() as Map<String, dynamic>;
-        final itemType = soldData['type'] ?? 'N/A';
-        final price = soldData['price']?.toString() ?? 'N/A';
-        final weight = soldData['weight']?.toString() ?? 'N/A';
-        final itemTotal = soldData['item_total']?.toString() ?? 'N/A';
-
-        soldItems.add(
-          pw.Text(
-            'Item: $itemType, Price: PHP $price, Weight: $weight, Total: PHP $itemTotal',
-            style: pw.TextStyle(fontSize: 12),
-          ),
-        );
-      }
-
-      // Add inflow data and its 'sold' items to the PDF
-      inflowWidgets.add(
-        pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text(
-              'Authorized By: ${inflowData['authorized_by'] ?? 'N/A'}',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-            ),
-            pw.Text('Customer Name: ${inflowData['customer_name'] ?? 'N/A'}'),
-            pw.Text('Date: ${DateFormat('yyyy-MM-dd').format(date)}'),
-            pw.Text('Description: ${inflowData['description'] ?? 'N/A'}'),
-            pw.Text(
-                'Overall Total: PHP ${inflowData['overall_total']?.toDouble().toStringAsFixed(2) ?? '0.00'}'),
-            pw.Text('Payment Method: ${inflowData['payment_method'] ?? 'N/A'}'),
-            pw.SizedBox(height: 10),
-            pw.Text('Recyclables:',
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-            pw.Column(children: soldItems), // Add the list of recyclables here
-            pw.Divider(),
-          ],
-        ),
-      );
-    }
-
-    // Add a footer with the total overall
-    inflowWidgets.add(
-      pw.Align(
-        alignment: pw.Alignment.centerRight,
-        child: pw.Text(
-          'Total Overall: PHP ${totalOverall.toStringAsFixed(2)}',
-          style: pw.TextStyle(
-            fontSize: 16,
-            fontWeight: pw.FontWeight.bold,
-          ),
-        ),
-      ),
+      (a, b) => (a['date'] as DateTime).compareTo(b['date'] as DateTime),
     );
 
+    // Build the PDF content
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        build: (context) => [
-          pw.Text(
-            'Inflow Report',
-            style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.SizedBox(height: 20),
-          ...inflowWidgets,
-        ],
+        build: (context) {
+          List<pw.Widget> pdfWidgets = [
+            pw.Text(
+              'Inflow Report',
+              style: pw.TextStyle(
+                fontSize: 24,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.green800,
+              ),
+            ),
+            pw.SizedBox(height: 20),
+          ];
+
+          // Main table for inflows
+          pdfWidgets.add(
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.black),
+              columnWidths: {
+                0: pw.FlexColumnWidth(3),
+                1: pw.FlexColumnWidth(3),
+                2: pw.FlexColumnWidth(3),
+                3: pw.FlexColumnWidth(3),
+                4: pw.FlexColumnWidth(2),
+              },
+              children: [
+                pw.TableRow(
+                  decoration: pw.BoxDecoration(color: PdfColors.green100),
+                  children: [
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(4),
+                      child: pw.Text('Authorized By',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(4),
+                      child: pw.Text('Customer Name',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(4),
+                      child: pw.Text('Company Name',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(4),
+                      child: pw.Text('Date',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(4),
+                      child: pw.Text('Total',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    ),
+                  ],
+                ),
+                ...inflowDataList.map((inflowMap) {
+                  final inflowData = inflowMap['data'] as Map<String, dynamic>;
+                  final date = inflowMap['date'] as DateTime;
+
+                  return pw.TableRow(
+                    children: [
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text(inflowData['authorized_by'] ?? 'N/A'),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child:
+                            pw.Text(inflowData['representative_name'] ?? 'N/A'),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text(inflowData['company_name'] ?? 'N/A'),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text(DateFormat('MM/dd/yyyy').format(date)),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text(
+                            'PHP ${inflowData['overall_total']?.toDouble().toStringAsFixed(2) ?? '0.00'}'),
+                      ),
+                    ],
+                  );
+                }),
+              ],
+            ),
+          );
+
+          // Breakdown of items for each inflow
+          for (var inflowMap in inflowDataList) {
+            final inflowData = inflowMap['data'] as Map<String, dynamic>;
+            final date = inflowMap['date'] as DateTime;
+            final soldItems =
+                inflowMap['soldItems'] as List<Map<String, dynamic>>;
+
+            // Add breakdown table
+            pdfWidgets.add(pw.SizedBox(height: 10));
+            pdfWidgets.add(
+              pw.Text(
+                'Breakdown for ${inflowData['representative_name']} (${DateFormat('MM/dd/yyyy').format(date)})',
+                style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 14,
+                    color: PdfColors.green800),
+              ),
+            );
+            pdfWidgets.add(
+              pw.Table(
+                border: pw.TableBorder.all(color: PdfColors.black),
+                columnWidths: {
+                  0: pw.FlexColumnWidth(3),
+                  1: pw.FlexColumnWidth(2),
+                  2: pw.FlexColumnWidth(2),
+                  3: pw.FlexColumnWidth(2),
+                },
+                children: [
+                  pw.TableRow(
+                    decoration: pw.BoxDecoration(color: PdfColors.green100),
+                    children: [
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text('Item',
+                            style:
+                                pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text('Price',
+                            style:
+                                pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text('Weight',
+                            style:
+                                pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(4),
+                        child: pw.Text('Total',
+                            style:
+                                pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                  ...soldItems.map((soldData) {
+                    return pw.TableRow(
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(soldData['type'] ?? 'N/A'),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(
+                              'PHP ${soldData['price']?.toDouble().toStringAsFixed(2) ?? '0.00'}'),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(
+                              '${soldData['weight']?.toDouble().toStringAsFixed(2) ?? '0.00'} kg'),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(4),
+                          child: pw.Text(
+                              'PHP ${soldData['item_total']?.toDouble().toStringAsFixed(2) ?? '0.00'}'),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ],
+              ),
+            );
+          }
+
+          // Add total overall
+          pdfWidgets.add(
+            pw.SizedBox(height: 20),
+          );
+          pdfWidgets.add(
+            pw.Align(
+              alignment: pw.Alignment.centerRight,
+              child: pw.Text(
+                'Total Overall: PHP ${totalOverall.toStringAsFixed(2)}',
+                style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 16,
+                    color: PdfColors.blueGrey900),
+              ),
+            ),
+          );
+
+          return pdfWidgets;
+        },
       ),
     );
 
-    // Convert PDF to Uint8List
+    // Convert to PDF and download
     final pdfBytes = await pdf.save();
-
-    // Create a Blob and open in a new tab
     final blob = html.Blob([pdfBytes], 'application/pdf');
     final url = html.Url.createObjectUrlFromBlob(blob);
-    html.window.open(url, '_blank');
-    html.Url.revokeObjectUrl(url); // Clean up the object URL
-  }
-
-// Helper function to fetch and format the 'sold' subcollection data for each inflow document
-  Future<pw.Widget> _buildSoldSubcollection(String inflowId) async {
-    final soldSnapshot = await _firestore
-        .collection('inflow')
-        .doc(inflowId)
-        .collection('sold')
-        .get();
-
-    if (soldSnapshot.docs.isEmpty) {
-      return pw.Text('No sold items.');
-    }
-
-    return pw.Column(
-      children: soldSnapshot.docs.map((soldDoc) {
-        final soldData = soldDoc.data();
-        final type = soldData['type'] ?? 'N/A';
-        final price = soldData['price'] ?? 'N/A';
-        final weight = soldData['weight'] ?? 'N/A';
-        final itemTotal = soldData['item_total'] ?? 'N/A';
-
-        return pw.Text(
-          'Item: $type | Price: PHP $price | Weight: $weight kg | Total: PHP $itemTotal',
-          style: pw.TextStyle(fontSize: 12),
-        );
-      }).toList(),
-    );
+    final anchor = html.AnchorElement(href: url)
+      ..target = 'blank'
+      ..download = 'Inflow_Report.pdf'
+      ..click();
+    html.Url.revokeObjectUrl(url);
   }
 
   Widget _buildDatePickerField(String label, TextEditingController controller) {

@@ -40,8 +40,14 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
 
     Timestamp? timestamp = args?['date'];
     DateTime? date = timestamp?.toDate();
+    // Extract start and end time from arguments
+    String startTime = args?['start_time'] ?? 'Unknown Start Time';
+    String endTime = args?['end_time'] ?? 'Unknown End Time';
+
+// Combine the date with the start and end times
     String formattedDate = date != null
-        ? DateFormat('MM/dd/yyyy, EEEE').format(date)
+        ? DateFormat('MM/dd/yyyy, EEEE').format(date) +
+            ' ($startTime - $endTime)'
         : 'Unknown Date';
 
     return Scaffold(
@@ -170,23 +176,23 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                             style: const TextStyle(fontSize: 15)),
 
                         // Display for Est. Total Price
-                        Row(
-                          children: [
-                            Text(
-                              'Est. Total Price: ₱${overallPrice.toStringAsFixed(2)} ',
-                              style: const TextStyle(fontSize: 15),
-                            ),
-                            Text(
-                              '${priceDifference >= 0 ? '+' : ''}${priceDifference.toStringAsFixed(2)}',
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: priceDifference >= 0
-                                    ? Colors.green
-                                    : Colors.red,
-                              ),
-                            ),
-                          ],
-                        ),
+                        // Row(
+                        //   children: [
+                        //     Text(
+                        //       'Est. Total Price: ₱${overallPrice.toStringAsFixed(2)} ',
+                        //       style: const TextStyle(fontSize: 15),
+                        //     ),
+                        //     Text(
+                        //       '${priceDifference >= 0 ? '+' : ''}${priceDifference.toStringAsFixed(2)}',
+                        //       style: TextStyle(
+                        //         fontSize: 15,
+                        //         color: priceDifference >= 0
+                        //             ? Colors.green
+                        //             : Colors.red,
+                        //       ),
+                        //     ),
+                        //   ],
+                        // ),
 
                         // Display for Actual Calculated Price
                         Text(
@@ -195,23 +201,23 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                         ),
 
                         // Display for Est. Total Weight
-                        Row(
-                          children: [
-                            Text(
-                              'Est. Total Weight: ${overallWeight.toStringAsFixed(2)} kg ',
-                              style: const TextStyle(fontSize: 15),
-                            ),
-                            Text(
-                              '${weightDifference >= 0 ? '+' : ''}${weightDifference.toStringAsFixed(2)} kg',
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: weightDifference >= 0
-                                    ? Colors.green
-                                    : Colors.red,
-                              ),
-                            ),
-                          ],
-                        ),
+                        // Row(
+                        //   children: [
+                        //     Text(
+                        //       'Est. Total Weight: ${overallWeight.toStringAsFixed(2)} kg ',
+                        //       style: const TextStyle(fontSize: 15),
+                        //     ),
+                        //     Text(
+                        //       '${weightDifference >= 0 ? '+' : ''}${weightDifference.toStringAsFixed(2)} kg',
+                        //       style: TextStyle(
+                        //         fontSize: 15,
+                        //         color: weightDifference >= 0
+                        //             ? Colors.green
+                        //             : Colors.red,
+                        //       ),
+                        //     ),
+                        //   ],
+                        // ),
 
                         // Display for Actual Calculated Weight
                         Text(
@@ -221,7 +227,30 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
 
                         Text('Date: $formattedDate',
                             style: const TextStyle(fontSize: 15)),
-                        const SizedBox(height: 20),
+
+                        // Add StreamBuilder for user count
+                        StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('bookings')
+                              .doc(bookingId)
+                              .collection('users')
+                              .snapshots(),
+                          builder: (context, userSnapshot) {
+                            if (!userSnapshot.hasData) {
+                              return const Text(
+                                "Loading user count...",
+                                style:
+                                    TextStyle(fontSize: 15, color: Colors.grey),
+                              );
+                            }
+                            // Count the number of users in the snapshot
+                            int userCount = userSnapshot.data?.docs.length ?? 0;
+                            return Text(
+                              "Number of Users: $userCount",
+                              style: const TextStyle(fontSize: 15),
+                            );
+                          },
+                        ),
                         Expanded(
                           child: StreamBuilder(
                             stream: FirebaseFirestore.instance
@@ -342,13 +371,28 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                               ? userData['final_total_price'] ??
                                                   0.0
                                               : userData['total_price'] ?? 0.0);
+
                                   print(
                                       'User Role: $userRole'); // Add this to check the fetched userRole
+
 // Calculate the driver share
-                                  double driverShare =
-                                      ((((totalPrice / (1 - 0.30)) + 40) -
-                                              totalPrice) *
-                                          sharePercentage);
+                                  double driverShare = 0.0;
+                                  if (userStatus != 'failed') {
+                                    if (firstName == "Guest") {
+                                      // Guest users: No subtraction of 40
+                                      driverShare =
+                                          (((effectiveTotalPrice / (1 - 0.30)) -
+                                                  effectiveTotalPrice) *
+                                              sharePercentage);
+                                    } else {
+                                      // Non-guest users: Include subtraction of 40
+                                      driverShare =
+                                          (((effectiveTotalPrice / (1 - 0.30)) +
+                                                  40 -
+                                                  effectiveTotalPrice) *
+                                              sharePercentage);
+                                    }
+                                  }
 
                                   return Card(
                                     margin: const EdgeInsets.all(10),
@@ -481,32 +525,55 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                                                   'failed') ...[
                                                             IconButton(
                                                               icon: Icon(
-                                                                  isEditing
+                                                                  isEditingWeight[
+                                                                              recyclableId] ==
+                                                                          true
                                                                       ? Icons
                                                                           .check
                                                                       : Icons
                                                                           .edit),
-                                                              onPressed: () {
-                                                                setState(() {
-                                                                  if (isEditing) {
-                                                                    double
-                                                                        newWeight =
-                                                                        double.tryParse(
-                                                                              weightControllers[recyclableId]!.text,
-                                                                            ) ??
-                                                                            weight;
-                                                                    updatedWeights[
-                                                                            recyclableId] =
-                                                                        newWeight;
-                                                                    itemPrice =
-                                                                        newWeight *
-                                                                            price;
-                                                                  }
+                                                              onPressed:
                                                                   isEditingWeight[
-                                                                          recyclableId] =
-                                                                      !isEditing;
-                                                                });
-                                                              },
+                                                                              recyclableId] ==
+                                                                          true
+                                                                      ? () async {
+                                                                          // Save changes to Firebase
+                                                                          double
+                                                                              newWeight =
+                                                                              double.tryParse(weightControllers[recyclableId]?.text ?? '0') ?? weight;
+                                                                          try {
+                                                                            await FirebaseFirestore.instance.collection('bookings').doc(bookingId).collection('users').doc(userId).collection('recyclables').doc(recyclableId).update({
+                                                                              'final_weight': newWeight,
+                                                                              'final_item_price': newWeight * (recyclableData['price'] ?? 0.0),
+                                                                            });
+
+                                                                            setState(() {
+                                                                              updatedWeights[recyclableId] = newWeight;
+                                                                              isEditingWeight[recyclableId] = false;
+                                                                            });
+
+                                                                            ScaffoldMessenger.of(context).showSnackBar(
+                                                                              const SnackBar(
+                                                                                content: Text('Weight updated successfully.'),
+                                                                              ),
+                                                                            );
+                                                                          } catch (e) {
+                                                                            print('Error updating weight: $e');
+                                                                            ScaffoldMessenger.of(context).showSnackBar(
+                                                                              const SnackBar(
+                                                                                content: Text('Failed to update weight. Please try again.'),
+                                                                              ),
+                                                                            );
+                                                                          }
+                                                                        }
+                                                                      : () {
+                                                                          // Enter editing mode
+                                                                          setState(
+                                                                              () {
+                                                                            isEditingWeight[recyclableId] =
+                                                                                true;
+                                                                          });
+                                                                        },
                                                             ),
                                                             IconButton(
                                                               icon: Icon(
@@ -549,40 +616,18 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                                                   },
                                                                 );
 
-                                                                if (confirmDelete ==
-                                                                    true) {
-                                                                  await FirebaseFirestore
-                                                                      .instance
-                                                                      .collection(
-                                                                          'bookings')
-                                                                      .doc(
-                                                                          bookingId)
-                                                                      .collection(
-                                                                          'users')
-                                                                      .doc(
-                                                                          userId)
-                                                                      .collection(
-                                                                          'recyclables')
-                                                                      .doc(
-                                                                          recyclableId)
-                                                                      .delete();
-
-                                                                  setState(() {
-                                                                    recyclables
-                                                                        .removeAt(
-                                                                            recIndex);
-                                                                  });
-
-                                                                  ScaffoldMessenger.of(
-                                                                          context)
-                                                                      .showSnackBar(
-                                                                    SnackBar(
-                                                                      content: Text(
-                                                                          'Product deleted successfully.'),
-                                                                      backgroundColor:
-                                                                          Colors
-                                                                              .red,
-                                                                    ),
+                                                                if (confirmDelete) {
+                                                                  await _deleteProduct(
+                                                                    bookingId:
+                                                                        bookingId,
+                                                                    userId:
+                                                                        userId,
+                                                                    recyclableId:
+                                                                        recyclableId,
+                                                                    itemPrice:
+                                                                        itemPrice,
+                                                                    weight:
+                                                                        weight,
                                                                   );
                                                                 }
                                                               },
@@ -590,11 +635,12 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                                                           ],
                                                         ],
                                                       ),
-                                                      if (isCollected)
-                                                        Text(
-                                                          'Final Weight: ${updatedWeights[recyclableId]!.toStringAsFixed(2)} kg',
-                                                        ),
-                                                      Text('Price: ₱$price'),
+                                                      // if (isCollected)
+                                                      //   Text(
+                                                      //     'Final Weight: ${updatedWeights[recyclableId]!.toStringAsFixed(2)} kg',
+                                                      //   ),
+                                                      Text(
+                                                          'Price: ₱${price.toStringAsFixed(2)}'),
                                                       Text(
                                                           'Item Price: ₱${(updatedWeights[recyclableId]! * price).toStringAsFixed(2)}'),
                                                       const Divider(),
@@ -706,6 +752,95 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
             }));
   }
 
+  Future<void> _deleteProduct({
+    required String bookingId,
+    required String userId,
+    required String recyclableId,
+    required double itemPrice, // Original price passed to the method
+    required double weight,
+  }) async {
+    try {
+      var userRef = FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .collection('users')
+          .doc(userId);
+
+      var recyclableRef = FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .collection('users')
+          .doc(userId)
+          .collection('recyclables')
+          .doc(recyclableId);
+
+      var userDoc = await userRef.get();
+      var recyclableDoc = await recyclableRef.get();
+
+      if (userDoc.exists && recyclableDoc.exists) {
+        var userData = userDoc.data() as Map<String, dynamic>;
+        var recyclableData = recyclableDoc.data() as Map<String, dynamic>;
+
+        String mode = userData['mode'] ?? 'regular';
+        String productId = recyclableData['productId'] ?? '';
+
+        print('Deleting product with mode: $mode, productId: $productId');
+
+        double updatedTotalPrice = userData['total_price'] ?? 0.0;
+        double updatedTotalWeight = (userData['total_weight'] ?? 0.0) - weight;
+
+        // Recalculate itemPrice
+        double recalculatedItemPrice;
+        if (mode == 'donate') {
+          print(
+              'Fetching latest price for productId: $productId in donate mode');
+          var latestPriceData = await _fetchLatestPrice(productId);
+          double latestPrice = latestPriceData['price'] ?? 0.0;
+          recalculatedItemPrice = weight * latestPrice;
+          print(
+              'Recalculated itemPrice for donate mode: $recalculatedItemPrice');
+        } else {
+          recalculatedItemPrice = weight * itemPrice;
+          print(
+              'Calculated itemPrice for regular mode: $recalculatedItemPrice');
+        }
+
+        // Deduct recalculated item price from total price
+        updatedTotalPrice -= recalculatedItemPrice;
+        if (updatedTotalPrice < 0) updatedTotalPrice = 0;
+
+        if (updatedTotalWeight < 0) updatedTotalWeight = 0;
+
+        print(
+            'Updated total_price: $updatedTotalPrice, total_weight: $updatedTotalWeight');
+
+        var batch = FirebaseFirestore.instance.batch();
+
+        // Delete the recyclable document
+        batch.delete(recyclableRef);
+
+        // Update the user's totals
+        batch.update(userRef, {
+          'total_price': updatedTotalPrice,
+          'total_weight': updatedTotalWeight,
+        });
+
+        await batch.commit();
+        print('Batch update committed successfully.');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Product deleted successfully.')),
+        );
+      }
+    } catch (e) {
+      print('Error deleting product: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Failed to delete product. Please try again.')),
+      );
+    }
+  }
+
   Future<void> _showNotCollectedConfirmation(
     String userId,
     String bookingId,
@@ -713,44 +848,75 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
     String lastName,
     Map<String, dynamic> userData,
   ) async {
+    TextEditingController reasonController = TextEditingController();
+    bool isReasonEmpty = false;
+
     bool confirmed = await showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Confirm Not Collected'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                  'Are you sure you want to mark $firstName $lastName as not collected?'),
-              const Text(
-                  'This will mark the collection as failed and set all totals to zero.'),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(false); // Cancel
-              },
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(true); // Confirm
-              },
-              child: const Text('Confirm'),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Confirm Not Collected'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                      'Are you sure you want to mark $firstName $lastName as not collected?'),
+                  const SizedBox(height: 10),
+                  const Text(
+                      'This will mark the collection as failed and set all totals to zero.'),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: reasonController,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      labelText: 'Reason for not collecting',
+                      border: const OutlineInputBorder(),
+                      errorText:
+                          isReasonEmpty ? 'This field is required' : null,
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        isReasonEmpty = value.isEmpty;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(false); // Cancel
+                  },
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      isReasonEmpty = reasonController.text.isEmpty;
+                    });
+
+                    if (!isReasonEmpty) {
+                      Navigator.of(context).pop(true); // Confirm
+                    }
+                  },
+                  child: const Text('Confirm'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
 
     if (confirmed == true) {
-      await _markAsNotCollected(bookingId, userId);
+      await _markAsNotCollected(bookingId, userId, reasonController.text);
     }
   }
 
-  Future<void> _markAsNotCollected(String bookingId, String userId) async {
+  Future<void> _markAsNotCollected(
+      String bookingId, String userId, String reason) async {
     try {
       // Step 1: Get the user's document reference in the 'users' collection
       var userDocRef =
@@ -760,14 +926,14 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
       var reportRef = userDocRef.collection('reports').doc();
       var bookingDocRef =
           FirebaseFirestore.instance.collection('bookings').doc(bookingId);
-      var userBookingDocPath =
-          'bookings/$bookingId/users/$userId'; // Full path as a string
+      var userBookingDocPath = 'bookings/$bookingId/users/$userId';
       var timestamp = FieldValue.serverTimestamp();
 
-      // Step 3: Add a new report document with datetimestamp, status, bookingReference, and userDocumentPath
+      // Step 3: Add a new report document with datetimestamp, status, reason, bookingReference, and userDocumentPath
       await reportRef.set({
         'datetimestamp': timestamp,
         'status': 'failed',
+        'reason': reason, // Include the reason in the report
         'bookingReference': bookingDocRef,
         'userDocumentPath': userBookingDocPath,
       });
@@ -784,8 +950,6 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
       // Step 5: Copy each recyclable item into the 'recyclables' subcollection in the report
       for (var rec in recyclablesSnapshot.docs) {
         var recyclableData = rec.data();
-
-        // Add the full recyclable data to the report's 'recyclables' subcollection
         await reportRef.collection('recyclables').add({
           'category': recyclableData['category'] ?? 'Unknown',
           'final_item_price': 0.0, // Reset final values as requested
@@ -809,11 +973,21 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
         );
       }
 
-      // Step 6: Update the user's document in the booking with failed status
+      // Step 6: Update the user's document in the booking with failed status and the reason
       var userBookingRef = bookingDocRef.collection('users').doc(userId);
       batch.update(userBookingRef, {
         'status': 'failed',
+        'reason': reason, // Save the reason in the user's booking document
+        'final_calculated_total_price': 0.0,
+        'calculated_total_price': 0.0,
+        'final_total_weight': 0.0,
+        'total_price': 0.0,
+        'final_total_price': 0.0,
+        'total_weight': 0.0,
       });
+
+      // Step 7: Update the user's status in the main 'users' collection to 'done'
+      batch.update(userDocRef, {'status': 'done', 'review_status': 'reported'});
 
       // Commit the batch update
       await batch.commit();
@@ -916,9 +1090,6 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
         );
       }
 
-      // Calculate the final calculated total price
-      double finalCalculatedTotalPrice = finalTotalPrice - 40;
-
       // Fetch user data
       var userDoc = await FirebaseFirestore.instance
           .collection('bookings')
@@ -928,11 +1099,29 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
           .get();
       var userData = userDoc.data() as Map<String, dynamic>;
 
+      // Retrieve mode with a default value
+      String mode =
+          userData['mode'] ?? 'regular'; // Default to 'regular' if not set
       String firstName = userData['firstName'] ?? 'Unknown';
       String userStatus = userData['status'] ?? 'pending';
+      String category = userData['category'] ?? 'unknown'; // Fetch category
+      print(mode);
+      print(category);
 
       // Check if the user is a guest
-      bool isGuest = firstName == "Guest";
+      bool isGuest = firstName == "Guest" || category == "business";
+
+      double finalCalculatedTotalPrice;
+      if (isGuest) {
+        // For guests and business, set final_calculated_total_price to final_total_price
+        finalCalculatedTotalPrice = finalTotalPrice;
+      } else if (mode == 'donate') {
+        // For donations, final_calculated_total_price is 0
+        finalCalculatedTotalPrice = 0.0;
+      } else {
+        // For other cases, subtract 40 for services
+        finalCalculatedTotalPrice = finalTotalPrice - 40;
+      }
 
       // Update the user's document
       var userRef = FirebaseFirestore.instance
@@ -955,6 +1144,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
             FirebaseFirestore.instance.collection('users').doc(userId);
         batch.update(mainUserRef, {'status': 'done'});
       }
+
       // Add new document to the `outflow` collection
       var bookingDoc = await FirebaseFirestore.instance
           .collection('bookings')
@@ -1179,34 +1369,62 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
     String endingMileage,
     String fuelPayment,
   ) async {
-    // Calculate the total final overall price, final overall weight, and total driver share
     double finalOverallPrice = 0.0;
     double finalOverallWeight = 0.0;
     double totalDriverShare = 0.0;
+    double finalCalculatedOverallPrice = 0.0; // New field
     double sharePercentage =
         userRole.toLowerCase() == 'contractual driver' ? 0.35 : 0.30;
 
     for (var userDoc in usersSnapshot.docs) {
       var userData = userDoc.data() as Map<String, dynamic>;
+
+      // Sum up the final price, weight, and calculated total price
       double finalTotalPrice = userData['final_total_price'] ?? 0.0;
       double finalTotalWeight = userData['final_total_weight'] ?? 0.0;
-
-      double driverShare =
-          ((((finalTotalPrice / (1 - 0.30)) + 40) - finalTotalPrice) *
-              sharePercentage);
+      double calculatedTotalPrice = userData['status'] == 'collected'
+          ? userData['final_calculated_total_price'] ?? 0.0
+          : userData['calculated_total_price'] ?? 0.0;
 
       finalOverallPrice += finalTotalPrice;
       finalOverallWeight += finalTotalWeight;
+      finalCalculatedOverallPrice +=
+          calculatedTotalPrice; // Add calculated total price
+
+      // Calculate the driver share
+      double driverShare = 0.0;
+
+      if (userData['status'] != 'failed') {
+        double effectiveTotalPrice = userData['mode'] == 'donate'
+            ? userData['total_price'] ?? 0.0
+            : finalTotalPrice;
+
+        if (userData['firstName'] == "Guest") {
+          // Guest users: No subtraction of 40
+          driverShare =
+              ((((effectiveTotalPrice / (1 - 0.30)) - effectiveTotalPrice) *
+                  sharePercentage));
+        } else {
+          // Non-guest users: Include subtraction of 40
+          driverShare = ((((effectiveTotalPrice / (1 - 0.30)) +
+                  40 -
+                  effectiveTotalPrice) *
+              sharePercentage));
+        }
+      }
+
       totalDriverShare += driverShare;
     }
 
-    // Update the booking document with the ending mileage and other details
+    // Update the booking document with the new fields
     var bookingRef =
         FirebaseFirestore.instance.collection('bookings').doc(bookingId);
     await bookingRef.update({
       'status': 'collected',
       'final_overall_price': finalOverallPrice,
       'final_overall_weight': finalOverallWeight,
+      'final_calculated_overall_price':
+          finalCalculatedOverallPrice, // New field
       'driver_share': totalDriverShare.toStringAsFixed(2),
       'ending_mileage': double.tryParse(endingMileage) ?? 0.0,
     });
@@ -1253,7 +1471,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
       const SnackBar(
         backgroundColor: Colors.green,
         content: Text(
-            'Booking marked as collected. Final overall price, weight, driver share, and fuel payment updated.'),
+            'Booking marked as collected. Final overall price, weight, calculated overall price, driver share, and fuel payment updated.'),
       ),
     );
 
@@ -1288,94 +1506,122 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
 
   void _showAddProductModal(String userId, String bookingId) async {
     final TextEditingController weightController = TextEditingController();
-    String selectedProductName = 'Unknown';
+    String? selectedCategory;
+    String? selectedProductName;
     double? recentPrice;
     double? originalPrice;
-    double? percentageProfit;
     String? productId;
-    String? category;
+    double totalPrice = 0.0; // Variable to track total price dynamically
+    String mode = 'regular'; // Default mode
 
-    // Fetch existing product names in user's recyclables
-    List<String> existingProductNames =
-        await _fetchUserRecyclableProductNames(userId, bookingId);
+    // Fetch the user's mode
+    var userDoc = await FirebaseFirestore.instance
+        .collection('bookings')
+        .doc(bookingId)
+        .collection('users')
+        .doc(userId)
+        .get();
+
+    if (userDoc.exists) {
+      mode = userDoc.data()?['mode'] ?? 'regular';
+    }
+
+    // Fetch all categories and types
+    var productSnapshot =
+        await FirebaseFirestore.instance.collection('products').get();
+    List<Map<String, dynamic>> products = productSnapshot.docs
+        .map((doc) => {
+              'id': doc.id,
+              'category': doc['category'] ?? 'Unknown',
+              'product_name': doc['product_name'] ?? 'Unknown'
+            })
+        .toList();
+
+    // Get the list of unique categories
+    List<String> categories = products
+        .map((product) => product['category'] as String)
+        .toSet()
+        .toList();
 
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setState) {
+            // Filter products by the selected category
+            List<Map<String, dynamic>> filteredProducts = products
+                .where((product) => product['category'] == selectedCategory)
+                .toList();
+
             return AlertDialog(
               title: const Text('Add Product'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Dropdown to select product name
-                  StreamBuilder(
-                    stream: FirebaseFirestore.instance
-                        .collection('products')
-                        .snapshots(),
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData) {
-                        return const CircularProgressIndicator();
-                      }
-
-                      var products = snapshot.data!.docs.where((doc) {
-                        String productName =
-                            doc['product_name'].toString().toLowerCase();
-                        return !existingProductNames.contains(productName);
-                      }).toList();
-
-                      if (products.isEmpty) {
-                        return const Text("No new products available to add.");
-                      }
-
-                      // Select the first available product by default
-                      if (selectedProductName == 'Unknown' &&
-                          products.isNotEmpty) {
-                        selectedProductName = products.first['product_name'];
-                        productId = products.first.id;
-                        category = products.first['category'];
-                      }
-
-                      return DropdownButton<String>(
-                        value: selectedProductName,
-                        onChanged: (value) {
-                          setState(() {
-                            selectedProductName = value!;
-
-                            // Find the selected product's details
-                            var selectedProduct = products.firstWhere((doc) =>
-                                doc['product_name'] == selectedProductName);
-
-                            productId = selectedProduct.id;
-                            category = selectedProduct['category'];
-
-                            // Fetch latest price and original price
-                            _fetchLatestPrice(productId!).then((data) {
-                              setState(() {
-                                recentPrice = data['price'];
-                                originalPrice = data['original_price'];
-                                percentageProfit = data['percentage_profit'];
-                              });
-                            });
-                          });
-                        },
-                        items: products.map<DropdownMenuItem<String>>((doc) {
-                          return DropdownMenuItem<String>(
-                            value: doc['product_name'],
-                            child: Text(doc['product_name']),
-                          );
-                        }).toList(),
-                      );
+                  // Dropdown for selecting a category
+                  DropdownButton<String>(
+                    value: selectedCategory,
+                    hint: const Text('Select Category'),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedCategory = value;
+                        selectedProductName = null; // Reset product selection
+                        totalPrice = 0.0; // Reset total price
+                      });
                     },
+                    items: categories.map((category) {
+                      return DropdownMenuItem<String>(
+                        value: category,
+                        child: Text(category),
+                      );
+                    }).toList(),
                   ),
                   const SizedBox(height: 10),
-                  // Display the most recent price
+
+                  // Dropdown for selecting a product (type)
+                  DropdownButton<String>(
+                    value: selectedProductName,
+                    hint: const Text('Select Type'),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedProductName = value;
+
+                        // Find the selected product's details
+                        var selectedProduct = filteredProducts.firstWhere(
+                            (product) => product['product_name'] == value);
+
+                        productId = selectedProduct['id'];
+
+                        // Fetch latest price and original price
+                        _fetchLatestPrice(productId!).then((data) {
+                          setState(() {
+                            recentPrice = mode == 'donate'
+                                ? 0.0
+                                : data[
+                                    'price']; // Set price to 0 if donate mode
+                            originalPrice = data['original_price'];
+                            totalPrice = 0.0; // Reset total price
+                          });
+                        });
+                      });
+                    },
+                    items: filteredProducts.map((product) {
+                      return DropdownMenuItem<String>(
+                        value: product['product_name'],
+                        child: Text(product['product_name']),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Display the most recent price or "Donate Mode Active"
                   recentPrice != null
-                      ? Text(
-                          'Recent Price: ₱${recentPrice!.toStringAsFixed(2)} per kg')
+                      ? Text(mode == 'donate'
+                          ? 'Donate Mode Active: Price is ₱0.00'
+                          : 'Recent Price: ₱${recentPrice!.toStringAsFixed(2)} per kg')
                       : const Text("No product chosen"),
                   const SizedBox(height: 10),
+
                   // Input for weight
                   TextField(
                     controller: weightController,
@@ -1384,6 +1630,20 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                       labelText: 'Weight (kg)',
                       border: OutlineInputBorder(),
                     ),
+                    onChanged: (value) {
+                      // Update the total price dynamically as weight changes
+                      setState(() {
+                        double weight = double.tryParse(value) ?? 0.0;
+                        totalPrice = (recentPrice ?? 0.0) * weight;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Display total price
+                  Text(
+                    'Total Price: ₱${totalPrice.toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -1402,11 +1662,11 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
                       await _addProductToUser(
                         userId,
                         bookingId,
-                        selectedProductName.toUpperCase(),
+                        selectedProductName!,
                         weight,
                         recentPrice!,
                         productId!,
-                        category!,
+                        selectedCategory!,
                         originalPrice!,
                       );
                       Navigator.of(context).pop();
@@ -1433,28 +1693,80 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
     String category,
     double originalPrice,
   ) async {
-    double itemPrice = weight * price;
+    try {
+      // Fetch the user's mode from Firestore
+      var userDoc = await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .collection('users')
+          .doc(userId)
+          .get();
 
-    await FirebaseFirestore.instance
-        .collection('bookings')
-        .doc(bookingId)
-        .collection('users')
-        .doc(userId)
-        .collection('recyclables')
-        .add({
-      'type': productName, // Store as uppercase
-      'weight': weight,
-      'price': price,
-      'original_price': originalPrice, // New field for original price
-      'item_price': itemPrice, // Changed from item_total to item_price
-      'productId': productId, // New field for product ID
-      'category': category, // New field for category
-      'timestamp': Timestamp.now(), // Changed from added_timestamp to timestamp
-    });
+      var userData = userDoc.data() as Map<String, dynamic>;
+      String mode =
+          userData['mode'] ?? 'regular'; // Default to 'regular' if not set
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Product added successfully.')),
-    );
+      // If the mode is "donate," fetch the latest price for the product type
+      double itemPrice = 0.0;
+      if (mode == 'donate') {
+        var latestPriceData = await _fetchLatestPrice(productId);
+        double latestPrice = latestPriceData['price'] ?? 0.0;
+        itemPrice = weight * latestPrice;
+      } else {
+        // Calculate item price using the given price for non-donate modes
+        itemPrice = weight * price;
+      }
+
+      // Add the product to the recyclables collection
+      await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .collection('users')
+          .doc(userId)
+          .collection('recyclables')
+          .add({
+        'type': productName,
+        'weight': weight,
+        'price': price,
+        'original_price': originalPrice,
+        'item_price': itemPrice,
+        'productId': productId,
+        'category': category,
+        'timestamp': Timestamp.now(),
+      });
+
+      // Update total weight and total price
+      double currentTotalWeight = userData['total_weight'] ?? 0.0;
+      double currentTotalPrice = userData['total_price'] ?? 0.0;
+
+      double updatedTotalWeight = currentTotalWeight + weight;
+      double updatedTotalPrice = mode == 'donate'
+          ? currentTotalPrice +
+              itemPrice // Use calculated price for donate mode
+          : currentTotalPrice + itemPrice;
+
+      // Update user's totals in Firestore
+      await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .collection('users')
+          .doc(userId)
+          .update({
+        'total_weight': updatedTotalWeight,
+        'total_price': updatedTotalPrice,
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Product added successfully.')),
+      );
+    } catch (e) {
+      print('Error adding product: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to add product. Please try again.'),
+        ),
+      );
+    }
   }
 
 // Helper function to fetch existing product names in user's recyclables
@@ -1498,6 +1810,7 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
     } catch (e) {
       print('Error fetching latest price: $e');
     }
+    print('Returning default price values for productId: $productId');
     return {
       'price': 0.0,
       'original_price': 0.0,
@@ -1518,56 +1831,40 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
   ) async {
     final pdf = pw.Document();
 
-    // Collect user details asynchronously
+    // Fetch user and recyclables details
     List<pw.Widget> userDetails =
-        await _generateUserDetails(bookingId, userRole);
+        await _generateUserDetailsWithRecyclables(bookingId, userRole);
 
-    // Fetch users data to calculate total calculated price and weight
+    // Calculate actual total price and weight for consistency
+    double actualTotalPrice = 0.0;
+    double actualTotalWeight = 0.0;
+
+    // Fetch users for the booking
     var usersSnapshot = await FirebaseFirestore.instance
         .collection('bookings')
         .doc(bookingId)
         .collection('users')
         .get();
 
-    double totalCalculatedPrice = 0.0;
-    double totalCalculatedWeight = 0.0;
-    double totalDriverShare = 0.0;
-
-    // Loop through each user and add up calculated/collected prices and weights
     for (var userDoc in usersSnapshot.docs) {
       var userData = userDoc.data() as Map<String, dynamic>;
       String userStatus = userData['status'] ?? 'pending';
 
-      double totalPrice = userStatus == 'collected'
-          ? userData['final_total_price'] ?? 0.0
-          : userData['total_price'] ?? 0.0;
-      double calculatedTotalPrice = userStatus == 'collected'
-          ? userData['final_calculated_total_price'] ?? 0.0
-          : userData['calculated_total_price'] ?? 0.0;
-      double totalWeight = userStatus == 'collected'
-          ? userData['final_total_weight'] ?? 0.0
-          : userData['total_weight'] ?? 0.0;
-
-      double sharePercentage =
-          userRole.toLowerCase() == 'contractual driver' ? 0.35 : 0.30;
-      double driverShare =
-          ((((totalPrice / (1 - 0.30)) + 40) - totalPrice) * sharePercentage);
-
-      // Sum up the totals
-      totalCalculatedPrice += calculatedTotalPrice;
-      totalCalculatedWeight += totalWeight;
-      totalDriverShare += driverShare;
+      if (userStatus == 'collected') {
+        actualTotalPrice += userData['final_calculated_total_price'] ?? 0.0;
+        actualTotalWeight += userData['final_total_weight'] ?? 0.0;
+      } else {
+        actualTotalPrice += userData['calculated_total_price'] ?? 0.0;
+        actualTotalWeight += userData['total_weight'] ?? 0.0;
+      }
     }
-
-    // Calculate the differences
-    double priceDifference = totalCalculatedPrice - overallPrice;
-    double weightDifference = totalCalculatedWeight - overallWeight;
 
     // Add the booking summary and user details to the PDF
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         build: (context) => [
+          // Booking Details Section
           pw.Text(
             "Booking Details",
             style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
@@ -1577,46 +1874,20 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
           pw.Text("Status: ${status[0].toUpperCase() + status.substring(1)}"),
           pw.Text("Vehicle: $vehicle"),
           pw.Text("Vehicle ID: $vehicleId"),
-          pw.SizedBox(height: 10),
 
-          // Display Estimated and Calculated Prices and Weights
-          pw.Row(
-            children: [
-              pw.Text(
-                'Est. Total Price: PHP ${overallPrice.toStringAsFixed(2)} ',
-              ),
-              pw.Text(
-                '${priceDifference >= 0 ? '+' : ''}${priceDifference.toStringAsFixed(2)}',
-                style: pw.TextStyle(
-                  color: priceDifference >= 0 ? PdfColors.green : PdfColors.red,
-                ),
-              ),
-            ],
+          // Replace Estimated/Calculated with Actual Calculated Total
+          pw.Text(
+            "Actual Total Price: PHP ${actualTotalPrice.toStringAsFixed(2)}",
           ),
           pw.Text(
-            'Actual Calculated Price: PHP ${totalCalculatedPrice.toStringAsFixed(2)}',
-          ),
-          pw.Row(
-            children: [
-              pw.Text(
-                'Est. Total Weight: ${overallWeight.toStringAsFixed(2)} kg ',
-              ),
-              pw.Text(
-                '${weightDifference >= 0 ? '+' : ''}${weightDifference.toStringAsFixed(2)} kg',
-                style: pw.TextStyle(
-                  color:
-                      weightDifference >= 0 ? PdfColors.green : PdfColors.red,
-                ),
-              ),
-            ],
-          ),
-          pw.Text(
-            'Actual Calculated Weight: ${totalCalculatedWeight.toStringAsFixed(2)} kg',
+            "Actual Total Weight: ${actualTotalWeight.toStringAsFixed(2)} kg",
           ),
           pw.Text("Date: $formattedDate"),
           pw.SizedBox(height: 20),
+
+          // Users and Recyclables Section
           pw.Text(
-            "Users",
+            "Users and Recyclables",
             style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 10),
@@ -1625,15 +1896,33 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
       ),
     );
 
-    // Convert PDF to Uint8List and open in a new tab
+    // Convert PDF to Uint8List
     final pdfBytes = await pdf.save();
+
+    // Create a Blob from the Uint8List
     final blob = html.Blob([pdfBytes], 'application/pdf');
     final url = html.Url.createObjectUrlFromBlob(blob);
-    html.window.open(url, '_blank');
-    html.Url.revokeObjectUrl(url); // Clean up the object URL
+
+    // Create a hidden download link
+    final anchor = html.AnchorElement()
+      ..href = url
+      ..download = 'booking_details.pdf'
+      ..style.display = 'none';
+
+    // Add the link to the document
+    html.document.body?.append(anchor);
+
+    // Trigger a click event on the anchor
+    anchor.click();
+
+    // Remove the anchor from the document
+    anchor.remove();
+
+    // Clean up the blob URL
+    html.Url.revokeObjectUrl(url);
   }
 
-  Future<List<pw.Widget>> _generateUserDetails(
+  Future<List<pw.Widget>> _generateUserDetailsWithRecyclables(
       String bookingId, String userRole) async {
     List<pw.Widget> userDetails = [];
 
@@ -1690,15 +1979,6 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
       userDetails
           .add(pw.Text("Driver Share: PHP ${driverShare.toStringAsFixed(2)}"));
 
-      if (userStatus == 'collected') {
-        Timestamp? collectedTimestamp = userData['collected_timestamp'];
-        String collectedDate = collectedTimestamp != null
-            ? DateFormat('MM/dd/yyyy, HH:mm')
-                .format(collectedTimestamp.toDate())
-            : 'N/A';
-        userDetails.add(pw.Text("Collected: $collectedDate"));
-      }
-
       // Fetch recyclables for this user
       var recyclablesSnapshot = await FirebaseFirestore.instance
           .collection('bookings')
@@ -1709,10 +1989,27 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
           .get();
 
       if (recyclablesSnapshot.docs.isNotEmpty) {
+        userDetails.add(pw.SizedBox(height: 10));
         userDetails.add(pw.Text(
           "Recyclables:",
           style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
         ));
+
+        // Create table for recyclables
+        List<pw.TableRow> tableRows = [
+          pw.TableRow(
+            children: [
+              pw.Text("Type",
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              pw.Text("Weight (kg)",
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              pw.Text("Price (PHP)",
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              pw.Text("Item Price (PHP)",
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            ],
+          ),
+        ];
 
         for (var recDoc in recyclablesSnapshot.docs) {
           var recData = recDoc.data() as Map<String, dynamic>;
@@ -1721,14 +2018,24 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
           double price = recData['price'] ?? 0.0;
           double itemPrice = recData['final_item_price'] ?? weight * price;
 
-          userDetails.add(pw.Text("  - Type: $type"));
-          userDetails
-              .add(pw.Text("    Weight: ${weight.toStringAsFixed(2)} kg"));
-          userDetails
-              .add(pw.Text("    Price: PHP ${price.toStringAsFixed(2)}"));
-          userDetails.add(
-              pw.Text("    Item Price: PHP ${itemPrice.toStringAsFixed(2)}"));
+          tableRows.add(
+            pw.TableRow(
+              children: [
+                pw.Text(type),
+                pw.Text(weight.toStringAsFixed(2)),
+                pw.Text(price.toStringAsFixed(2)),
+                pw.Text(itemPrice.toStringAsFixed(2)),
+              ],
+            ),
+          );
         }
+
+        userDetails.add(
+          pw.Table(
+            border: pw.TableBorder.all(),
+            children: tableRows,
+          ),
+        );
       } else {
         userDetails.add(pw.Text("No recyclables found."));
       }

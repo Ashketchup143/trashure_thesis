@@ -260,16 +260,16 @@ class _InventoryState extends State<Inventory> {
                       // Inventory Titles
 
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8.0),
-                        child: Row(
-                          children: [
-                            title('Category', 2),
-                            title('Type', 2),
-                            title('Current Weight', 1),
-                            title('Details', 1),
-                          ],
-                        ),
-                      ),
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Row(
+                            children: [
+                              Expanded(flex: 1, child: SizedBox()),
+                              title('Type', 2),
+                              title('Category', 2),
+                              title('Current Weight', 1),
+                              title('Details', 1),
+                            ],
+                          )),
 
                       const Divider(
                           height: 1, color: Colors.black), // Separator line
@@ -352,7 +352,8 @@ class _InventoryState extends State<Inventory> {
   Widget title(String text, int fl) {
     return Expanded(
       flex: fl,
-      child: Center(
+      child: Align(
+        alignment: Alignment.centerLeft,
         child: Text(
           text,
           style: GoogleFonts.roboto(
@@ -387,14 +388,14 @@ class _InventoryState extends State<Inventory> {
           Expanded(
             flex: 2,
             child: Text(
-              category,
+              type,
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
           ),
           Expanded(
             flex: 2,
             child: Text(
-              type,
+              category,
               style: const TextStyle(fontSize: 16),
             ),
           ),
@@ -471,12 +472,36 @@ class _InventoryState extends State<Inventory> {
       final Map<String, double?> originalPrices = {};
       final Map<String, String?> errorMessages = {};
 
+      // Variables to calculate overall totals
+      double overallWeight = 0.0;
+      double overallPrice = 0.0;
+
+      // Function to calculate totals
+      void _calculateInitialTotals() {
+        overallWeight = 0.0;
+        overallPrice = 0.0;
+
+        for (var item in selectedItems) {
+          String itemId = item['id'];
+          double inputWeight =
+              double.tryParse(weightControllers[itemId]?.text ?? '0') ?? 0;
+          double inputPrice =
+              double.tryParse(priceControllers[itemId]?.text ?? '0') ?? 0;
+
+          overallWeight += inputWeight;
+          overallPrice += inputWeight * inputPrice;
+        }
+      }
+
       // Fetch all original prices before showing the dialog
       for (var item in selectedItems) {
+        double currentWeight = item['weight'];
         String itemId = item['id'];
         String itemType =
             item['type'].toLowerCase(); // Convert to lowercase for comparison
-        weightControllers[itemId] = TextEditingController();
+        weightControllers[itemId] = TextEditingController(
+          text: currentWeight.toStringAsFixed(2), // Pre-fill available weight
+        );
         priceControllers[itemId] = TextEditingController();
         errorMessages[itemId] = null;
 
@@ -490,164 +515,232 @@ class _InventoryState extends State<Inventory> {
         }
       }
 
+      // Calculate initial totals
+      _calculateInitialTotals();
+
       // Now that all data is ready, proceed to show the dialog
       showDialog(
         context: context,
         builder: (context) {
           return StatefulBuilder(
             builder: (context, setState) {
+              // Function to update overall totals whenever changes are made
+              void _updateOverallTotals() {
+                double tempOverallWeight = 0.0;
+                double tempOverallPrice = 0.0;
+
+                for (var item in selectedItems) {
+                  String itemId = item['id'];
+                  double inputWeight =
+                      double.tryParse(weightControllers[itemId]?.text ?? '0') ??
+                          0;
+                  double inputPrice =
+                      double.tryParse(priceControllers[itemId]?.text ?? '0') ??
+                          0;
+                  tempOverallWeight += inputWeight;
+                  tempOverallPrice += inputWeight * inputPrice;
+                }
+
+                setState(() {
+                  overallWeight = tempOverallWeight;
+                  overallPrice = tempOverallPrice;
+                });
+              }
+
               return Dialog(
-                  insetPadding: const EdgeInsets.symmetric(horizontal: 50),
-                  child: Container(
-                    width: MediaQuery.of(context).size.width * 0.8,
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Sell Products',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 24,
-                          ),
+                insetPadding: const EdgeInsets.symmetric(horizontal: 50),
+                child: Container(
+                  width: MediaQuery.of(context).size.width * 0.8,
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Sell Products',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 24,
                         ),
-                        const SizedBox(height: 20),
-                        // Representative Name Field
+                      ),
+                      const SizedBox(height: 20),
+                      // Representative Name Field
+                      TextField(
+                        controller: representativeNameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Representative Name',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      // Company Name Field
+                      TextField(
+                        controller: companyNameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Company Name',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      // Payment Method Dropdown
+                      DropdownButtonFormField<String>(
+                        value: selectedPaymentMethod,
+                        items: [
+                          DropdownMenuItem(
+                            value: 'Cash',
+                            child: const Text('Cash'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Online Payment',
+                            child: const Text('Online Payment'),
+                          ),
+                        ],
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            selectedPaymentMethod = newValue ?? 'Cash';
+                          });
+                        },
+                        decoration: const InputDecoration(
+                          labelText: 'Payment Method',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      // Reference Number Field (visible only for Online Payment)
+                      if (selectedPaymentMethod == 'Online Payment')
                         TextField(
-                          controller: representativeNameController,
+                          controller: referenceNumberController,
                           decoration: const InputDecoration(
-                            labelText: 'Representative Name',
+                            labelText: 'Reference Number',
                             border: OutlineInputBorder(),
                           ),
                         ),
-                        const SizedBox(height: 10),
-                        // Company Name Field
-                        TextField(
-                          controller: companyNameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Company Name',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        // Payment Method Dropdown
-                        DropdownButtonFormField<String>(
-                          value: selectedPaymentMethod,
-                          items: [
-                            DropdownMenuItem(
-                              value: 'Cash',
-                              child: const Text('Cash'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'Online Payment',
-                              child: const Text('Online Payment'),
-                            ),
-                          ],
-                          onChanged: (String? newValue) {
-                            setState(() {
-                              selectedPaymentMethod = newValue ?? 'Cash';
-                            });
-                          },
-                          decoration: const InputDecoration(
-                            labelText: 'Payment Method',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        // Reference Number Field (visible only for Online Payment)
-                        if (selectedPaymentMethod == 'Online Payment')
-                          TextField(
-                            controller: referenceNumberController,
-                            decoration: const InputDecoration(
-                              labelText: 'Reference Number',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                        const SizedBox(height: 10),
-                        Expanded(
-                          child: SingleChildScrollView(
-                            child: Column(
-                              children: selectedItems.map((item) {
-                                String itemId = item['id'];
-                                String category = item['category'];
-                                String type = item['type'];
-                                double currentWeight = item['weight'];
-                                double? originalPrice = originalPrices[itemId];
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: selectedItems.map((item) {
+                              String itemId = item['id'];
+                              String category = item['category'];
+                              String type = item['type'];
+                              double currentWeight = item['weight'];
+                              double? originalPrice = originalPrices[itemId];
 
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                        '$category - $type (Available: $currentWeight kg)'),
-                                    const SizedBox(height: 10),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          flex: 1,
-                                          child: TextField(
-                                            controller:
-                                                weightControllers[itemId],
-                                            keyboardType: TextInputType.number,
-                                            decoration: const InputDecoration(
-                                              labelText: 'Weight to sell (kg)',
-                                              border: OutlineInputBorder(),
-                                            ),
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                      '$category - $type (Available: $currentWeight kg)'),
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 1,
+                                        child: TextField(
+                                          controller: weightControllers[itemId],
+                                          keyboardType: TextInputType.number,
+                                          decoration: const InputDecoration(
+                                            labelText: 'Weight to sell (kg)',
+                                            border: OutlineInputBorder(),
                                           ),
+                                          onChanged: (value) =>
+                                              _updateOverallTotals(),
                                         ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          flex: 1,
-                                          child: TextField(
-                                            controller:
-                                                priceControllers[itemId],
-                                            keyboardType: TextInputType.number,
-                                            decoration: InputDecoration(
-                                              labelText: 'Enter Price per kg',
-                                              hintText: originalPrice != null
-                                                  ? '₱${originalPrice.toStringAsFixed(2)}' // Display original price as hint
-                                                  : 'Enter Price per kg',
-                                              border:
-                                                  const OutlineInputBorder(),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    if (errorMessages[itemId] != null &&
-                                        errorMessages[itemId]!.isNotEmpty)
-                                      Text(
-                                        errorMessages[itemId]!,
-                                        style:
-                                            const TextStyle(color: Colors.red),
                                       ),
-                                    const SizedBox(height: 20),
-                                  ],
-                                );
-                              }).toList(),
-                            ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        flex: 1,
+                                        child: TextField(
+                                          controller: priceControllers[itemId],
+                                          keyboardType: TextInputType.number,
+                                          decoration: InputDecoration(
+                                            labelText: 'Enter Price per kg',
+                                            hintText: originalPrice != null
+                                                ? '₱${originalPrice.toStringAsFixed(2)}'
+                                                : 'Enter Price per kg',
+                                            border: const OutlineInputBorder(),
+                                          ),
+                                          onChanged: (value) =>
+                                              _updateOverallTotals(),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                    ],
+                                  ),
+                                  Text(
+                                    '₱${((double.tryParse(weightControllers[itemId]?.text ?? '0') ?? 0) * (double.tryParse(priceControllers[itemId]?.text ?? '0') ?? 0)).toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  if (errorMessages[itemId] != null &&
+                                      errorMessages[itemId]!.isNotEmpty)
+                                    Text(
+                                      errorMessages[itemId]!,
+                                      style: const TextStyle(color: Colors.red),
+                                    ),
+                                  const SizedBox(height: 20),
+                                ],
+                              );
+                            }).toList(),
                           ),
                         ),
-                        const SizedBox(height: 20),
-                        // Buttons for Cancel and Confirm actions
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(),
-                              child: const Text('Cancel'),
-                            ),
-                            ElevatedButton(
-                              onPressed: () {
-                                bool isValid = _validateSellProductInput(
-                                    selectedItems,
-                                    weightControllers,
-                                    priceControllers,
-                                    errorMessages,
-                                    setState);
+                      ),
+                      const SizedBox(height: 20),
+                      // Display overall totals
+                      Divider(),
+                      Row(
+                        children: [
+                          Text(
+                            'Overall Weight: ${overallWeight.toStringAsFixed(2)} kg',
+                            style: const TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          SizedBox(
+                            width: 20,
+                          ),
+                          Text(
+                            'Overall Price: ₱${overallPrice.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      // Buttons for Cancel and Confirm actions
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text('Cancel'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () {
+                              bool isValid = _validateSellProductInput(
+                                  selectedItems,
+                                  weightControllers,
+                                  priceControllers,
+                                  errorMessages,
+                                  setState);
 
-                                if (isValid) {
-                                  _sellProduct(
+                              if (isValid) {
+                                // Show the confirmation modal before proceeding
+                                _showConfirmationModal(
+                                  context,
+                                  selectedItems,
+                                  weightControllers,
+                                  priceControllers,
+                                  representativeNameController.text,
+                                  companyNameController.text,
+                                  selectedPaymentMethod,
+                                  referenceNumberController.text,
+                                  overallWeight,
+                                  overallPrice,
+                                  () {
+                                    // This callback will execute the actual sell product function
+                                    _sellProduct(
                                       selectedItems,
                                       weightControllers,
                                       priceControllers,
@@ -656,23 +749,155 @@ class _InventoryState extends State<Inventory> {
                                       descriptionController,
                                       selectedPaymentMethod,
                                       referenceNumberController,
-                                      deliveryFeeController);
-                                  Navigator.of(context)
-                                      .pop(); // Close the modal after processing
-                                }
-                              },
-                              child: const Text('Confirm Sell'),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ));
+                                      deliveryFeeController,
+                                    );
+                                    Navigator.of(context)
+                                        .pop(); // Close the confirmation modal
+                                    Navigator.of(context)
+                                        .pop(); // Close the main modal
+                                  },
+                                );
+                              }
+                            },
+                            child: const Text('Confirm Sell'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
             },
           );
         },
       );
     }
+  }
+
+  void _showSuccessModal(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Success'),
+          content:
+              const Text('The product sale has been successfully recorded.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the modal
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showConfirmationModal(
+    BuildContext context,
+    List<Map<String, dynamic>> selectedItems,
+    Map<String, TextEditingController> weightControllers,
+    Map<String, TextEditingController> priceControllers,
+    String representativeName,
+    String companyName,
+    String paymentMethod,
+    String referenceNumber,
+    double overallWeight,
+    double overallPrice,
+    VoidCallback onConfirm,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Confirm Sale'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Are you sure you want to proceed with the sale?',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                if (representativeName.isNotEmpty)
+                  Text('Representative: $representativeName'),
+                if (companyName.isNotEmpty) Text('Company Name: $companyName'),
+                Text('Payment Method: $paymentMethod'),
+                if (paymentMethod == 'Online Payment' &&
+                    referenceNumber.isNotEmpty)
+                  Text('Reference Number: $referenceNumber'),
+                const SizedBox(height: 10),
+                const Text(
+                  'Items to be Sold:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 5),
+                ...selectedItems.map((item) {
+                  String itemId = item['id'];
+                  String type = item['type'];
+                  double inputWeight =
+                      double.tryParse(weightControllers[itemId]?.text ?? '0') ??
+                          0;
+                  double inputPrice =
+                      double.tryParse(priceControllers[itemId]?.text ?? '0') ??
+                          0;
+                  double itemTotal = inputWeight * inputPrice;
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 5),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(flex: 2, child: Text(type)),
+                        Expanded(
+                            flex: 1,
+                            child:
+                                Text('${inputWeight.toStringAsFixed(2)} kg')),
+                        Expanded(
+                            flex: 1,
+                            child: Text('₱${inputPrice.toStringAsFixed(2)}')),
+                        Expanded(
+                            flex: 1,
+                            child: Text('₱${itemTotal.toStringAsFixed(2)}')),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                const Divider(),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Overall Weight: ${overallWeight.toStringAsFixed(2)} kg',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'Overall Price: ₱${overallPrice.toStringAsFixed(2)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the confirmation modal
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: onConfirm,
+              child: const Text('Confirm'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   // Function to validate sell product input
@@ -789,19 +1014,7 @@ class _InventoryState extends State<Inventory> {
     for (var soldItem in soldItems) {
       await inflowRef.collection('sold').add(soldItem);
     }
-    // Check if delivery fee is greater than 0 and create outflow document
-    double deliveryFee = double.tryParse(deliveryFeeController.text) ?? 0.0;
-    if (deliveryFee > 0) {
-      try {
-        await _addOutflowDocument(
-          authorizedBy: authorizedBy,
-          deliveryFee: deliveryFee,
-        );
-        print("Outflow document created successfully for delivery fee.");
-      } catch (e) {
-        print("Error creating outflow document: $e");
-      }
-    }
+    _showSuccessModal(context);
   }
 
   Future<void> _addOutflowDocument({

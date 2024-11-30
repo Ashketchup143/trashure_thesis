@@ -149,7 +149,8 @@ class _SidebarState extends State<Sidebar> {
           ),
           _buildHoverableListTile(
               4, Icons.dashboard_outlined, 'Dashboard', '/dashboard'),
-          _buildUsersTile(),
+          _buildHoverableListTile(1, Icons.person_outlined, 'Users', '/users'),
+          // _buildUsersTile(),
           _buildBookingsTile(), // Updated Bookings Tile with dropdown
 
           _buildHoverableListTile(
@@ -160,9 +161,8 @@ class _SidebarState extends State<Sidebar> {
               10, Icons.settings_outlined, 'Products', '/products'),
           _buildHoverableListTile(
               6, Icons.directions_car_outlined, 'Vehicle', '/vehicle'),
-          if (hasFullAccess)
-            _buildHoverableListTile(30, Icons.groups_outlined, 'Employees',
-                '/employee'), // Updated Employees Tile with dropdown
+          _buildHoverableListTile(30, Icons.groups_outlined, 'Employees',
+              '/employee'), // Updated Employees Tile with dropdown
           // Logout tile with logout function
           _buildHoverableListTile(11, Icons.logout_outlined, 'Logout', '',
               onTap: _handleLogout),
@@ -308,7 +308,7 @@ class _SidebarState extends State<Sidebar> {
         ),
         if (_isBookingsExpanded) ...[
           _buildsecondHoverableListTile(
-              24, Icons.list_alt_outlined, 'Pending', '/bookings'),
+              24, Icons.list_alt_outlined, 'Scheduling', '/bookings'),
           _buildsecondHoverableListTile(
               25, Icons.check_circle_outline, 'Receiving', '/receiving'),
           _buildsecondHoverableListTile(

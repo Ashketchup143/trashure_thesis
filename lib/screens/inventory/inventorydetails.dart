@@ -68,7 +68,11 @@ class InventoryDetails extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Weight History for $itemType'),
+        iconTheme: IconThemeData(color: Colors.white),
+        title: Text(
+          'Weight History for $itemType',
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: Colors.green,
       ),
       body: FutureBuilder<DocumentSnapshot>(
@@ -158,6 +162,14 @@ class InventoryDetails extends StatelessWidget {
                                 (historyData['timestamp'] as Timestamp)
                                     .toDate();
                             final price = historyData['price'] ?? null;
+                            final category = historyData['category'] ??
+                                'From Booking'; // Default to "From Booking"
+
+                            // Determine category display text
+                            final categoryDisplay =
+                                category == 'Onsite Collection'
+                                    ? 'Onsite Collection'
+                                    : 'From Booking';
 
                             // Format the display text based on operation type
                             final weightDisplay = (operation == 'add')
@@ -191,7 +203,7 @@ class InventoryDetails extends StatelessWidget {
                                 ),
                               ),
                               subtitle: Text(
-                                'Date: $formattedDate\n$priceDisplay',
+                                'Category: $categoryDisplay\nDate: $formattedDate\n$priceDisplay',
                                 style: const TextStyle(fontSize: 14),
                               ),
                             );

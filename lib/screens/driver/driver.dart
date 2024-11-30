@@ -19,7 +19,6 @@ class _DriverState extends State<Driver> {
   bool isCollecting = false; // Flag to check if any booking is collecting
 
   @override
-  @override
   void initState() {
     super.initState();
     FirebaseAuth.instance.authStateChanges().listen((User? user) {
@@ -366,28 +365,41 @@ class _DriverState extends State<Driver> {
                         .where('driverId', isEqualTo: id)
                         .snapshots(),
                     builder: (context, snapshot) {
-                      if (!snapshot.hasData) {
-                        return Center(child: CircularProgressIndicator());
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
                       }
 
-                      // Filter bookings for 'pending' and 'collecting' statuses and sort by date in descending order
-                      var bookings = snapshot.data?.docs.where((doc) {
+                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                        return const Center(
+                          child: Text(
+                            'No bookings found.',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                        );
+                      }
+
+                      // Filter bookings for 'pending' and 'collecting' statuses
+                      var bookings = snapshot.data!.docs.where((doc) {
+                        var data = doc.data() as Map<String, dynamic>;
                         var status =
-                            (doc['status'] ?? '').toString().toLowerCase();
-                        return status == 'pending' || status == 'collecting';
+                            (data['status'] ?? '').toString().toLowerCase();
+                        var overallWeight = (data['overall_weight'] is num)
+                            ? data['overall_weight']
+                            : 0.0;
+
+                        // Only include bookings with status 'pending' or 'collecting' and weight > 0
+                        return (status == 'pending' ||
+                                status == 'collecting') &&
+                            overallWeight > 0;
                       }).toList();
 
-                      // Sort by 'date' field in descending order
-                      bookings?.sort((a, b) {
-                        var dateA = (a['date'] as Timestamp?)?.toDate() ??
-                            DateTime.now();
-                        var dateB = (b['date'] as Timestamp?)?.toDate() ??
-                            DateTime.now();
-                        return dateB.compareTo(dateA);
-                      });
-
-                      if (bookings == null || bookings.isEmpty) {
-                        return Center(child: Text('No bookings found.'));
+                      if (bookings.isEmpty) {
+                        return const Center(
+                          child: Text(
+                            'No bookings match the criteria.',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                        );
                       }
 
                       return ListView.builder(
@@ -412,11 +424,6 @@ class _DriverState extends State<Driver> {
                               bookingData['calculated_overall_price'] ??
                                   'Not set';
 
-                          // Skip this card if overallWeight is zero
-                          if (overallWeight == 0) {
-                            return SizedBox.shrink(); // Return an empty widget
-                          }
-
                           return Card(
                             margin: const EdgeInsets.all(10),
                             child: Padding(
@@ -431,11 +438,11 @@ class _DriverState extends State<Driver> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'Date: ${formatDate(bookingDate)}',
-                                          style: TextStyle(
+                                          'Date: ${formatDate(bookingDate)}, ${bookingData['start_time'] ?? 'N/A'} - ${bookingData['end_time'] ?? 'N/A'}',
+                                          style: const TextStyle(
                                               fontWeight: FontWeight.bold),
                                         ),
-                                        SizedBox(height: 4),
+                                        const SizedBox(height: 4),
                                         Text('Location: $location'),
                                         Text('Booking ID: $bookingId'),
                                         Text('Status: $bookingStatus'),
@@ -444,11 +451,14 @@ class _DriverState extends State<Driver> {
                                         Text(
                                             'Vehicle ID: ${bookingData['vehicleId']}'),
                                         Text(
-                                            'Overall Price: ₱${overallPrice.toStringAsFixed(2)}'),
-                                        Text(
-                                          'Overall Weight: ${overallWeight.toStringAsFixed(2)} kg',
+                                          'Est. Calculated Price: ₱${(calculatedPrice is num ? calculatedPrice : 0.0).toStringAsFixed(2)}',
                                         ),
-                                        Text('Calculated: ₱$calculatedPrice'),
+                                        // Text(
+                                        //     'Overall Price: ₱${overallPrice.toStringAsFixed(2)}'),
+                                        Text(
+                                          'Est. Overall Weight: ${overallWeight.toStringAsFixed(2)} kg',
+                                        ),
+
                                         if (bookingData
                                             .containsKey('starting_mileage'))
                                           Text(
@@ -456,7 +466,7 @@ class _DriverState extends State<Driver> {
                                       ],
                                     ),
                                   ),
-                                  SizedBox(width: 10),
+                                  const SizedBox(width: 10),
                                   Expanded(
                                     flex: 1,
                                     child: Column(
@@ -464,7 +474,7 @@ class _DriverState extends State<Driver> {
                                           CrossAxisAlignment.end,
                                       children: [
                                         IconButton(
-                                          icon: Icon(Icons.info),
+                                          icon: const Icon(Icons.info),
                                           onPressed: () {
                                             Navigator.pushNamed(
                                               context,
@@ -483,24 +493,32 @@ class _DriverState extends State<Driver> {
                                                 'overall_weight': bookingData[
                                                     'overall_weight'],
                                                 'date': bookingData['date'],
+                                                'start_time':
+                                                    bookingData['start_time'] ??
+                                                        'N/A',
+                                                'end_time':
+                                                    bookingData['end_time'] ??
+                                                        'N/A',
                                               },
                                             );
                                           },
                                         ),
-                                        SizedBox(height: 50),
+                                        const SizedBox(height: 50),
                                         if (bookingStatus != 'collecting')
                                           ElevatedButton(
-                                            onPressed: isCollecting
-                                                ? _showErrorModal
+                                            onPressed: isCollecting ||
+                                                    !_isSameDate(
+                                                        bookingData['date'])
+                                                ? null // Disable button if already collecting or date doesn't match
                                                 : () {
                                                     _showCollectConfirmation(
                                                         bookingId);
                                                   },
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.green,
-                                              minimumSize: Size(80, 30),
+                                              minimumSize: const Size(80, 30),
                                             ),
-                                            child: Text(
+                                            child: const Text(
                                               'Collect',
                                               style: TextStyle(
                                                   fontSize: 12,
@@ -518,17 +536,18 @@ class _DriverState extends State<Driver> {
                                                 style: ElevatedButton.styleFrom(
                                                   backgroundColor:
                                                       Colors.redAccent,
-                                                  minimumSize: Size(80, 30),
+                                                  minimumSize:
+                                                      const Size(80, 30),
                                                 ),
-                                                child: Text(
+                                                child: const Text(
                                                   'Revert',
                                                   style: TextStyle(
                                                       fontSize: 12,
                                                       color: Colors.white),
                                                 ),
                                               ),
-                                              SizedBox(height: 4),
-                                              Text(
+                                              const SizedBox(height: 4),
+                                              const Text(
                                                 'Collecting',
                                                 style: TextStyle(
                                                   color: Colors.orange,
@@ -549,12 +568,23 @@ class _DriverState extends State<Driver> {
                       );
                     },
                   ),
-                )
+                ),
               ],
             ),
           ),
         ),
       ),
     );
+  }
+
+  bool _isSameDate(Timestamp timestamp) {
+    DateTime bookingDate =
+        timestamp.toDate(); // Convert Firestore Timestamp to DateTime
+    DateTime currentDate = DateTime.now();
+
+    // Compare year, month, and day
+    return bookingDate.year == currentDate.year &&
+        bookingDate.month == currentDate.month &&
+        bookingDate.day == currentDate.day;
   }
 }

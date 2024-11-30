@@ -264,6 +264,36 @@ class _VehicleState extends State<Vehicle> {
     );
   }
 
+  // Function to delete a vehicle and its subcollection 'drivers'
+  Future<void> _deleteVehicle(String vehicleId) async {
+    try {
+      // Reference to the vehicle document
+      DocumentReference vehicleRef =
+          FirebaseFirestore.instance.collection('vehicles').doc(vehicleId);
+
+      // Delete the drivers subcollection documents
+      QuerySnapshot driversSnapshot =
+          await vehicleRef.collection('drivers').get();
+
+      for (QueryDocumentSnapshot doc in driversSnapshot.docs) {
+        await doc.reference.delete();
+      }
+
+      // Delete the vehicle document
+      await vehicleRef.delete();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Vehicle and its drivers deleted successfully.')),
+      );
+    } catch (e) {
+      print('Error deleting vehicle: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete vehicle. Please try again.')),
+      );
+    }
+  }
+
   Widget title(String text, int flex) {
     return Expanded(
       flex: flex,
@@ -328,16 +358,53 @@ class _VehicleState extends State<Vehicle> {
                   style: TextStyle(fontSize: 16))),
           Expanded(
             flex: 1,
-            child: IconButton(
-              icon: Icon(Icons.info_outline),
-              onPressed: () {
-                // Navigate to '/vehicleinformation' with the vehicle data
-                Navigator.pushNamed(
-                  context,
-                  '/vehicleinformation',
-                  arguments: vehicle,
-                );
-              },
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 30,
+                ),
+                IconButton(
+                  icon: Icon(Icons.info_outline),
+                  onPressed: () {
+                    // Navigate to '/vehicleinformation' with the vehicle data
+                    Navigator.pushNamed(
+                      context,
+                      '/vehicleinformation',
+                      arguments: vehicle,
+                    );
+                  },
+                ),
+                // IconButton(
+                //   icon: Icon(Icons.delete, color: Colors.red),
+                //   onPressed: () async {
+                //     bool confirm = await showDialog(
+                //       context: context,
+                //       builder: (BuildContext context) {
+                //         return AlertDialog(
+                //           title: Text('Delete Vehicle'),
+                //           content: Text(
+                //               'Are you sure you want to delete this vehicle?'),
+                //           actions: [
+                //             TextButton(
+                //               onPressed: () => Navigator.of(context).pop(false),
+                //               child: Text('Cancel'),
+                //             ),
+                //             TextButton(
+                //               onPressed: () => Navigator.of(context).pop(true),
+                //               child: Text('Delete'),
+                //             ),
+                //           ],
+                //         );
+                //       },
+                //     );
+
+                //     if (confirm == true) {
+                //       await _deleteVehicle(
+                //           vehicleId); // Call the delete function
+                //     }
+                //   },
+                // ),
+              ],
             ),
           ),
         ],
@@ -429,6 +496,33 @@ class _VehicleState extends State<Vehicle> {
     }
   }
 
+  Widget buildDropdownField(
+      String labelText, String? selectedValue, Function(String?) onChanged) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: DropdownButtonFormField<String>(
+        value: selectedValue,
+        decoration: InputDecoration(
+          labelText: labelText,
+          border: OutlineInputBorder(),
+        ),
+        items: ['Gasoline', 'Diesel']
+            .map((fuelType) => DropdownMenuItem(
+                  value: fuelType,
+                  child: Text(fuelType),
+                ))
+            .toList(),
+        onChanged: onChanged,
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Please select $labelText';
+          }
+          return null;
+        },
+      ),
+    );
+  }
+
   Future<Map<String, String>?> _showDriverSelectionDialog() async {
     List<Map<String, dynamic>> drivers = [];
 
@@ -507,6 +601,7 @@ class _VehicleState extends State<Vehicle> {
 
   void _showAddVehicleDialog(BuildContext context) async {
     final _formKey = GlobalKey<FormState>();
+    String? selectedFuelType;
 
     TextEditingController brandController = TextEditingController();
     TextEditingController colorController = TextEditingController();
@@ -545,7 +640,11 @@ class _VehicleState extends State<Vehicle> {
                   children: [
                     buildTextFormField('Brand', brandController, true),
                     buildTextFormField('Color', colorController, true),
-                    buildTextFormField('Fuel Type', fuelTypeController, true),
+                    buildDropdownField('Fuel Type', selectedFuelType, (value) {
+                      setState(() {
+                        selectedFuelType = value!;
+                      });
+                    }),
                     buildTextFormField(
                         'License Plate Number', licensePlateController, true),
                     buildTextFormField('Model', modelController, true),
@@ -554,31 +653,31 @@ class _VehicleState extends State<Vehicle> {
                     buildTextFormField(
                         'Weight Limit', weightLimitController, true,
                         isNumeric: true),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8.0),
-                      child: DropdownButtonFormField<String>(
-                        value: selectedDriverId,
-                        hint: Text('Select Assigned Driver (optional)'),
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            selectedDriverId = newValue;
-                          });
-                        },
-                        items: drivers.map<DropdownMenuItem<String>>((driver) {
-                          return DropdownMenuItem<String>(
-                            value: driver['id'],
-                            child: Text(driver['name'] ?? 'N/A'),
-                          );
-                        }).toList(),
-                        decoration: InputDecoration(
-                          labelText: 'Assigned Driver (optional)',
-                        ),
-                        isExpanded: true,
-                        validator: (value) {
-                          return null;
-                        },
-                      ),
-                    ),
+                    // Padding(
+                    //   padding: const EdgeInsets.only(bottom: 8.0),
+                    //   child: DropdownButtonFormField<String>(
+                    //     value: selectedDriverId,
+                    //     hint: Text('Select Assigned Driver (optional)'),
+                    //     onChanged: (String? newValue) {
+                    //       setState(() {
+                    //         selectedDriverId = newValue;
+                    //       });
+                    //     },
+                    //     items: drivers.map<DropdownMenuItem<String>>((driver) {
+                    //       return DropdownMenuItem<String>(
+                    //         value: driver['id'],
+                    //         child: Text(driver['name'] ?? 'N/A'),
+                    //       );
+                    //     }).toList(),
+                    //     decoration: InputDecoration(
+                    //       labelText: 'Assigned Driver (optional)',
+                    //     ),
+                    //     isExpanded: true,
+                    //     validator: (value) {
+                    //       return null;
+                    //     },
+                    //   ),
+                    // ),
                     buildTextFormField('Last Service Date (optional)',
                         lastServiceDateController, false),
                     buildTextFormField('Next Scheduled Maintenance (optional)',
@@ -613,7 +712,7 @@ class _VehicleState extends State<Vehicle> {
                         : '',
                     'brand': brandController.text,
                     'color': colorController.text,
-                    'fuel_type': fuelTypeController.text,
+                    'fuel_type': selectedFuelType,
                     'license_plate_number': licensePlateController.text,
                     'model': modelController.text,
                     'vehicle_type': vehicleTypeController.text,

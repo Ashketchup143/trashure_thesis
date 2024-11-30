@@ -77,16 +77,11 @@ class _EmployeesState extends State<Employees> {
         try {
           Reference ref =
               FirebaseStorage.instance.ref('employee_images/$imageFileName');
-          ListResult listResult = await ref.listAll();
-          if (listResult.items.isNotEmpty) {
-            imageUrl = await ref.getDownloadURL();
-          } else {
-            print('File not found in Firebase Storage: $imageFileName');
-            imageUrl = null;
-          }
+          imageUrl =
+              await ref.getDownloadURL(); // Directly get the download URL
         } catch (e) {
           print('Error fetching image URL: $e');
-          imageUrl = null;
+          imageUrl = null; // Set to null if file not found or any error occurs
         }
       }
 
@@ -512,6 +507,12 @@ class _EmployeesState extends State<Employees> {
               child: Column(
                 children: [
                   Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      border:
+                          const Border(bottom: BorderSide(color: Colors.grey)),
+                    ),
                     child: Row(
                       children: [
                         title('Employee ID', 3),
@@ -735,9 +736,6 @@ class _EmployeesState extends State<Employees> {
       flex: flex,
       child: Container(
         height: 20,
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide()),
-        ),
         child: Center(
           child: Text(
             text,
@@ -784,6 +782,7 @@ class _EmployeesState extends State<Employees> {
 
     Uint8List? _imageBytes;
     String? _imageFileName;
+    String? _errorMessage; // Error message to display
     bool _isUploading = false;
 
     // Function to pick an image
@@ -812,17 +811,8 @@ class _EmployeesState extends State<Employees> {
 
         await storageReference.putData(_imageBytes!);
         _isUploading = false;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Image uploaded successfully!'),
-            duration: Duration(seconds: 1),
-          ),
-        );
       } catch (e) {
         _isUploading = false;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to upload image: $e')),
-        );
       }
     }
 
@@ -927,10 +917,10 @@ class _EmployeesState extends State<Employees> {
                       const SizedBox(height: 10),
                       if (_imageBytes != null)
                         SizedBox(
-                          height: 75,
-                          width: 100,
+                          height: 50,
+                          width: 50,
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(25),
                             child: Image.memory(
                               _imageBytes!,
                               fit: BoxFit.cover,
@@ -943,6 +933,15 @@ class _EmployeesState extends State<Employees> {
                           child: Text(
                             'Selected file: $_imageFileName',
                             style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      if (_errorMessage != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Text(
+                            _errorMessage!,
+                            style: const TextStyle(
+                                color: Colors.red, fontWeight: FontWeight.bold),
                           ),
                         ),
                     ],
@@ -970,11 +969,10 @@ class _EmployeesState extends State<Employees> {
                             salaryController.text.isEmpty) ||
                         birthDateController.text.isEmpty ||
                         _imageBytes == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text(
-                                'Please fill in all required fields, including profile image and salary if applicable.')),
-                      );
+                      setModalState(() {
+                        _errorMessage =
+                            'Please fill in all required fields, including profile image and salary if applicable.';
+                      });
                       return;
                     }
 
@@ -1004,7 +1002,7 @@ class _EmployeesState extends State<Employees> {
                                     _selectedPosition!.toLowerCase() !=
                                         'contractual driver'
                                 ? salaryController.text
-                                : 0.0,
+                                : '0.0',
                         'birth_date': birthDateController.text,
                         'exp_time_in': expTimeInController.text,
                         'exp_time_out': expTimeOutController.text,
@@ -1015,15 +1013,10 @@ class _EmployeesState extends State<Employees> {
 
                       Navigator.of(context).pop();
                       _fetchEmployees();
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Employee added successfully!')),
-                      );
                     } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Failed to add employee: $e')),
-                      );
+                      setModalState(() {
+                        _errorMessage = 'Failed to add employee: $e';
+                      });
                     }
                   },
                   child: const Text('Add Employee'),

@@ -11,7 +11,6 @@ class Users extends StatefulWidget {
 }
 
 class _UsersState extends State<Users> {
-  List<Map<String, dynamic>> _usersList = []; // Store user data locally
   List<Map<String, dynamic>> _filteredUsers = []; // Store filtered data
   Map<String, bool> _selectedOptions = {}; // Checkbox states
   TextEditingController _searchController = TextEditingController();
@@ -19,7 +18,6 @@ class _UsersState extends State<Users> {
   @override
   void initState() {
     super.initState();
-    _fetchUsers();
     _searchController.addListener(_onSearchChanged); // Listen to search changes
   }
 
@@ -30,56 +28,9 @@ class _UsersState extends State<Users> {
     super.dispose();
   }
 
-  // Fetch user data from Firestore and put it in _usersList
-  Future<void> _fetchUsers() async {
-    try {
-      final snapshot =
-          await FirebaseFirestore.instance.collection('users').get();
-      List<Map<String, dynamic>> userList = snapshot.docs.map((doc) {
-        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-
-        return {
-          'id': doc.id,
-          'firstName': data['firstName'] ?? 'No First Name', // Default if null
-          'lastName': data['lastName'] ?? 'No Last Name', // Default if null
-          'category': data['category'] ?? 'Unknown', // Default if null
-          'contact': data['contact'] ?? 'No Contact', // Default if null
-          'address': data['address'] ?? 'No Address', // Default if null
-          'email': data['email'] ?? 'No Email', // Default if null
-          'balance': data['balance'] ?? 0.0, // Default if null
-          'profileImage': data['profileImage'] ?? '', // Default profile image
-          'landmark': data['landmark'] ?? 'No Landmark', // Default if null
-          'location': data['location'] ?? GeoPoint(0, 0), // Default GeoPoint
-          'status': data['status'] ?? 'unbooked', // Adding status with default
-        };
-      }).toList();
-
-      setState(() {
-        _usersList = userList;
-        _filteredUsers = userList; // Initialize filtered list with all users
-      });
-    } catch (e) {
-      print('Error fetching users: $e');
-      // Optionally, show an error message to the user
-    }
-  }
-
   // Function to handle search changes
   void _onSearchChanged() {
-    String searchTerm = _searchController.text.toLowerCase();
-    setState(() {
-      _filteredUsers = _usersList.where((user) {
-        String fullName =
-            '${user['firstName']} ${user['lastName']}'.toLowerCase();
-        return fullName.contains(searchTerm) ||
-            user['category'].toLowerCase().contains(searchTerm) ||
-            user['contact'].toLowerCase().contains(searchTerm) ||
-            user['address'].toLowerCase().contains(searchTerm) ||
-            user['status']
-                .toLowerCase()
-                .contains(searchTerm); // Include status in search
-      }).toList();
-    });
+    setState(() {}); // Trigger rebuild to apply filtering
   }
 
   void _showUserInformation(Map<String, dynamic> user) {
@@ -93,8 +44,10 @@ class _UsersState extends State<Users> {
   // Function to get color based on status
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'scheduled':
-        return Colors.blue;
+      case 'done':
+        return const Color.fromARGB(255, 89, 167, 230);
+      case 'booked':
+        return const Color.fromARGB(255, 89, 169, 92);
       case 'unbooked':
       default:
         return Color(0xFFF5D322);
@@ -149,7 +102,7 @@ class _UsersState extends State<Users> {
                         controller: _searchController,
                         decoration: InputDecoration(
                           hintText:
-                              'Search by name, category, contact, address, or status',
+                              'Search by name, category, contact, address, area, or status',
                           border: InputBorder.none,
                           prefixIcon: Icon(Icons.search),
                         ),
@@ -163,46 +116,105 @@ class _UsersState extends State<Users> {
                   height: MediaQuery.of(context).size.height * .8,
                   width: MediaQuery.of(context).size.width,
                   decoration: BoxDecoration(border: Border.all()),
-                  child: Column(
-                    children: [
-                      // Table Headers
-                      Row(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('users')
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Center(child: CircularProgressIndicator());
+                      }
+                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                        return Center(child: Text('No users found.'));
+                      }
+
+                      // Map Firestore data to local users list
+                      List<Map<String, dynamic>> usersList =
+                          snapshot.data!.docs.map((doc) {
+                        Map<String, dynamic> data =
+                            doc.data() as Map<String, dynamic>;
+                        return {
+                          'id': doc.id,
+                          'firstName': data['firstName'] ?? 'No First Name',
+                          'lastName': data['lastName'] ?? 'No Last Name',
+                          'category': data['category'] ?? 'Unknown',
+                          'contact': data['contact'] ?? 'No Contact',
+                          'address': data['address'] ?? 'No Address',
+                          'area': data['area'] ?? 'No Area',
+                          'email': data['email'] ?? 'No Email',
+                          'balance': data['balance'] ?? 0.0,
+                          'profileImage': data['profileImage'] ?? '',
+                          'landmark': data['landmark'] ?? 'No Landmark',
+                          'location': data['location'] ?? GeoPoint(0, 0),
+                          'status': data['status'] ?? 'unbooked',
+                        };
+                      }).toList();
+
+                      // Filter users for search
+                      String searchTerm = _searchController.text.toLowerCase();
+                      _filteredUsers = usersList.where((user) {
+                        String fullName =
+                            '${user['firstName']} ${user['lastName']}'
+                                .toLowerCase();
+                        return fullName.contains(searchTerm) ||
+                            user['category']
+                                .toLowerCase()
+                                .contains(searchTerm) ||
+                            user['contact']
+                                .toLowerCase()
+                                .contains(searchTerm) ||
+                            user['address']
+                                .toLowerCase()
+                                .contains(searchTerm) ||
+                            user['area']
+                                .toLowerCase()
+                                .contains(searchTerm) || // Area search
+                            user['status'].toLowerCase().contains(
+                                searchTerm); // Include status in search
+                      }).toList();
+
+                      return Column(
                         children: [
-                          title('Name', 3),
-                          title('Category', 2),
-                          title('Contact', 2),
-                          title('Address', 3),
-                          title('Status', 2),
-                          title('Details', 1),
+                          // Table Headers
+                          Row(
+                            children: [
+                              title('Name', 3),
+                              title('Category', 2),
+                              title('Area', 2), // Add Area column
+                              title('Contact', 2),
+                              title('Address', 3),
+                              title('Status', 2),
+                              title('Details', 1),
+                            ],
+                          ),
+                          // Users List
+                          Expanded(
+                            child: ListView.builder(
+                              itemCount: _filteredUsers.length,
+                              itemBuilder: (context, index) {
+                                final user = _filteredUsers[index];
+                                final uid = user['id'];
+
+                                // Initialize checkbox state if not present
+                                _selectedOptions[uid] =
+                                    _selectedOptions[uid] ?? false;
+
+                                return _buildCustomCheckboxTile(
+                                  uid,
+                                  '${user['firstName']} ${user['lastName']}',
+                                  user['category'],
+                                  user['contact'],
+                                  user['address'],
+                                  user['area'], // Add area data
+                                  user['status'], // Include status
+                                  user,
+                                );
+                              },
+                            ),
+                          ),
                         ],
-                      ),
-                      // Users List
-                      Expanded(
-                        child: _filteredUsers.isNotEmpty
-                            ? ListView.builder(
-                                itemCount: _filteredUsers.length,
-                                itemBuilder: (context, index) {
-                                  final user = _filteredUsers[index];
-                                  final uid = user['id'];
-
-                                  // Initialize checkbox state if not present
-                                  _selectedOptions[uid] =
-                                      _selectedOptions[uid] ?? false;
-
-                                  return _buildCustomCheckboxTile(
-                                    uid,
-                                    '${user['firstName']} ${user['lastName']}',
-                                    user['category'],
-                                    user['contact'],
-                                    user['address'],
-                                    user['status'], // Include status
-                                    user,
-                                  );
-                                },
-                              )
-                            : Center(child: Text('No users found.')),
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ),
               ],
@@ -240,13 +252,13 @@ class _UsersState extends State<Users> {
   }
 
   // Custom Checkbox List Tile for each user
-  // Custom Checkbox List Tile for each user
   Widget _buildCustomCheckboxTile(
     String uid,
     String name,
     String category,
     String contact,
     String address,
+    String area, // Added area
     String status, // Added status here
     Map<String, dynamic> user,
   ) {
@@ -270,6 +282,10 @@ class _UsersState extends State<Users> {
           Expanded(
             flex: 2,
             child: Text(category),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(area), // Display area
           ),
           Expanded(
             flex: 2,

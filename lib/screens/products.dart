@@ -65,7 +65,7 @@ class _ProductsState extends State<Products> {
   }
 
   // Fetch the latest price from the 'prices' subcollection
-  Future<double> _fetchLatestPrice(String productId) async {
+  Future<Map<String, double>> _fetchLatestPrice(String productId) async {
     QuerySnapshot priceSnapshot = await _productsCollection
         .doc(productId)
         .collection('prices')
@@ -74,20 +74,19 @@ class _ProductsState extends State<Products> {
         .get();
 
     if (priceSnapshot.docs.isNotEmpty) {
-      return priceSnapshot.docs.first['price'] ?? 0.0;
+      var latestPriceData =
+          priceSnapshot.docs.first.data() as Map<String, dynamic>;
+      return {
+        'price': latestPriceData['price'] ?? 0.0,
+        'original_price': latestPriceData['original_price'] ?? 0.0,
+      };
     }
-    return 0.0;
+    return {'price': 0.0, 'original_price': 0.0};
   }
 
   void _onSearchChanged() {
-    String searchTerm = _searchController.text.trim().toLowerCase();
     setState(() {
-      _filteredProducts = _allProducts.where((product) {
-        String productName = product['product_name'].toString().toLowerCase();
-        String category = product['category'].toString().toLowerCase();
-        return productName.contains(searchTerm) ||
-            category.contains(searchTerm);
-      }).toList();
+      _searchTerm = _searchController.text.trim().toLowerCase();
     });
   }
 
@@ -282,45 +281,103 @@ class _ProductsState extends State<Products> {
                                   children: [
                                     _titleCell('Product Name', 3),
                                     _titleCell('Category', 2),
+                                    _titleCell(
+                                        'Original Price', 2), // Add this column
                                     _titleCell('Price', 2),
                                     _titleCell('Details', 4),
                                   ],
                                 ),
                               ),
                               Expanded(
-                                child: _filteredProducts.isEmpty
-                                    ? Center(child: Text('No products found'))
-                                    : ListView.builder(
-                                        itemCount: _filteredProducts.length,
-                                        itemBuilder: (context, index) {
-                                          var product =
-                                              _filteredProducts[index];
-                                          String productId = product[
-                                              'id']; // Correct way to get id
-                                          return FutureBuilder<double>(
-                                            future:
-                                                _fetchLatestPrice(productId),
-                                            builder: (context, snapshot) {
-                                              if (snapshot.connectionState ==
-                                                  ConnectionState.waiting) {
-                                                return Center(
-                                                    child:
-                                                        CircularProgressIndicator());
-                                              }
-                                              if (snapshot.hasError) {
-                                                return Text(
-                                                    'Error fetching price');
-                                              }
-                                              double price =
-                                                  snapshot.data ?? 0.0;
+                                child: StreamBuilder<QuerySnapshot>(
+                                  stream: _productsCollection
+                                      .snapshots(), // Real-time updates
+                                  builder: (context, snapshot) {
+                                    if (snapshot.connectionState ==
+                                        ConnectionState.waiting) {
+                                      return Center(
+                                          child: CircularProgressIndicator());
+                                    }
 
-                                              // Now pass the entire product map
-                                              return _buildProductTile(product);
-                                            },
-                                          );
-                                        },
-                                      ),
-                              )
+                                    if (snapshot.hasError) {
+                                      return Center(
+                                        child: Text(
+                                            'Error fetching products: ${snapshot.error}'),
+                                      );
+                                    }
+
+                                    if (!snapshot.hasData ||
+                                        snapshot.data!.docs.isEmpty) {
+                                      return Center(
+                                          child: Text('No products found'));
+                                    }
+
+                                    // Fetch all products from Firestore
+                                    final allProducts =
+                                        snapshot.data!.docs.map((doc) {
+                                      return {
+                                        ...doc.data() as Map<String, dynamic>,
+                                        'id': doc.id, // Include document ID
+                                      };
+                                    }).toList();
+
+                                    // Filter products based on the search term
+                                    final filteredProducts =
+                                        allProducts.where((product) {
+                                      String productName =
+                                          product['product_name']
+                                              .toString()
+                                              .toLowerCase();
+                                      String category = product['category']
+                                          .toString()
+                                          .toLowerCase();
+                                      return productName
+                                              .contains(_searchTerm) ||
+                                          category.contains(_searchTerm);
+                                    }).toList();
+
+                                    // Display the filtered products
+                                    return ListView.builder(
+                                      itemCount: filteredProducts.length,
+                                      itemBuilder: (context, index) {
+                                        var product = filteredProducts[index];
+                                        String productId = product['id'];
+
+                                        return FutureBuilder<
+                                            Map<String, double>>(
+                                          future: _fetchLatestPrice(productId),
+                                          builder: (context, priceSnapshot) {
+                                            if (priceSnapshot.connectionState ==
+                                                ConnectionState.waiting) {
+                                              return Center(
+                                                  child:
+                                                      CircularProgressIndicator());
+                                            }
+                                            if (priceSnapshot.hasError) {
+                                              return Text(
+                                                  'Error fetching price');
+                                            }
+                                            if (!priceSnapshot.hasData) {
+                                              return Text(
+                                                  'No price data available');
+                                            }
+
+                                            double price =
+                                                priceSnapshot.data!['price'] ??
+                                                    0.0;
+                                            double originalPrice = priceSnapshot
+                                                    .data!['original_price'] ??
+                                                0.0;
+
+                                            return _buildProductTile(
+                                                product, price, originalPrice);
+                                          },
+                                        );
+                                      },
+                                    );
+                                  },
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -364,7 +421,8 @@ class _ProductsState extends State<Products> {
   }
 
 // Inside _buildProductTile
-  Widget _buildProductTile(Map<String, dynamic> product) {
+  Widget _buildProductTile(
+      Map<String, dynamic> product, double price, double originalPrice) {
     String productId = product['id'];
     String productName = product['product_name'];
     String category = product['category'];
@@ -372,109 +430,104 @@ class _ProductsState extends State<Products> {
     String details = product['details'];
     String picture = product['picture'];
 
-    return FutureBuilder<double>(
-      future: _fetchLatestPrice(productId),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Text('Error fetching price');
-        }
-        double price = snapshot.data ?? 0.0;
-
-        return ListTile(
-          leading: FutureBuilder<String?>(
-            future:
-                _getProductImage(picture), // Fetch the image URL by filename
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.done) {
-                if (snapshot.hasData && snapshot.data != null) {
-                  // Display the fetched image
-                  return ClipOval(
-                    child: Image.network(
-                      snapshot.data!,
-                      width: 50,
-                      height: 50,
-                      fit: BoxFit.cover,
-                    ),
-                  );
-                } else {
-                  // Fallback to default image if no URL is found
-                  return Icon(Icons.image_not_supported, size: 50);
-                }
-              } else {
-                // Display a loading indicator while fetching the image URL
-                return CircularProgressIndicator();
-              }
+    return ListTile(
+      leading: FutureBuilder<String?>(
+        future: _getProductImage(picture), // Fetch the image URL by filename
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.done) {
+            if (snapshot.hasData && snapshot.data != null) {
+              // Display the fetched image
+              return ClipOval(
+                child: Image.network(
+                  snapshot.data!,
+                  width: 50,
+                  height: 50,
+                  fit: BoxFit.cover,
+                ),
+              );
+            } else {
+              // Fallback to default image if no URL is found
+              return Icon(Icons.image_not_supported, size: 50);
+            }
+          } else {
+            // Display a loading indicator while fetching the image URL
+            return CircularProgressIndicator();
+          }
+        },
+      ),
+      title: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: Text(
+              productName,
+              style: GoogleFonts.poppins(
+                textStyle: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(category),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+                '₱${originalPrice.toStringAsFixed(2)}/$unit'), // Original Price
+          ),
+          Expanded(
+            flex: 2,
+            child: Text('₱${price.toStringAsFixed(2)}/$unit'), // Current Price
+          ),
+          Expanded(
+            flex: 4,
+            child: Text(_truncateDetails(details)),
+          ),
+        ],
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: Icon(Icons.edit),
+            onPressed: () {
+              _showEditProductDialog(
+                  context,
+                  productId,
+                  productName,
+                  category,
+                  originalPrice.toString(),
+                  price.toString(),
+                  unit,
+                  details,
+                  picture);
             },
           ),
-          title: Row(
-            children: [
-              Expanded(
-                flex: 3,
-                child: Text(
-                  productName,
-                  style: GoogleFonts.poppins(
-                    textStyle: TextStyle(fontWeight: FontWeight.bold),
+          // IconButton(
+          //   icon: Icon(Icons.delete, color: Colors.red),
+          //   onPressed: () {
+          //     _showDeleteProductDialog(context, productId);
+          //   },
+          // ),
+          IconButton(
+            icon: Icon(Icons.info_outline),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProductInformation(
+                    productId: productId,
+                    productName: productName,
+                    details: details,
+                    category: category,
+                    imageUrl: picture, // Pass file name to details screen
                   ),
                 ),
-              ),
-              Expanded(flex: 1, child: Container()),
-              Expanded(
-                flex: 2,
-                child: Text(category),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text('₱${price.toStringAsFixed(2)}/$unit'),
-              ),
-              Expanded(
-                flex: 4,
-                child: Text(_truncateDetails(details)),
-              ),
-            ],
+              );
+            },
           ),
-          tileColor: Color.fromARGB(255, 255, 255, 255),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: Icon(Icons.edit),
-                onPressed: () {
-                  _showEditProductDialog(context, productId, productName,
-                      category, price.toString(), unit, details, picture);
-                },
-              ),
-              IconButton(
-                icon: Icon(Icons.delete, color: Colors.red),
-                onPressed: () {
-                  _showDeleteProductDialog(context, productId);
-                },
-              ),
-              IconButton(
-                icon: Icon(
-                  Icons.info_outline,
-                ), // Added Details Icon
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ProductInformation(
-                        productId: productId,
-                        productName: productName,
-                        details: details,
-                        category: category,
-                        imageUrl: picture, // Pass file name to details screen
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        );
-      },
+        ],
+      ),
     );
   }
 
@@ -544,12 +597,13 @@ class _ProductsState extends State<Products> {
       String productId,
       String productName,
       String category,
+      String Originalprice,
       String price,
       String unit,
       String details,
       String picture) {
     final TextEditingController priceController =
-        TextEditingController(text: price);
+        TextEditingController(text: Originalprice);
     final TextEditingController detailsController =
         TextEditingController(text: details);
     String? _imageFileName; // Filename for the uploaded image
@@ -943,7 +997,8 @@ class _ProductsState extends State<Products> {
       builder: (context) {
         return AlertDialog(
           title: Text('Delete Product'),
-          content: Text('Are you sure you want to delete this product?'),
+          content: Text(
+              'Are you sure you want to delete this product and its associated prices?'),
           actions: [
             ElevatedButton(
               style:
@@ -956,32 +1011,48 @@ class _ProductsState extends State<Products> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
               onPressed: () async {
-                // Get the product document to retrieve the image filename
-                DocumentSnapshot productSnapshot =
-                    await _productsCollection.doc(productId).get();
+                try {
+                  // Get the product document to retrieve the image filename
+                  DocumentSnapshot productSnapshot =
+                      await _productsCollection.doc(productId).get();
 
-                if (productSnapshot.exists) {
-                  String? imageFileName =
-                      productSnapshot['picture']; // Get the filename
+                  if (productSnapshot.exists) {
+                    String? imageFileName = productSnapshot['picture'];
 
-                  // If there's an image associated, delete it from Firebase Storage
-                  if (imageFileName != null && imageFileName.isNotEmpty) {
-                    try {
-                      await FirebaseStorage.instance
-                          .ref('product_images/$imageFileName')
-                          .delete();
-                      print('Image deleted from storage');
-                    } catch (e) {
-                      print('Error deleting image: $e');
+                    // Delete the image from Firebase Storage if it exists
+                    if (imageFileName != null && imageFileName.isNotEmpty) {
+                      try {
+                        await FirebaseStorage.instance
+                            .ref('product_images/$imageFileName')
+                            .delete();
+                        print('Image deleted from storage');
+                      } catch (e) {
+                        print('Error deleting image: $e');
+                      }
                     }
-                  }
 
-                  // Delete the product document from Firestore
-                  await _productsCollection.doc(productId).delete();
-                  _fetchProducts(); // Refresh products after deletion
-                  Navigator.of(context).pop();
-                } else {
-                  print('Product does not exist.');
+                    // Delete all documents in the 'prices' subcollection
+                    QuerySnapshot pricesSnapshot = await _productsCollection
+                        .doc(productId)
+                        .collection('prices')
+                        .get();
+
+                    for (var doc in pricesSnapshot.docs) {
+                      await doc.reference.delete();
+                    }
+                    print('Prices subcollection deleted.');
+
+                    // Delete the product document
+                    await _productsCollection.doc(productId).delete();
+                    print('Product deleted.');
+
+                    _fetchProducts(); // Refresh the product list
+                    Navigator.of(context).pop();
+                  } else {
+                    print('Product does not exist.');
+                  }
+                } catch (e) {
+                  print('Error deleting product and prices: $e');
                 }
               },
               child: Text('Delete'),

@@ -206,6 +206,7 @@ class _VehicleInformationState extends State<VehicleInformation> {
                               // Makes the list scrollable
                               child: ListView.builder(
                             itemCount: bookings.length,
+                            // Inside the ListView.builder for displaying bookings
                             itemBuilder: (context, index) {
                               var booking = bookings[index];
 
@@ -219,10 +220,17 @@ class _VehicleInformationState extends State<VehicleInformation> {
                                   booking['driver'] ?? 'No Driver Assigned';
                               String vehicle =
                                   booking['vehicle'] ?? 'No Vehicle Assigned';
+
+                              // Use final calculated values if they exist, otherwise use fallback
                               double overallPrice =
-                                  booking['overall_price'] ?? 0.0;
+                                  booking['final_calculated_overall_price'] ??
+                                      booking['calculated_overall_price'] ??
+                                      0.0;
                               double overallWeight =
-                                  booking['overall_weight'] ?? 0.0;
+                                  booking['final_overall_weight'] ??
+                                      booking['overall_weight'] ??
+                                      0.0;
+
                               String startTime =
                                   booking['start_time'] ?? 'No Start Time';
                               String endTime =
@@ -240,8 +248,10 @@ class _VehicleInformationState extends State<VehicleInformation> {
                                     Text('Status: $status'),
                                     Text('Driver: $driver'),
                                     Text('Vehicle: $vehicle'),
-                                    Text('Price: ₱$overallPrice'),
-                                    Text('Weight: $overallWeight kg'),
+                                    Text(
+                                        'Price: ₱${overallPrice.toStringAsFixed(2)}'),
+                                    Text(
+                                        'Weight: ${overallWeight.toStringAsFixed(2)} kg'),
                                   ],
                                 ),
                                 trailing: IconButton(

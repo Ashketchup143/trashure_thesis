@@ -2,8 +2,6 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart';
-import 'package:file_picker/file_picker.dart';
 
 import 'dart:io';
 
@@ -22,8 +20,6 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
   String birthDate = 'Loading...';
   String status = 'Loading...';
   String id = 'Loading...';
-  double totalDriverShare = 0.0;
-  List<Map<String, dynamic>> bookingsList = [];
   String imageUrl = '';
   File? _selectedImage;
 
@@ -73,61 +69,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
             print('Error fetching image URL: $e');
           }
         }
-
-        // Fetch the bookings associated with the driver
-        await _fetchDriverBookings();
       }
-    }
-  }
-
-  Future<void> _fetchDriverBookings() async {
-    try {
-      QuerySnapshot bookingsSnapshot = await FirebaseFirestore.instance
-          .collection('bookings')
-          .where('driverId', isEqualTo: id)
-          .get();
-
-      double totalShare = 0.0;
-      List<Map<String, dynamic>> fetchedBookings = [];
-
-      for (var doc in bookingsSnapshot.docs) {
-        var bookingData = doc.data() as Map<String, dynamic>;
-        double driverShare =
-            double.tryParse(bookingData['driver_share']?.toString() ?? '0.0') ??
-                0.0;
-        totalShare += driverShare;
-
-        Timestamp timestamp = bookingData['date'] ?? Timestamp.now();
-        String formattedDate =
-            DateFormat('MM/dd/yyyy, EEEE').format(timestamp.toDate());
-
-        fetchedBookings.add({
-          'bookingId': doc.id,
-          'date': formattedDate,
-          'status': bookingData['status'] ?? 'Unknown',
-          'vehicle': bookingData['vehicle'] ?? 'N/A',
-          'overall_weight': double.tryParse(
-                  bookingData['overall_weight']?.toString() ?? '0.0') ??
-              0.0,
-          'overall_price': double.tryParse(
-                  bookingData['overall_price']?.toString() ?? '0.0') ??
-              0.0,
-          'driver_share': driverShare,
-        });
-      }
-
-      fetchedBookings.sort((a, b) {
-        DateTime dateA = DateFormat('MM/dd/yyyy, EEEE').parse(a['date']);
-        DateTime dateB = DateFormat('MM/dd/yyyy, EEEE').parse(b['date']);
-        return dateB.compareTo(dateA);
-      });
-
-      setState(() {
-        totalDriverShare = totalShare;
-        bookingsList = fetchedBookings;
-      });
-    } catch (e) {
-      print('Error fetching bookings: $e');
     }
   }
 
@@ -183,127 +125,54 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.center, // Center contents horizontally
               children: [
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Colors.grey.shade300,
-                    backgroundImage:
-                        imageUrl.isNotEmpty ? NetworkImage(imageUrl) : null,
-                    child: imageUrl.isEmpty
-                        ? const Icon(Icons.person,
-                            size: 50, color: Colors.white)
-                        : null,
+                SizedBox(
+                  height: 100,
+                ),
+                CircleAvatar(
+                  radius: 70,
+                  backgroundColor: Colors.grey.shade300,
+                  backgroundImage:
+                      imageUrl.isNotEmpty ? NetworkImage(imageUrl) : null,
+                  child: imageUrl.isEmpty
+                      ? const Icon(Icons.person, size: 70, color: Colors.white)
+                      : null,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Driver: $name',
+                  style: const TextStyle(
+                    color: Colors.green,
+                    fontSize: 26, // Larger font size
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(width: 16),
-                Padding(
-                  padding: const EdgeInsets.only(left: 16.0),
-                  child: Text(
-                    'Driver: $name',
-                    style: const TextStyle(
-                      color: Colors.green,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                const SizedBox(height: 8),
+                Text(
+                  'Email: $email',
+                  style: const TextStyle(fontSize: 18), // Larger font size
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(left: 16.0),
-                  child: Text(
-                    'Email: $email',
-                    style: const TextStyle(fontSize: 14),
-                  ),
+                const SizedBox(height: 8),
+                Text(
+                  'Phone: $phone',
+                  style: const TextStyle(fontSize: 18), // Larger font size
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(left: 16.0, top: 8),
-                  child: Text(
-                    'Phone: $phone',
-                    style: const TextStyle(fontSize: 14),
-                  ),
+                const SizedBox(height: 8),
+                Text(
+                  'Address: $address',
+                  style: const TextStyle(fontSize: 18), // Larger font size
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(left: 16.0, top: 8),
-                  child: Text(
-                    'Address: $address',
-                    style: const TextStyle(fontSize: 14),
-                  ),
+                const SizedBox(height: 8),
+                Text(
+                  'Birth Date: $birthDate',
+                  style: const TextStyle(fontSize: 18), // Larger font size
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(left: 16.0, top: 8),
-                  child: Text(
-                    'Birth Date: $birthDate',
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(left: 16.0, top: 8),
-                  child: Text(
-                    'Status: $status',
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(left: 16.0, top: 8),
-                  child: Text(
-                    'Total Driver Share: ₱${totalDriverShare.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
-                    ),
-                  ),
-                ),
-                const Divider(),
-                const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Text(
-                    'Bookings:',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Expanded(
-                  child: bookingsList.isEmpty
-                      ? const Center(child: Text('No bookings found.'))
-                      : ListView.builder(
-                          itemCount: bookingsList.length,
-                          itemBuilder: (context, index) {
-                            var booking = bookingsList[index];
-                            return Card(
-                              margin: const EdgeInsets.symmetric(
-                                  vertical: 8.0, horizontal: 16.0),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15.0),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Date: ${booking['date']}',
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                    Text('Status: ${booking['status']}'),
-                                    Text('Vehicle: ${booking['vehicle']}'),
-                                    Text(
-                                      'Overall Weight: ${booking['overall_weight'] is double ? booking['overall_weight'].toStringAsFixed(2) : 'N/A'} kg',
-                                    ),
-                                    Text(
-                                      'Overall Price: ₱${booking['overall_price'] is double ? booking['overall_price'].toStringAsFixed(2) : 'N/A'}',
-                                    ),
-                                    Text(
-                                      'Driver Share: ₱${booking['driver_share'] is double ? booking['driver_share'].toStringAsFixed(2) : 'N/A'}',
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                const SizedBox(height: 8),
+                Text(
+                  'Status: $status',
+                  style: const TextStyle(fontSize: 18), // Larger font size
                 ),
               ],
             ),
@@ -322,19 +191,6 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Display selected image preview
-              _selectedImage != null
-                  ? Image.file(
-                      _selectedImage!,
-                      height: 100,
-                      width: 100,
-                      fit: BoxFit.cover,
-                    )
-                  : const Icon(Icons.person, size: 100),
-              TextButton(
-                onPressed: _pickImage,
-                child: const Text('Choose Image'),
-              ),
               TextField(
                 controller: phoneController,
                 decoration: const InputDecoration(labelText: 'Contact Number'),
@@ -366,21 +222,6 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
     );
   }
 
-  // Function to pick an image using file_picker
-  Future<void> _pickImage() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      allowMultiple: false,
-    );
-
-    if (result != null && result.files.single.path != null) {
-      setState(() {
-        _selectedImage = File(result.files.single.path!);
-      });
-    }
-  }
-
-  // Function to upload the selected image to Firebase Storage
   Future<void> _uploadImage() async {
     try {
       final storageRef = FirebaseStorage.instance.ref().child(

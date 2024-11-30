@@ -103,42 +103,42 @@ class _AddInventoryModalState extends State<AddInventoryModal> {
     CollectionReference inventory =
         FirebaseFirestore.instance.collection('inventory');
 
+    // Normalize the type to lowercase before storing it
     String normalizedType = type.toLowerCase();
 
+    // Query inventory for the type in lowercase
     QuerySnapshot inventoryDocs =
         await inventory.where('type', isEqualTo: normalizedType).limit(1).get();
 
-    if (inventoryDocs.docs.isEmpty) {
-      inventoryDocs = await inventory
-          .where('type_lowercase', isEqualTo: normalizedType)
-          .limit(1)
-          .get();
-    }
-
     if (inventoryDocs.docs.isNotEmpty) {
+      // If the type already exists, update the weight
       DocumentReference typeDoc = inventoryDocs.docs.first.reference;
 
       await typeDoc.update({
         'weight': FieldValue.increment(weight),
       });
 
+      // Add weight change to weight history
       await typeDoc.collection('weight_history').add({
         'weight': weight,
         'operation': 'add',
         'timestamp': FieldValue.serverTimestamp(),
+        'category': 'Onsite Collection',
       });
     } else {
+      // If the type doesn't exist, create a new document
       DocumentReference newDocRef = await inventory.add({
         'category': category,
-        'type': type,
-        'type_lowercase': normalizedType,
+        'type': normalizedType, // Store type in lowercase
         'weight': weight,
       });
 
+      // Add the weight change to weight history
       await newDocRef.collection('weight_history').add({
         'weight': weight,
         'operation': 'add',
         'timestamp': FieldValue.serverTimestamp(),
+        'category': 'Onsite Collection',
       });
     }
   }
@@ -191,24 +191,9 @@ class _AddInventoryModalState extends State<AddInventoryModal> {
 
     String userName = Provider.of<UserModel>(context, listen: false).userName;
 
-    // Add document to 'onsite_collections' collection
-    DocumentReference onsiteCollectionRef =
-        await FirebaseFirestore.instance.collection('onsite_collections').add({
-      'overall_price': overallPrice,
-      'overall_weight': overallWeight,
-      'date': FieldValue.serverTimestamp(),
-      'authorized_by': userName,
-    });
-
-    // Add each recyclable item to the 'recyclables' subcollection of 'onsite_collections'
-    for (var recyclable in recyclables) {
-      await onsiteCollectionRef.collection('recyclables').add(recyclable);
-    }
-
     // Add document to 'outflow' collection
     DocumentReference outflowRef =
         await FirebaseFirestore.instance.collection('outflow').add({
-      'collectionId': onsiteCollectionRef.id,
       'category': 'onsite collection',
       'date': FieldValue.serverTimestamp(),
       'employee': userName,

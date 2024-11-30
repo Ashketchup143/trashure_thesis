@@ -27,8 +27,6 @@ class _BookingState extends State<Booking> {
 
   String? selectedDriver;
   String? selectedVehicle;
-  String? selectedDriverPosition;
-
   Map<String, bool> _selectedOptions = {};
 
   List<DocumentSnapshot> filteredBookings = [];
@@ -133,8 +131,9 @@ class _BookingState extends State<Booking> {
                             title('Location', 2),
                             title('Driver', 2),
                             title('Vehicle', 2),
-                            title('OA. Price', 1),
-                            title('OA. Weight', 1),
+                            title('Est. Price', 1),
+                            title('Est. Weight', 1),
+                            title('Customers', 1),
                             title('Status', 1),
                             title('Details', 1),
                           ],
@@ -530,28 +529,38 @@ class _BookingState extends State<Booking> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Date Field with Validation
                     TextFormField(
-                      controller: dateController,
-                      decoration: const InputDecoration(
-                        labelText: "Select Date",
-                        border: OutlineInputBorder(),
-                      ),
-                      readOnly: true,
-                      onTap: () async {
-                        DateTime? pickedDate = await showDatePicker(
-                          context: context,
-                          initialDate: selectedDate,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2030),
-                        );
-                        if (pickedDate != null) {
-                          setState(() {
-                            selectedDate = pickedDate;
-                            dateController.text = _formatDate(pickedDate);
-                          });
-                        }
-                      },
-                    ),
+                        controller: dateController,
+                        decoration: const InputDecoration(
+                          labelText: "Select Date",
+                          border: OutlineInputBorder(),
+                        ),
+                        readOnly: true,
+                        onTap: () async {
+                          DateTime today = DateTime.now();
+                          DateTime firstDate = today.add(const Duration(
+                              days: 1)); // Ensure at least one day ahead
+                          DateTime initialDate =
+                              selectedDate.isBefore(firstDate)
+                                  ? firstDate
+                                  : selectedDate;
+
+                          DateTime? pickedDate = await showDatePicker(
+                            context: context,
+                            initialDate:
+                                initialDate, // Fix: Ensure this is after firstDate
+                            firstDate:
+                                firstDate, // At least one day ahead of today
+                            lastDate: DateTime(2030),
+                          );
+                          if (pickedDate != null) {
+                            setState(() {
+                              selectedDate = pickedDate;
+                              dateController.text = _formatDate(pickedDate);
+                            });
+                          }
+                        }),
                     const SizedBox(height: 10),
                     // District Dropdown
                     DropdownButtonFormField<String>(
@@ -577,9 +586,7 @@ class _BookingState extends State<Booking> {
                       },
                     ),
                     const SizedBox(height: 10),
-                    // Button to add all locations
-                    const SizedBox(height: 10),
-                    // Location Dropdown (allows multiple selections)
+                    // Location Dropdown
                     DropdownButtonFormField<String>(
                       decoration: const InputDecoration(
                         labelText: 'Select Location',
@@ -601,18 +608,6 @@ class _BookingState extends State<Booking> {
                       },
                     ),
                     const SizedBox(height: 8),
-                    ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          selectedLocations = filteredLocations
-                              .map<String>(
-                                  (location) => location['id'] as String)
-                              .toList();
-                        });
-                      },
-                      child: const Text("Add All Locations"),
-                    ),
-                    const SizedBox(height: 8),
                     Wrap(
                       spacing: 8.0,
                       children: selectedLocations.map((locationId) {
@@ -629,6 +624,7 @@ class _BookingState extends State<Booking> {
                       }).toList(),
                     ),
                     const SizedBox(height: 10),
+                    // Start Time Field with Validation
                     TextFormField(
                       controller: startTimeController,
                       decoration: const InputDecoration(
@@ -651,6 +647,7 @@ class _BookingState extends State<Booking> {
                       },
                     ),
                     const SizedBox(height: 10),
+                    // End Time Field with Validation
                     TextFormField(
                       controller: endTimeController,
                       decoration: const InputDecoration(
@@ -682,8 +679,18 @@ class _BookingState extends State<Booking> {
               actions: [
                 TextButton(
                   onPressed: () {
-                    Navigator.of(context).pop();
-                    _addSchedules(selectedLocations);
+                    if (dateController.text.isEmpty ||
+                        startTimeController.text.isEmpty ||
+                        endTimeController.text.isEmpty ||
+                        selectedLocations.isEmpty) {
+                      setState(() {
+                        errorMessage =
+                            'Please ensure all required fields are filled: Date, Start Time, End Time, and at least one Location.';
+                      });
+                    } else {
+                      Navigator.of(context).pop();
+                      _addSchedules(selectedLocations);
+                    }
                   },
                   child: const Text('Add'),
                 ),
@@ -903,24 +910,29 @@ class _BookingState extends State<Booking> {
 
                       return DropdownButtonFormField<String>(
                         value: selectedVehicle,
-                        decoration: const InputDecoration(
-                          labelText: 'Select Vehicle',
+                        decoration: InputDecoration(
+                          labelText: "Select Vehicle",
                           border: OutlineInputBorder(),
                         ),
-                        items: filteredVehicles.map((doc) {
+                        hint: Text(
+                            "Select a vehicle"), // Displayed when no vehicle is selected
+                        items: vehicles.map((doc) {
                           var vehicleData = doc.data() as Map<String, dynamic>;
-                          String vehicleLabel =
-                              "${vehicleData['brand']} ${vehicleData['model']} (${vehicleData['vehicle_type']}) - Limit: ${vehicleData['weight_limit']} kg";
                           return DropdownMenuItem<String>(
-                            value: doc.id,
-                            child: Text(vehicleLabel),
+                            value: doc
+                                .id, // Ensure this value matches with `selectedVehicle`
+                            child: Text(
+                              "${vehicleData['brand']} ${vehicleData['model']} "
+                              "(${vehicleData['vehicle_type']}) - Limit: ${vehicleData['weight_limit']} kg",
+                            ),
                           );
                         }).toList(),
                         onChanged: (String? newValue) {
                           setState(() {
-                            selectedVehicle = newValue!;
+                            selectedVehicle =
+                                newValue; // Update selected vehicle
                             _fetchMostRecentDriverForVehicle(
-                                newValue, setState);
+                                newValue!, setState); // Fetch driver details
                           });
                         },
                       );
@@ -995,22 +1007,9 @@ class _BookingState extends State<Booking> {
 
       if (driversSnapshot.docs.isNotEmpty) {
         var recentDriverData = driversSnapshot.docs.first.data();
-        var driverId = recentDriverData['driverid'];
-
-        // Fetch the driver's details, including position
-        var driverDoc = await FirebaseFirestore.instance
-            .collection('employees')
-            .doc(driverId)
-            .get();
-
-        if (driverDoc.exists) {
-          var driverData = driverDoc.data() as Map<String, dynamic>;
-          setState(() {
-            selectedDriver = driverId;
-            selectedDriverPosition =
-                driverData['position'] ?? 'Unknown Position';
-          });
-        }
+        setState(() {
+          selectedDriver = recentDriverData['driverid'];
+        });
       }
     } catch (e) {
       print('Error fetching most recent driver: $e');
@@ -1062,75 +1061,13 @@ class _BookingState extends State<Booking> {
     }
 
     bool conflictDetected = false;
-    String conflictMessage = "";
-    final timeFormat = DateFormat('hh:mm a');
-    var selectedSchedules = _selectedOptions.keys
-        .where((key) => _selectedOptions[key] == true)
-        .toList();
-
     try {
-      // Check for conflicts within the selected bookings themselves
-      for (int i = 0; i < selectedSchedules.length; i++) {
-        var scheduleIdA = selectedSchedules[i];
-        DocumentSnapshot bookingDocA = await FirebaseFirestore.instance
-            .collection('bookings')
-            .doc(scheduleIdA)
-            .get();
-        var bookingDataA = bookingDocA.data() as Map<String, dynamic>;
+      var selectedSchedules = _selectedOptions.keys
+          .where((key) => _selectedOptions[key] == true)
+          .toList();
 
-        DateTime dateA = bookingDataA['date'].toDate();
-        DateTime startA = timeFormat.parse(bookingDataA['start_time']);
-        DateTime endA = timeFormat.parse(bookingDataA['end_time']);
+      final timeFormat = DateFormat('hh:mm a');
 
-        for (int j = i + 1; j < selectedSchedules.length; j++) {
-          var scheduleIdB = selectedSchedules[j];
-          DocumentSnapshot bookingDocB = await FirebaseFirestore.instance
-              .collection('bookings')
-              .doc(scheduleIdB)
-              .get();
-          var bookingDataB = bookingDocB.data() as Map<String, dynamic>;
-
-          DateTime dateB = bookingDataB['date'].toDate();
-          DateTime startB = timeFormat.parse(bookingDataB['start_time']);
-          DateTime endB = timeFormat.parse(bookingDataB['end_time']);
-
-          // Check if the bookings have the same date and overlapping time
-          bool isSameDay = dateA.isAtSameMomentAs(dateB);
-          bool timesOverlap = startA.isBefore(endB) && endA.isAfter(startB);
-
-          if (isSameDay && timesOverlap) {
-            conflictDetected = true;
-            conflictMessage =
-                "Selected bookings have conflicting times on ${_formatDate(dateA)} from ${bookingDataA['start_time']} - ${bookingDataA['end_time']} and ${bookingDataB['start_time']} - ${bookingDataB['end_time']}.";
-            break;
-          }
-        }
-
-        if (conflictDetected) break;
-      }
-
-      if (conflictDetected) {
-        await showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: const Text('Conflict Detected'),
-              content: Text(conflictMessage),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('OK'),
-                ),
-              ],
-            );
-          },
-        );
-        return; // Exit if there are conflicts among selected bookings
-      }
-
-      // Check for conflicts with other bookings assigned to the selected driver
       for (var scheduleId in selectedSchedules) {
         DocumentSnapshot bookingDoc = await FirebaseFirestore.instance
             .collection('bookings')
@@ -1153,17 +1090,12 @@ class _BookingState extends State<Booking> {
           DateTime conflictStartTime =
               timeFormat.parse(conflictData['start_time']);
           DateTime conflictEndTime = timeFormat.parse(conflictData['end_time']);
-          String conflictBookingId = conflictDoc.id;
-
-          if (conflictBookingId == scheduleId) continue;
 
           bool timesOverlap = bookingStartTime.isBefore(conflictEndTime) &&
               bookingEndTime.isAfter(conflictStartTime);
 
           if (timesOverlap) {
             conflictDetected = true;
-            conflictMessage =
-                "The selected driver is already booked for a conflicting schedule on ${_formatDate(bookingDate)} from ${conflictData['start_time']} to ${conflictData['end_time']}.";
             break;
           }
         }
@@ -1177,7 +1109,8 @@ class _BookingState extends State<Booking> {
           builder: (BuildContext context) {
             return AlertDialog(
               title: const Text('Conflict Detected'),
-              content: Text(conflictMessage),
+              content: const Text(
+                  'The selected driver is already assigned to another booking on the same date and overlapping time. Please choose a different driver or time.'),
               actions: [
                 TextButton(
                   onPressed: () {
@@ -1190,7 +1123,6 @@ class _BookingState extends State<Booking> {
           },
         );
       } else {
-        // Proceed with updating driver and vehicle if no conflicts are found
         for (var scheduleId in selectedSchedules) {
           var vehicleDoc = await FirebaseFirestore.instance
               .collection('vehicles')
@@ -1205,8 +1137,10 @@ class _BookingState extends State<Booking> {
           var driverData = driverDoc.data() as Map<String, dynamic>;
 
           var vehicleName =
-              "${vehicleData['brand']} ${vehicleData['model']} (${vehicleData['vehicle_type']})";
+              "${vehicleData['brand']} ${vehicleData['model']} ${vehicleData['vehicle_type']}";
           var driverName = driverData['name'];
+          var driverPosition = driverData['position'] ??
+              'Unknown Position'; // Fetch the position
 
           await FirebaseFirestore.instance
               .collection('bookings')
@@ -1216,7 +1150,8 @@ class _BookingState extends State<Booking> {
             'vehicleId': selectedVehicle,
             'driver': driverName,
             'driverId': selectedDriver,
-            'position': driverData['position'] ?? 'Unknown Position',
+            'position':
+                driverPosition, // Add the position to the booking document
           });
         }
 
@@ -1300,7 +1235,7 @@ class _BookingState extends State<Booking> {
         (data['end_time']?.toString() ?? 'no end time').toLowerCase();
     String normalizedQuery = searchQuery.toLowerCase();
 
-    return id.contains(normalizedQuery) ||
+    bool matches = id.contains(normalizedQuery) ||
         driver.contains(normalizedQuery) ||
         vehicle.contains(normalizedQuery) ||
         status.contains(normalizedQuery) ||
@@ -1308,6 +1243,13 @@ class _BookingState extends State<Booking> {
         startTime.contains(normalizedQuery) ||
         endTime.contains(normalizedQuery) ||
         location.contains(normalizedQuery);
+
+    // Remove the schedule ID from _selectedOptions if it doesn't match
+    if (!matches) {
+      _selectedOptions.remove(scheduleId);
+    }
+
+    return matches;
   }
 
   Widget _buildCustomCheckboxTile(
@@ -1316,9 +1258,12 @@ class _BookingState extends State<Booking> {
       leading: Checkbox(
         value: _selectedOptions[scheduleId] ?? false,
         onChanged: (bool? value) {
-          // Update only the specific checkbox state
           setState(() {
-            _selectedOptions[scheduleId] = value ?? false;
+            if (value == true) {
+              _selectedOptions[scheduleId] = true; // Mark as selected
+            } else {
+              _selectedOptions.remove(scheduleId); // Unselect and remove
+            }
           });
         },
         activeColor: Colors.green,
@@ -1361,8 +1306,8 @@ class _BookingState extends State<Booking> {
               flex: 1,
               child: Center(
                   child: Text(
-                      bookingData['overall_price'] != null
-                          ? '₱${bookingData['overall_price'].toStringAsFixed(2)}'
+                      bookingData['calculated_overall_price'] != null
+                          ? '₱${bookingData['calculated_overall_price'].toStringAsFixed(2)}'
                           : '₱0',
                       style: GoogleFonts.poppins(fontSize: 14)))),
           Expanded(
@@ -1371,8 +1316,37 @@ class _BookingState extends State<Booking> {
                   child: Text(
                       bookingData['overall_weight'] != null
                           ? '${bookingData['overall_weight'].toStringAsFixed(2)} kg'
-                          : 'N/A',
+                          : '0 kg',
                       style: GoogleFonts.poppins(fontSize: 14)))),
+          Expanded(
+            flex: 1,
+            child: Center(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('bookings')
+                    .doc(scheduleId)
+                    .collection('users')
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                    );
+                  } else if (snapshot.hasError) {
+                    return const Text('Error',
+                        style: TextStyle(color: Colors.red));
+                  } else {
+                    final numOfPeople = snapshot.data?.docs.length ?? 0;
+                    return Text(
+                      '$numOfPeople',
+                      style: GoogleFonts.poppins(fontSize: 14),
+                    );
+                  }
+                },
+              ),
+            ),
+          ),
           Expanded(
               flex: 1,
               child: Center(
@@ -1380,19 +1354,21 @@ class _BookingState extends State<Booking> {
                       style: const TextStyle(fontSize: 14)))),
           Expanded(
             flex: 1,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            child: Center(
+                child: Row(
+              mainAxisAlignment:
+                  MainAxisAlignment.center, // Align the buttons properly
               children: [
                 IconButton(
-                  padding: EdgeInsets.zero, // This removes the default padding
-                  constraints:
-                      BoxConstraints(), // This removes additional constraints
+                  padding: EdgeInsets.zero, // Removes the default padding
+                  constraints: BoxConstraints(), // Removes default constraints
                   icon: const Icon(Icons.map, size: 18),
                   onPressed: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => Maps(bookingId: scheduleId)),
+                        builder: (context) => Maps(bookingId: scheduleId),
+                      ),
                     );
                   },
                 ),
@@ -1400,9 +1376,8 @@ class _BookingState extends State<Booking> {
                   width: 10,
                 ),
                 IconButton(
-                  padding: EdgeInsets.zero, // This removes the default padding
-                  constraints:
-                      BoxConstraints(), // This removes additional constraints
+                  padding: EdgeInsets.zero, // Removes the default padding
+                  constraints: BoxConstraints(), // Removes default constraints
                   icon: const Icon(Icons.info_outline, size: 18),
                   onPressed: () {
                     Navigator.push(
@@ -1416,11 +1391,76 @@ class _BookingState extends State<Booking> {
                     );
                   },
                 ),
+                SizedBox(
+                  width: 10,
+                ),
+                IconButton(
+                  padding: EdgeInsets.zero, // Removes the default padding
+                  constraints: BoxConstraints(), // Removes default constraints
+                  icon: const Icon(Icons.delete, color: Colors.red, size: 18),
+                  onPressed: () {
+                    _confirmDelete(scheduleId, bookingData);
+                  },
+                ),
               ],
-            ),
+            )),
           ),
         ],
       ),
     );
+  }
+
+  void _confirmDelete(String scheduleId, Map<String, dynamic> bookingData) {
+    if (bookingData['overall_weight'] != null &&
+        bookingData['overall_weight'] > 0) {
+      // Show a dialog saying the booking cannot be deleted
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Cannot Delete'),
+          content: const Text(
+              'This booking cannot be deleted because there is a user who already booked.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // Show a confirmation dialog before deleting
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Confirm Deletion'),
+          content: const Text(
+              'Are you sure you want to delete this booking? This action cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                // Delete the booking from Firestore
+                await FirebaseFirestore.instance
+                    .collection('bookings')
+                    .doc(scheduleId)
+                    .delete();
+
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                      content:
+                          Text('Booking $scheduleId deleted successfully.')),
+                );
+              },
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 }

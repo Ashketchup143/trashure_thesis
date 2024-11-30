@@ -282,8 +282,8 @@ class _CompletedBookingsState extends State<CompletedBookings> {
           Expanded(
             flex: 1,
             child: Text(
-              bookingData['overall_price'] != null
-                  ? '₱${bookingData['overall_price'].toStringAsFixed(2)}'
+              bookingData['final_calculated_overall_price'] != null
+                  ? '₱${bookingData['final_calculated_overall_price'].toStringAsFixed(2)}'
                   : '₱0',
               style: GoogleFonts.poppins(fontSize: 14),
             ),
@@ -291,10 +291,36 @@ class _CompletedBookingsState extends State<CompletedBookings> {
           Expanded(
             flex: 1,
             child: Text(
-              bookingData['overall_weight'] != null
-                  ? '${bookingData['overall_weight'].toStringAsFixed(2)} kg'
+              bookingData['final_overall_weight'] != null
+                  ? '${bookingData['final_overall_weight'].toStringAsFixed(2)} kg'
                   : 'N/A',
               style: GoogleFonts.poppins(fontSize: 14),
+            ),
+          ),
+          Expanded(
+            flex: 1,
+            child: Center(
+              child: FutureBuilder<int>(
+                future: _fetchNumOfUsers(scheduleId),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const CircularProgressIndicator(
+                      strokeWidth: 1,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                    );
+                  } else if (snapshot.hasError) {
+                    return const Text(
+                      'Error',
+                      style: TextStyle(color: Colors.red),
+                    );
+                  } else {
+                    return Text(
+                      '${snapshot.data}',
+                      style: GoogleFonts.poppins(fontSize: 14),
+                    );
+                  }
+                },
+              ),
             ),
           ),
           Expanded(
@@ -340,5 +366,20 @@ class _CompletedBookingsState extends State<CompletedBookings> {
         ],
       ),
     );
+  }
+
+  Future<int> _fetchNumOfUsers(String scheduleId) async {
+    try {
+      final usersCollection = FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(scheduleId)
+          .collection('users');
+      final snapshot = await usersCollection.get();
+      return snapshot
+          .size; // Returns the number of documents in the users subcollection
+    } catch (e) {
+      print('Error fetching number of users for booking $scheduleId: $e');
+      return 0; // Return 0 in case of an error
+    }
   }
 }

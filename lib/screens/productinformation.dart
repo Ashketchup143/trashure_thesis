@@ -36,6 +36,7 @@ class _ProductInformationState extends State<ProductInformation> {
   List<DocumentSnapshot> _allCategories = []; // For category dropdown
   String _selectedCategory = ""; // Selected category from dropdown
   Uint8List? _imageBytes; // To store the selected image bytes
+  String _currentImageUrl = "";
 
   @override
   void initState() {
@@ -44,6 +45,7 @@ class _ProductInformationState extends State<ProductInformation> {
     _categoryController.text = widget.category;
     _imageUrlController.text = widget.imageUrl;
     _selectedCategory = widget.category; // Set default category
+    _currentImageUrl = widget.imageUrl; // Initialize the current image URL
     _fetchLatestPrice(); // Fetch the most recent price
     _fetchCategories(); // Fetch the categories for dropdown
   }
@@ -76,7 +78,7 @@ class _ProductInformationState extends State<ProductInformation> {
         .get();
 
     if (priceSnapshot.docs.isNotEmpty) {
-      double latestPrice = priceSnapshot.docs.first['price'] ?? 0.0;
+      double latestPrice = priceSnapshot.docs.first['original_price'] ?? 0.0;
       setState(() {
         _currentPrice = latestPrice;
         _priceController.text = _currentPrice.toStringAsFixed(2);
@@ -88,7 +90,7 @@ class _ProductInformationState extends State<ProductInformation> {
     // Trim and get the updated values
     String updatedDetails = _detailsController.text.trim();
     String updatedCategory = _selectedCategory;
-    String updatedImageUrl = _imageFileName ?? widget.imageUrl;
+    String updatedImageUrl = _imageFileName ?? _currentImageUrl;
     double newPrice = double.tryParse(_priceController.text.trim()) ?? 0.0;
 
     // Check if there are any actual changes
@@ -102,9 +104,8 @@ class _ProductInformationState extends State<ProductInformation> {
         !hasCategoryChanged &&
         !hasImageChanged &&
         !hasPriceChanged) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No changes to update')),
-      );
+      // Show "Edit Successful" modal
+      _showModalDialog('No Changes', 'Details stay the same.');
       return;
     }
 
@@ -115,16 +116,20 @@ class _ProductInformationState extends State<ProductInformation> {
       calculatedPrice = newPrice * (1 - percentageProfit / 100);
     }
 
-    // If an image was selected, upload it first
-    if (hasImageChanged && _imageBytes != null) {
+    if (_imageFileName != null) {
+      // Upload the image and update Firestore
       await _uploadImage(widget.productId);
+
+      setState(() {
+        _currentImageUrl = _imageFileName!;
+      });
     }
 
     // Update product details in Firestore if there are changes
     Map<String, dynamic> updateData = {};
     if (hasDetailsChanged) updateData['details'] = updatedDetails;
     if (hasCategoryChanged) updateData['category'] = updatedCategory;
-    if (hasImageChanged) updateData['picture'] = updatedImageUrl;
+    if (hasImageChanged) updateData['picture'] = _currentImageUrl;
 
     // Perform updates only if necessary
     if (updateData.isNotEmpty) {
@@ -151,8 +156,28 @@ class _ProductInformationState extends State<ProductInformation> {
       });
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Product details updated successfully')),
+    // Show "Edit Successful" modal
+    _showModalDialog(
+        'Edit Successful', 'Product details updated successfully.');
+  }
+
+  void _showModalDialog(String title, String content) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(title),
+          content: Text(content),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('OK'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -169,21 +194,21 @@ class _ProductInformationState extends State<ProductInformation> {
             .child('product_images/$_imageFileName');
         await storageRef.putData(_imageBytes!);
 
-        // Get the download URL for the uploaded image
-        String downloadUrl = await storageRef.getDownloadURL();
-
-        // Update the image URL in Firestore
+        // Update the filename in Firestore
         await FirebaseFirestore.instance
             .collection('products')
             .doc(productId)
-            .update({'picture': downloadUrl});
+            .update({'picture': _imageFileName});
 
         setState(() {
           _isUploading = false;
+          _currentImageUrl = _imageFileName!;
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Image uploaded successfully!')),
+          SnackBar(
+              content:
+                  Text('Image uploaded and filename updated successfully!')),
         );
       } catch (e) {
         setState(() {
@@ -274,7 +299,7 @@ class _ProductInformationState extends State<ProductInformation> {
 
             // Check if there's an image URL, and fetch it from Firebase if necessary
             FutureBuilder<String>(
-              future: _getImageDownloadUrl(widget.imageUrl),
+              future: _getImageDownloadUrl(_currentImageUrl),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return CircularProgressIndicator();
@@ -288,6 +313,25 @@ class _ProductInformationState extends State<ProductInformation> {
                 return Text('No Image Available');
               },
             ),
+
+            _isEditing
+                ? Row(
+                    children: [
+                      ElevatedButton(
+                        onPressed: _pickAndDisplayImage,
+                        child: _isUploading
+                            ? CircularProgressIndicator()
+                            : Text('Choose Image'),
+                      ),
+                      SizedBox(width: 10),
+                      if (_imageFileName != null)
+                        Text('Image Selected: $_imageFileName'),
+                    ],
+                  )
+                : Text(
+                    'Image URL: ${_imageFileName ?? widget.imageUrl}',
+                    style: TextStyle(fontSize: 18),
+                  ),
 
             SizedBox(height: 10),
             Text(
@@ -333,25 +377,7 @@ class _ProductInformationState extends State<ProductInformation> {
                     style: TextStyle(fontSize: 18),
                   ),
             SizedBox(height: 10),
-            _isEditing
-                ? Row(
-                    children: [
-                      ElevatedButton(
-                        onPressed: _pickAndDisplayImage,
-                        child: _isUploading
-                            ? CircularProgressIndicator()
-                            : Text('Choose Image'),
-                      ),
-                      SizedBox(width: 10),
-                      if (_imageFileName != null)
-                        Text('Image Selected: $_imageFileName'),
-                    ],
-                  )
-                : Text(
-                    'Image URL: ${_imageFileName ?? widget.imageUrl}',
-                    style: TextStyle(fontSize: 18),
-                  ),
-            SizedBox(height: 10),
+
             _isEditing
                 ? TextFormField(
                     controller: _priceController,

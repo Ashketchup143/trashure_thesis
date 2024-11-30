@@ -9,39 +9,56 @@ class UserInformation extends StatefulWidget {
 }
 
 class _UserInformationState extends State<UserInformation> {
-  late TextEditingController _nameController;
+  late TextEditingController _firstNameController;
+  late TextEditingController _lastNameController;
   late TextEditingController _categoryController;
   late TextEditingController _contactController;
   late TextEditingController _emailController;
   late TextEditingController _addressController;
+  late TextEditingController _areaController; // Add for area field
   late TextEditingController _balanceController;
   late TextEditingController _landmarkController;
   late GeoPoint _location;
   late String _selectedStatus;
+  List<String> _locations = []; // List to store locations from Firestore
   bool _isLoading = false;
   bool _isEditing = false;
   Map<String, dynamic>? user;
   Map<String, dynamic>? originalUserData;
 
-  final List<String> _statusOptions = [
-    'Booked',
-    'Completed',
-    'In Progress',
-    'Delayed',
-    'Unbooked'
-  ];
+  final List<String> _statusOptions = ['Booked', 'Done', 'Unbooked'];
+
+  void _fetchLocations() async {
+    try {
+      final snapshot =
+          await FirebaseFirestore.instance.collection('locations').get();
+
+      setState(() {
+        _locations = snapshot.docs
+            .map((doc) => doc['location']
+                .toString()
+                .toLowerCase()) // Convert to lowercase
+            .toList();
+      });
+    } catch (e) {
+      print('Error fetching locations: $e');
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController();
+    _firstNameController = TextEditingController();
+    _lastNameController = TextEditingController();
     _categoryController = TextEditingController();
     _contactController = TextEditingController();
     _emailController = TextEditingController();
     _addressController = TextEditingController();
     _balanceController = TextEditingController();
     _landmarkController = TextEditingController();
+    _areaController = TextEditingController();
     _selectedStatus = 'Unbooked';
+    _fetchLocations(); // Fetch locations during initialization
   }
 
   @override
@@ -53,15 +70,15 @@ class _UserInformationState extends State<UserInformation> {
 
       if (user != null) {
         originalUserData = Map<String, dynamic>.from(user!);
-        String firstName = user!['firstName'] ?? 'No First Name';
-        String lastName = user!['lastName'] ?? 'No Last Name';
-        _nameController.text = '$firstName $lastName';
+        _firstNameController.text = user!['firstName'] ?? 'No First Name';
+        _lastNameController.text = user!['lastName'] ?? 'No Last Name';
         _categoryController.text = user!['category'] ?? 'No Category';
         _contactController.text = user!['contact'] ?? 'No Contact';
         _emailController.text = user!['email'] ?? 'No Email';
         _addressController.text = user!['address'] ?? 'No Address';
         _balanceController.text = user!['balance']?.toString() ?? '0.0';
         _landmarkController.text = user!['landmark'] ?? 'No Landmark';
+        _areaController.text = user!['area'] ?? 'No Area'; // Set area field
         _location = user!['location'] ?? GeoPoint(0, 0);
         _selectedStatus = user!['status'] ?? 'Unbooked';
       }
@@ -75,13 +92,15 @@ class _UserInformationState extends State<UserInformation> {
   }
 
   bool _hasChanged() {
-    return _nameController.text != originalUserData!['name'] ||
+    return _firstNameController.text != originalUserData!['firstName'] ||
+        _lastNameController.text != originalUserData!['lastName'] ||
         _categoryController.text != originalUserData!['category'] ||
         _contactController.text != originalUserData!['contact'] ||
         _emailController.text != originalUserData!['email'] ||
         _addressController.text != originalUserData!['address'] ||
         _balanceController.text != originalUserData!['balance']?.toString() ||
         _landmarkController.text != originalUserData!['landmark'] ||
+        _areaController.text != originalUserData!['area'] || // Compare area
         _location.latitude != originalUserData!['location']?.latitude ||
         _location.longitude != originalUserData!['location']?.longitude ||
         _selectedStatus != originalUserData!['status'];
@@ -100,16 +119,15 @@ class _UserInformationState extends State<UserInformation> {
 
     try {
       await FirebaseFirestore.instance.collection('users').doc(userId).update({
-        'firstName': _nameController.text.split(' ')[0],
-        'lastName': _nameController.text.split(' ').length > 1
-            ? _nameController.text.split(' ').sublist(1).join(' ')
-            : '',
+        'firstName': _firstNameController.text,
+        'lastName': _lastNameController.text,
         'category': _categoryController.text,
         'contact': _contactController.text,
         'email': _emailController.text,
         'address': _addressController.text,
         'balance': double.tryParse(_balanceController.text) ?? 0.0,
         'landmark': _landmarkController.text,
+        'area': _areaController.text.toLowerCase(), // Save as lowercase
         'location': _location,
         'status': _selectedStatus,
       });
@@ -118,16 +136,15 @@ class _UserInformationState extends State<UserInformation> {
       setState(() {
         _isEditing = false;
         originalUserData = {
-          'firstName': _nameController.text.split(' ')[0],
-          'lastName': _nameController.text.split(' ').length > 1
-              ? _nameController.text.split(' ').sublist(1).join(' ')
-              : '',
+          'firstName': _firstNameController.text,
+          'lastName': _lastNameController.text,
           'category': _categoryController.text,
           'contact': _contactController.text,
           'email': _emailController.text,
           'address': _addressController.text,
           'balance': double.tryParse(_balanceController.text) ?? 0.0,
           'landmark': _landmarkController.text,
+          'area': _areaController.text.toLowerCase(), // Save lowercase
           'location': _location,
           'status': _selectedStatus,
         };
@@ -203,8 +220,13 @@ class _UserInformationState extends State<UserInformation> {
                           _buildProfileField('User ID', user!['id'] ?? 'N/A',
                               isEditable: false),
                           SizedBox(height: 16),
-                          _buildProfileField('Name', _nameController.text,
-                              controller: _nameController),
+                          _buildProfileField(
+                              'First Name', _firstNameController.text,
+                              controller: _firstNameController),
+                          SizedBox(height: 16),
+                          _buildProfileField(
+                              'Last Name', _lastNameController.text,
+                              controller: _lastNameController),
                           SizedBox(height: 16),
                           _buildProfileField(
                               'Category', _categoryController.text,
@@ -219,12 +241,12 @@ class _UserInformationState extends State<UserInformation> {
                           _buildProfileField('Address', _addressController.text,
                               controller: _addressController),
                           SizedBox(height: 16),
-                          _buildProfileField('Balance', _balanceController.text,
-                              controller: _balanceController),
-                          SizedBox(height: 16),
                           _buildProfileField(
                               'Landmark', _landmarkController.text,
                               controller: _landmarkController),
+
+                          SizedBox(height: 16),
+                          _buildAreaField(), // Add the area field here
                           SizedBox(height: 16),
                           _buildLocationField('Location', _location),
                           SizedBox(height: 16),
@@ -258,6 +280,7 @@ class _UserInformationState extends State<UserInformation> {
           return Center(child: CircularProgressIndicator());
         }
 
+        // Fetch all bookings
         var allBookings = snapshot.data!.docs;
 
         return FutureBuilder<List<Map<String, dynamic>>>(
@@ -277,6 +300,13 @@ class _UserInformationState extends State<UserInformation> {
                 ),
               );
             }
+
+            // Sort bookings by date (ascending)
+            userBookings.sort((a, b) {
+              DateTime dateA = (a['date'] as Timestamp).toDate();
+              DateTime dateB = (b['date'] as Timestamp).toDate();
+              return dateB.compareTo(dateA); // Descending order
+            });
 
             return ListView.builder(
               shrinkWrap: true,
@@ -385,92 +415,154 @@ class _UserInformationState extends State<UserInformation> {
   }
 
   Widget _buildRecyclablesList(String bookingId, String userId, String status) {
-    return StreamBuilder<QuerySnapshot>(
+    return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
           .collection('bookings')
           .doc(bookingId)
           .collection('users')
           .doc(userId)
-          .collection('recyclables')
           .snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
+      builder: (context, userSnapshot) {
+        if (!userSnapshot.hasData) {
           return Center(child: CircularProgressIndicator());
         }
 
-        var recyclables = snapshot.data!.docs;
+        var userData = userSnapshot.data!.data() as Map<String, dynamic>;
+        String userStatus = userData['status'] ?? 'Unknown';
+        print('User Data: $userData');
 
-        if (recyclables.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text('No recyclables found for this booking.'),
-          );
-        }
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('bookings')
+              .doc(bookingId)
+              .collection('users')
+              .doc(userId)
+              .collection('recyclables')
+              .snapshots(),
+          builder: (context, recyclableSnapshot) {
+            if (!recyclableSnapshot.hasData) {
+              return Center(child: CircularProgressIndicator());
+            }
 
-        double totalAmount = 0;
-        double totalWeight = 0;
+            var recyclables = recyclableSnapshot.data!.docs;
 
-        recyclables.forEach((recyclable) {
-          var data = recyclable.data() as Map<String, dynamic>;
-          var weight = data['weight'] ?? 0.0;
-          var pricePerKg = data['price'] ?? 0.0;
-          var itemPrice = (status == 'collected' || status == 'completed')
-              ? data['final_item_price'] ?? weight * pricePerKg
-              : weight * pricePerKg;
-
-          totalWeight += weight;
-          totalAmount += itemPrice;
-        });
-
-        return Column(
-          children: [
-            Row(
-              children: [
-                Expanded(child: Text('Type', style: _headerTextStyle())),
-                Expanded(child: Text('Weight', style: _headerTextStyle())),
-                Expanded(
-                    child: Text('Price per kg', style: _headerTextStyle())),
-                Expanded(child: Text('Total', style: _headerTextStyle())),
-              ],
-            ),
-            Divider(),
-            ...recyclables.map((recyclable) {
-              var data = recyclable.data() as Map<String, dynamic>;
-              var type = data['type'] ?? 'Unknown';
-              var weight = data['weight'] ?? 0.0;
-              var price = data['price'] ?? 0.0;
-              var itemPrice = (status == 'collected' || status == 'completed')
-                  ? data['final_item_price'] ?? weight * price
-                  : weight * price;
-
+            if (recyclables.isEmpty) {
               return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: Row(
+                padding: const EdgeInsets.all(8.0),
+                child: Text('No recyclables found for this booking.'),
+              );
+            }
+
+            double totalAmount = 0;
+            double totalWeight = 0;
+
+            recyclables.forEach((recyclable) {
+              var data = recyclable.data() as Map<String, dynamic>;
+              var weight = data['final_weight'] ?? data['weight'] ?? 0.0;
+              var price = data['price'] ?? 0.0;
+              var itemPrice = weight * price;
+
+              totalWeight += weight;
+              totalAmount += itemPrice;
+            });
+
+            // Calculate the adjusted total amount based on user category and mode
+            // Calculate the adjusted total amount based on user category or mode
+            double adjustedTotalAmount;
+            bool isServiceFeeApplicable = true;
+
+// Check if service fee is applicable
+            if (userData['category']?.toLowerCase() == 'business' ||
+                userData['mode']?.toLowerCase() == 'donate') {
+              // No service fee for business category or donate mode
+              adjustedTotalAmount = totalAmount;
+              isServiceFeeApplicable = false;
+            } else {
+              // Deduct service fee for other cases
+              adjustedTotalAmount = totalAmount - 40;
+              isServiceFeeApplicable = true;
+            }
+
+            return Column(
+              children: [
+                Row(
                   children: [
-                    Expanded(child: Text(type)),
-                    Expanded(child: Text('${weight.toStringAsFixed(2)} kg')),
-                    Expanded(child: Text('₱${price.toStringAsFixed(2)}')),
-                    Expanded(child: Text('₱${itemPrice.toStringAsFixed(2)}')),
+                    Expanded(child: Text('Type', style: _headerTextStyle())),
+                    Expanded(child: Text('Weight', style: _headerTextStyle())),
+                    Expanded(
+                        child: Text('Price per kg', style: _headerTextStyle())),
+                    Expanded(child: Text('Total', style: _headerTextStyle())),
                   ],
                 ),
-              );
-            }).toList(),
-            Divider(),
-            Row(
-              children: [
-                Expanded(
-                    child: Text('Total',
-                        style: TextStyle(fontWeight: FontWeight.bold))),
-                Expanded(
-                    child: Text('${totalWeight.toStringAsFixed(2)} kg',
-                        style: TextStyle(fontWeight: FontWeight.bold))),
-                Expanded(child: SizedBox()),
-                Expanded(
-                    child: Text('₱${totalAmount.toStringAsFixed(2)}',
-                        style: TextStyle(fontWeight: FontWeight.bold))),
+                Divider(),
+                ...recyclables.map((recyclable) {
+                  var data = recyclable.data() as Map<String, dynamic>;
+                  var type = data['type'] ?? 'Unknown';
+                  var weight = data['final_weight'] ?? data['weight'] ?? 0.0;
+                  var price = data['price'] ?? 0.0;
+                  var itemPrice = weight * price;
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(type)),
+                        Expanded(
+                            child: Text('${weight.toStringAsFixed(2)} kg')),
+                        Expanded(child: Text('₱${price.toStringAsFixed(2)}')),
+                        Expanded(
+                            child: Text('₱${itemPrice.toStringAsFixed(2)}')),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                Divider(),
+                Row(
+                  children: [
+                    Expanded(
+                        child: Text('Total',
+                            style: TextStyle(fontWeight: FontWeight.bold))),
+                    Expanded(
+                        child: Text('${totalWeight.toStringAsFixed(2)} kg',
+                            style: TextStyle(fontWeight: FontWeight.bold))),
+                    Expanded(child: SizedBox()), // Empty cell for alignment
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '₱${totalAmount.toStringAsFixed(2)}',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          if (isServiceFeeApplicable) ...[
+                            Text(
+                              '- 40 (Service Fee)',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                            Text(
+                              '₱${adjustedTotalAmount.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 10),
+                Text(
+                  'User Status: ${userData['status'] ?? 'Unknown'}',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blueGrey,
+                  ),
+                ),
               ],
-            ),
-          ],
+            );
+          },
         );
       },
     );
@@ -547,6 +639,56 @@ class _UserInformationState extends State<UserInformation> {
     );
   }
 
+  Widget _buildAreaField() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 1,
+          child: Text(
+            'Area:',
+            style: GoogleFonts.poppins(
+              textStyle: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          flex: 2,
+          child: _isEditing
+              ? DropdownButton<String>(
+                  value: _locations.contains(_areaController.text.toLowerCase())
+                      ? _areaController.text.toLowerCase()
+                      : null, // Normalize case for value check
+                  hint: Text("Select Area"),
+                  items: _locations.map((location) {
+                    return DropdownMenuItem<String>(
+                      value: location, // Use lowercase value
+                      child: Text(location), // Display in lowercase
+                    );
+                  }).toList(),
+                  onChanged: (newValue) {
+                    setState(() {
+                      _areaController.text = newValue ?? 'No Area';
+                    });
+                  },
+                )
+              : Text(
+                  _areaController.text.isEmpty
+                      ? 'No Area'
+                      : _areaController.text
+                          .toLowerCase(), // Display in lowercase
+                  style: GoogleFonts.poppins(
+                    textStyle: TextStyle(fontSize: 16),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildStatusField(String fieldName, String selectedStatus) {
     String status = selectedStatus.isEmpty ? 'Unbooked' : selectedStatus;
     return Row(
@@ -616,18 +758,16 @@ class _UserInformationState extends State<UserInformation> {
     );
   }
 
+  // Function to get color based on status
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'booked':
+      case 'done':
         return Colors.blue;
-      case 'completed':
+      case 'booked':
         return Colors.green;
-      case 'in progress':
-        return Colors.grey;
-      case 'delayed':
-        return Colors.red;
+      case 'unbooked':
       default:
-        return Colors.orange;
+        return Color(0xFFF5D322);
     }
   }
 }

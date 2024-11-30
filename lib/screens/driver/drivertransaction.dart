@@ -44,13 +44,11 @@ class _DriverTransactionsState extends State<DriverTransactions> {
   }
 
   // Function to format Firestore Timestamp to "MM/dd/yyyy, DayOfWeek"
-  String formatDate(Timestamp timestamp) {
-    DateTime date =
-        timestamp.toDate(); // Convert Firestore Timestamp to DateTime
-    DateFormat formatter = DateFormat('MM/dd/yyyy'); // Define desired format
-    String dayOfWeek =
-        DateFormat('EEEE').format(date); // Get day of the week (e.g., Monday)
-    return '${formatter.format(date)}, $dayOfWeek'; // Return formatted date and day of the week
+  String formatDate(Timestamp timestamp, String startTime, String endTime) {
+    DateTime date = timestamp.toDate();
+    DateFormat formatter = DateFormat('MM/dd/yyyy, EEEE');
+    String formattedDate = formatter.format(date);
+    return '$formattedDate, $startTime - $endTime';
   }
 
   @override
@@ -72,8 +70,8 @@ class _DriverTransactionsState extends State<DriverTransactions> {
             ),
             const Text(
               "Booking History",
-              style: const TextStyle(color: Colors.white),
-            ), // Display the driver's name in the app bar
+              style: TextStyle(color: Colors.white),
+            ),
           ],
         ),
       ),
@@ -84,17 +82,16 @@ class _DriverTransactionsState extends State<DriverTransactions> {
             height: MediaQuery.of(context).size.height * .90,
             decoration: BoxDecoration(
               border: Border.all(color: Colors.green, width: 3),
-              color: Colors.white, // Background color of the inner container
-              borderRadius: BorderRadius.circular(20), // Rounded corners
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
             ),
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start, // Align content to the left
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Text(
-                    'Driver: $name', // Header for Booking data
+                    'Driver: $name',
                     style: const TextStyle(
                       color: Colors.green,
                       fontSize: 24,
@@ -105,7 +102,7 @@ class _DriverTransactionsState extends State<DriverTransactions> {
                 Padding(
                   padding: const EdgeInsets.only(left: 16),
                   child: Text(
-                    'Driver ID: $id', // Display the driver's ID
+                    'Driver ID: $id',
                     style: const TextStyle(
                       color: Colors.black,
                       fontSize: 18,
@@ -124,7 +121,6 @@ class _DriverTransactionsState extends State<DriverTransactions> {
                         return const Center(child: CircularProgressIndicator());
                       }
 
-                      // Filter bookings with 'status' of either 'collected' or 'completed'
                       var bookings = snapshot.data?.docs.where((doc) {
                         var status =
                             (doc['status'] ?? '').toString().toLowerCase();
@@ -147,29 +143,74 @@ class _DriverTransactionsState extends State<DriverTransactions> {
                           var bookingStatus =
                               bookingData['status'] ?? "Not set";
                           var overallPrice =
-                              bookingData['final_overall_price'] ?? 'Not set';
+                              (bookingData['final_overall_price'] ?? 0.0)
+                                  .toStringAsFixed(2);
                           var overallWeight =
-                              bookingData['final_overall_weight'] ?? 'Not set';
+                              (bookingData['final_overall_weight'] ?? 0.0)
+                                  .toStringAsFixed(2);
+                          var location = bookingData['location'] ?? 'Unknown';
+                          var startTime =
+                              bookingData['start_time'] ?? 'Unknown';
+                          var endTime = bookingData['end_time'] ?? 'Unknown';
+                          var calculatedPrice =
+                              (bookingData['final_calculated_overall_price'] ??
+                                      0.0)
+                                  .toStringAsFixed(2);
+                          var startingMileage =
+                              (bookingData['starting_mileage'] ?? 0.0)
+                                  .toStringAsFixed(2);
+                          var endingMileage =
+                              (bookingData['ending_mileage'] ?? 0.0)
+                                  .toStringAsFixed(2);
 
                           return Card(
                             margin: const EdgeInsets.all(10),
                             color: Colors.lightGreen[100],
                             child: ListTile(
                               title: Text(
-                                'Date: ${formatDate(bookingDate)}',
+                                'Date: ${formatDate(bookingDate, startTime, endTime)}',
                                 style: const TextStyle(
                                     fontWeight: FontWeight.bold),
                               ),
                               subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  Text('Location: $location'),
                                   Text('Booking ID: $bookingId'),
-                                  Text('Status: ${bookingData['status']}'),
+                                  Text('Status: $bookingStatus'),
                                   Text('Vehicle: ${bookingData['vehicle']}'),
                                   Text(
                                       'Vehicle ID: ${bookingData['vehicleId']}'),
-                                  Text('Overall Price: ₱${overallPrice}'),
+                                  // Text('Overall Price: ₱$overallPrice'),
+                                  Text('Calculated Price: ₱$calculatedPrice'),
                                   Text('Overall Weight: ${overallWeight} kg'),
+
+                                  Text('Starting Mileage: $startingMileage km'),
+                                  Text('Ending Mileage: $endingMileage km'),
+                                  // Add StreamBuilder for user count
+                                  StreamBuilder<QuerySnapshot>(
+                                    stream: FirebaseFirestore.instance
+                                        .collection('bookings')
+                                        .doc(bookingId)
+                                        .collection('users')
+                                        .snapshots(),
+                                    builder: (context, userSnapshot) {
+                                      if (!userSnapshot.hasData) {
+                                        return const Text(
+                                          "Loading user count...",
+                                          style: TextStyle(
+                                              fontSize: 15, color: Colors.grey),
+                                        );
+                                      }
+                                      // Count the number of users in the snapshot
+                                      int userCount =
+                                          userSnapshot.data?.docs.length ?? 0;
+                                      return Text(
+                                        "Number of Users: $userCount",
+                                        style: const TextStyle(fontSize: 15),
+                                      );
+                                    },
+                                  ),
                                 ],
                               ),
                               trailing: IconButton(
@@ -180,19 +221,22 @@ class _DriverTransactionsState extends State<DriverTransactions> {
                                     '/drivertransactiondetails',
                                     arguments: {
                                       'bookingId': bookingId,
-                                      'status': bookingData['status'],
+                                      'status': bookingStatus,
+                                      'location': location,
                                       'vehicle': bookingData['vehicle'],
                                       'vehicleId': bookingData['vehicleId'],
                                       'driver_share':
                                           bookingData['driver_share'],
-                                      'overall_price':
-                                          bookingData['overall_price'],
-                                      'final_overall_price':
-                                          bookingData['final_overall_price'],
-                                      'final_overall_weight':
-                                          bookingData['final_overall_weight'],
-                                      'overall_weight':
-                                          bookingData['overall_weight'],
+                                      'overall_price': overallPrice,
+                                      'final_overall_price': overallPrice,
+                                      'final_overall_weight': overallWeight,
+                                      'overall_weight': overallWeight,
+                                      'final_calculated_overall_price':
+                                          calculatedPrice,
+                                      'starting_mileage': startingMileage,
+                                      'ending_mileage': endingMileage,
+                                      'start_time': startTime,
+                                      'end_time': endTime,
                                       'date': bookingData['date'],
                                     },
                                   );

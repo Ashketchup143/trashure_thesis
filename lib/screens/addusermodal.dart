@@ -38,7 +38,6 @@ class _AddUserModalState extends State<AddUserModal> {
         'product_id': doc.id,
         'product_name': data['product_name'],
         'category': data['category'],
-        'details': data['details'],
       };
     }).toList();
   }
@@ -117,7 +116,6 @@ class _AddUserModalState extends State<AddUserModal> {
           'price': price,
           'item_price': weight * price,
           'category': product['category'],
-          'details': product['details'],
         });
       }
     }
@@ -134,7 +132,15 @@ class _AddUserModalState extends State<AddUserModal> {
     });
 
     // Calculate calculated_total_price
-    double calculatedTotalPrice = totalPrice - 40;
+    double calculatedTotalPrice = totalPrice;
+
+    // Check if calculated total is negative
+    if (calculatedTotalPrice < 0) {
+      setState(() {
+        errorMessage = "Calculated total cannot be negative.";
+      });
+      return;
+    }
 
     // Add the user with their recyclables
     await userRef.set({
@@ -205,7 +211,6 @@ class _AddUserModalState extends State<AddUserModal> {
             ),
             SizedBox(height: 20),
 
-            // Display Total Weight and Total Price below "Add Another Product" button
             // Display Total Weight, Total Price, and Calculated Total Price
             Divider(),
             Text(
@@ -216,14 +221,17 @@ class _AddUserModalState extends State<AddUserModal> {
               'Total Price: ₱${totalPrice.toStringAsFixed(2)}',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
-            Text(
-              'Calculated Total (Total - 40): ₱${(totalPrice - 40).toStringAsFixed(2)}',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: Colors.green, // Highlight the calculated total in green
-              ),
-            ),
+            // Text(
+            //   'Calculated Total (Total - 40): ₱${(totalPrice - 40).toStringAsFixed(2)}',
+            //   style: TextStyle(
+            //     fontWeight: FontWeight.bold,
+            //     fontSize: 16,
+            //     color: (totalPrice - 40) < 0
+            //         ? Colors.red
+            //         : Colors.green, // Change color based on the value
+            //   ),
+            // ),
+
             Divider(),
             SizedBox(height: 20),
 

@@ -24,11 +24,12 @@ class _OutflowState extends State<Outflow> {
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _startDateController = TextEditingController();
   final TextEditingController _endDateController = TextEditingController();
+  String? selectedVehicleLabel;
+
   double _totalPrice = 0.0; // Variable to hold the total price
 
   @override
   Widget build(BuildContext context) {
-    final userName = Provider.of<UserModel>(context, listen: false).userName;
     return Scaffold(
       drawer: const Sidebar(),
       body: Padding(
@@ -60,8 +61,14 @@ class _OutflowState extends State<Outflow> {
                 const Spacer(),
                 ElevatedButton.icon(
                   onPressed: () => _printOutflowData(),
-                  icon: const Icon(Icons.print),
-                  label: const Text("Print"),
+                  icon: const Icon(
+                    Icons.print,
+                    color: Colors.white,
+                  ),
+                  label: const Text(
+                    "Print",
+                    style: TextStyle(color: Colors.white),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                   ),
@@ -94,7 +101,7 @@ class _OutflowState extends State<Outflow> {
                 const SizedBox(width: 20),
                 ElevatedButton(
                   onPressed: () {
-                    _showAddOutflowDialog(context, userName);
+                    _showAddOutflowDialog(context);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF4CAF4F),
@@ -213,10 +220,12 @@ class _OutflowState extends State<Outflow> {
                                       outflowData['price']?.toDouble() ?? 0.0;
                                   double weight =
                                       outflowData['weight']?.toDouble() ?? 0.0;
-                                  String employee =
-                                      outflowData['employee'] ?? '';
+
                                   String status = outflowData['status'] ?? '';
-                                  String vehicle = outflowData['vehicle'] ?? '';
+                                  String vehicle = outflowData['vehicle'] ??
+                                      'N/A'; // Use vehicle_label
+                                  String employee = outflowData['employee'] ??
+                                      'N/A'; // Display employee name
 
                                   return Container(
                                     decoration: const BoxDecoration(
@@ -234,7 +243,8 @@ class _OutflowState extends State<Outflow> {
                                         _buildText(vehicle, 2),
                                         IconButton(
                                           icon: const Icon(Icons.info_outline,
-                                              color: Colors.blue),
+                                              color:
+                                                  Color.fromARGB(255, 0, 0, 0)),
                                           onPressed: () {
                                             Navigator.push(
                                               context,
@@ -256,6 +266,9 @@ class _OutflowState extends State<Outflow> {
                                   );
                                 },
                               ),
+                            ),
+                            Divider(
+                              color: Colors.black,
                             ),
                             Container(
                               padding: const EdgeInsets.all(8.0),
@@ -336,14 +349,16 @@ class _OutflowState extends State<Outflow> {
     }
   }
 
-  void _showAddOutflowDialog(BuildContext context, String? userName) {
+  void _showAddOutflowDialog(BuildContext context) {
+    final userName = Provider.of<UserModel>(context, listen: false).userName;
+    final _formKey = GlobalKey<FormState>(); // Define a GlobalKey for the Form
     final TextEditingController _priceController = TextEditingController();
     final TextEditingController _detailsController = TextEditingController();
     String? selectedCategory;
     String? selectedVehicle;
     String? selectedDriver;
     final List<String> categories = [
-      'Fuel',
+      'Additional fuel',
       'Vehicle Maintenance',
       'Delivery Fee',
       'Etc.',
@@ -356,139 +371,179 @@ class _OutflowState extends State<Outflow> {
           builder: (context, setState) {
             return AlertDialog(
               title: const Text('Add Outflow'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Category Dropdown
-                    DropdownButtonFormField<String>(
-                      decoration: const InputDecoration(
-                        labelText: 'Category',
-                        border: OutlineInputBorder(),
-                      ),
-                      value: selectedCategory,
-                      items: categories.map((category) {
-                        return DropdownMenuItem<String>(
-                          value: category,
-                          child: Text(category),
-                        );
-                      }).toList(),
-                      onChanged: (newValue) {
-                        setState(() {
-                          selectedCategory = newValue;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Price Input
-                    TextFormField(
-                      controller: _priceController,
-                      decoration: const InputDecoration(
-                        labelText: 'Price',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Vehicle Dropdown for Fuel, Delivery Fee, and Vehicle Maintenance
-                    if (selectedCategory == 'Fuel' ||
-                        selectedCategory == 'Vehicle Maintenance' ||
-                        selectedCategory == 'Delivery Fee')
-                      StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance
-                            .collection('vehicles')
-                            .snapshots(),
-                        builder: (context, snapshot) {
-                          if (!snapshot.hasData) {
-                            return const CircularProgressIndicator();
-                          }
-                          var vehicles = snapshot.data?.docs ?? [];
-                          return DropdownButtonFormField<String>(
-                            decoration: const InputDecoration(
-                              labelText: 'Select Vehicle',
-                              border: OutlineInputBorder(),
-                            ),
-                            value: selectedVehicle,
-                            items: vehicles.map((doc) {
-                              var vehicleData =
-                                  doc.data() as Map<String, dynamic>;
-                              String vehicleLabel =
-                                  "${vehicleData['brand']} ${vehicleData['model']}";
-                              return DropdownMenuItem<String>(
-                                value: doc.id,
-                                child: Text(vehicleLabel),
-                              );
-                            }).toList(),
-                            onChanged: (newValue) {
-                              setState(() {
-                                selectedVehicle = newValue;
-                              });
-                            },
-                          );
-                        },
-                      ),
-                    const SizedBox(height: 16),
-
-                    // Driver Dropdown for Fuel and Delivery Fee
-                    if (selectedCategory == 'Fuel' ||
-                        selectedCategory == 'Delivery Fee')
-                      StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance
-                            .collection('employees')
-                            .snapshots(),
-                        builder: (context, snapshot) {
-                          if (!snapshot.hasData) {
-                            return const CircularProgressIndicator();
-                          }
-                          var employees = snapshot.data?.docs ?? [];
-                          return DropdownButtonFormField<String>(
-                            decoration: const InputDecoration(
-                              labelText: 'Select Driver',
-                              border: OutlineInputBorder(),
-                            ),
-                            value: selectedDriver,
-                            items: employees.map((doc) {
-                              var employeeData =
-                                  doc.data() as Map<String, dynamic>;
-                              String employeeName =
-                                  employeeData['name'] ?? 'Unnamed';
-                              return DropdownMenuItem<String>(
-                                value: doc.id,
-                                child: Text(employeeName),
-                              );
-                            }).toList(),
-                            onChanged: (newValue) {
-                              setState(() {
-                                selectedDriver = newValue;
-                              });
-                            },
-                          );
-                        },
-                      )
-                    else if (selectedCategory == 'Etc.')
-                      TextFormField(
-                        controller: _detailsController,
+              content: Form(
+                key: _formKey, // Associate the Form with the GlobalKey
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Category Dropdown
+                      DropdownButtonFormField<String>(
                         decoration: const InputDecoration(
-                          labelText: 'Expense Details',
+                          labelText: 'Category',
                           border: OutlineInputBorder(),
                         ),
+                        value: selectedCategory,
+                        items: categories.map((category) {
+                          return DropdownMenuItem<String>(
+                            value: category,
+                            child: Text(category),
+                          );
+                        }).toList(),
+                        onChanged: (newValue) {
+                          setState(() {
+                            selectedCategory = newValue;
+                          });
+                        },
+                        validator: (value) =>
+                            value == null ? 'Please select a category' : null,
                       ),
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
-                    // Employee Name (Read-only)
-                    TextFormField(
-                      readOnly: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Employee',
-                        border: OutlineInputBorder(),
+                      // Price Input
+                      TextFormField(
+                        controller: _priceController,
+                        decoration: const InputDecoration(
+                          labelText: 'Price',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter a price';
+                          }
+                          final double? price = double.tryParse(value);
+                          if (price == null || price <= 0) {
+                            return 'Please enter a valid price';
+                          }
+                          return null;
+                        },
                       ),
-                      controller: TextEditingController(
-                        text: userName ?? 'Admin',
+                      const SizedBox(height: 16),
+
+                      // Vehicle Dropdown for Applicable Categories
+                      if (selectedCategory == 'Additional fuel' ||
+                          selectedCategory == 'Vehicle Maintenance' ||
+                          selectedCategory == 'Delivery Fee')
+                        StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('vehicles')
+                              .snapshots(),
+                          builder: (context, snapshot) {
+                            if (!snapshot.hasData) {
+                              return const CircularProgressIndicator();
+                            }
+                            var vehicles = snapshot.data?.docs ?? [];
+                            return DropdownButtonFormField<String>(
+                              decoration: const InputDecoration(
+                                labelText: 'Select Vehicle',
+                                border: OutlineInputBorder(),
+                              ),
+                              value: selectedVehicle,
+                              items: vehicles.map((doc) {
+                                var vehicleData =
+                                    doc.data() as Map<String, dynamic>;
+                                String vehicleLabel =
+                                    "${vehicleData['brand']} ${vehicleData['model']} (${vehicleData['vehicle_type']})";
+                                return DropdownMenuItem<String>(
+                                  value: vehicleLabel, // Use vehicle ID
+                                  child: Text(vehicleLabel),
+                                );
+                              }).toList(),
+                              onChanged: (newValue) {
+                                setState(() {
+                                  selectedVehicle = newValue;
+                                });
+                              },
+                              validator: (value) => (selectedCategory != null &&
+                                      (selectedCategory == 'Additional fuel' ||
+                                          selectedCategory == 'Delivery Fee' ||
+                                          selectedCategory ==
+                                              'Vehicle Maintenance') &&
+                                      value == null)
+                                  ? 'Please select a vehicle'
+                                  : null,
+                            );
+                          },
+                        ),
+                      const SizedBox(height: 16),
+
+                      // Driver Dropdown for Applicable Categories
+                      if (selectedCategory == 'Additional fuel' ||
+                          selectedCategory == 'Delivery Fee')
+                        StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('employees')
+                              .where('position', whereIn: [
+                            'driver',
+                            'contractual driver'
+                          ]).snapshots(),
+                          builder: (context, snapshot) {
+                            if (!snapshot.hasData) {
+                              return const CircularProgressIndicator();
+                            }
+                            var drivers = snapshot.data?.docs ?? [];
+                            return DropdownButtonFormField<String>(
+                              decoration: const InputDecoration(
+                                labelText: 'Select Driver',
+                                border: OutlineInputBorder(),
+                              ),
+                              value: selectedDriver,
+                              items: drivers.map((doc) {
+                                var employeeData =
+                                    doc.data() as Map<String, dynamic>;
+                                String driverName =
+                                    employeeData['name'] ?? 'N/A';
+                                return DropdownMenuItem<String>(
+                                  value: doc.id, // Use driver ID
+                                  child: Text(driverName),
+                                );
+                              }).toList(),
+                              onChanged: (newValue) {
+                                setState(() {
+                                  selectedDriver = newValue;
+                                });
+                              },
+                              validator: (value) => (selectedCategory != null &&
+                                      (selectedCategory == 'Additional fuel' ||
+                                          selectedCategory == 'Delivery Fee') &&
+                                      value == null)
+                                  ? 'Please select a driver'
+                                  : null,
+                            );
+                          },
+                        ),
+                      const SizedBox(height: 16),
+
+                      // Details Input for Etc. Category
+                      if (selectedCategory == 'Etc.')
+                        TextFormField(
+                          controller: _detailsController,
+                          decoration: const InputDecoration(
+                            labelText: 'Expense Details',
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (value) => (selectedCategory == 'Etc.' &&
+                                  (value == null || value.isEmpty))
+                              ? 'Please provide expense details'
+                              : null,
+                        ),
+
+                      const SizedBox(height: 16),
+
+                      // Employee Name (Read-only)
+                      TextFormField(
+                        readOnly: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Employee',
+                          border: OutlineInputBorder(),
+                        ),
+                        controller: TextEditingController(
+                          text: userName ?? 'Admin',
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               actions: [
@@ -498,55 +553,42 @@ class _OutflowState extends State<Outflow> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    double price =
-                        double.tryParse(_priceController.text) ?? 0.0;
+                    // Validate all fields
+                    if (_formKey.currentState?.validate() ?? false) {
+                      double price =
+                          double.tryParse(_priceController.text) ?? 0.0;
 
-                    if (selectedCategory == null ||
-                        price <= 0 ||
-                        ((selectedCategory == 'Fuel' ||
-                                selectedCategory == 'Delivery Fee') &&
-                            (selectedVehicle == null ||
-                                selectedDriver == null))) {
+                      // Prepare the outflow data
+                      Map<String, dynamic> outflowData = {
+                        'category': selectedCategory,
+                        'date': FieldValue.serverTimestamp(),
+                        'price': price,
+                        'employee': userName ?? 'Admin',
+                        'status': 'Pending',
+                      };
+
+                      if (selectedCategory == 'Additional fuel' ||
+                          selectedCategory == 'Delivery Fee') {
+                        outflowData['vehicle'] = selectedVehicle;
+                        outflowData['driver'] = selectedDriver;
+                      } else if (selectedCategory == 'Vehicle Maintenance') {
+                        outflowData['vehicle'] = selectedVehicle;
+                      } else if (selectedCategory == 'Etc.') {
+                        outflowData['details'] = _detailsController.text;
+                      }
+
+                      // Save to Firestore
+                      await FirebaseFirestore.instance
+                          .collection('outflow')
+                          .add(outflowData);
+
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                            content:
-                                Text('Please fill out all required fields.')),
+                            content: Text('Outflow added successfully!')),
                       );
-                      return;
+
+                      Navigator.of(context).pop();
                     }
-
-                    // Prepare the outflow data
-                    Map<String, dynamic> outflowData = {
-                      'category': selectedCategory,
-                      'date': FieldValue
-                          .serverTimestamp(), // Use current date and time
-                      'price': price,
-                      'employee': userName ?? 'Admin',
-                      'status': 'Pending',
-                    };
-
-                    // Add vehicle and driver fields if applicable
-                    if (selectedCategory == 'Fuel' ||
-                        selectedCategory == 'Delivery Fee') {
-                      outflowData['vehicle'] = selectedVehicle;
-                      outflowData['driver'] = selectedDriver;
-                    } else if (selectedCategory == 'Vehicle Maintenance') {
-                      outflowData['vehicle'] = selectedVehicle;
-                    } else if (selectedCategory == 'Etc.') {
-                      outflowData['details'] = _detailsController.text;
-                    }
-
-                    // Save to Firestore
-                    await FirebaseFirestore.instance
-                        .collection('outflow')
-                        .add(outflowData);
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('Outflow added successfully!')),
-                    );
-
-                    Navigator.of(context).pop();
                   },
                   child: const Text('Add'),
                 ),
@@ -562,13 +604,25 @@ class _OutflowState extends State<Outflow> {
     return Expanded(
       flex: flex,
       child: Container(
-        height: 20,
-        decoration: const BoxDecoration(border: Border(bottom: BorderSide())),
-        child: Center(
+        height: 40,
+        decoration: BoxDecoration(
+          color: Colors.grey.shade200, // Same background color
+          border: const Border(
+            bottom: BorderSide(
+                color:
+                    Color.fromARGB(255, 5, 5, 5)), // Same bottom border style
+          ),
+        ),
+        child: Align(
+          alignment: Alignment.centerLeft,
           child: Text(
             text,
             style: GoogleFonts.roboto(
-                textStyle: const TextStyle(fontWeight: FontWeight.bold)),
+              textStyle: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14, // Adjust font size as needed
+              ),
+            ),
           ),
         ),
       ),
@@ -633,50 +687,94 @@ class _OutflowState extends State<Outflow> {
         (a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
 
     // Build PDF content with sorted outflow documents
-    List<pw.TableRow> outflowRows = [
-      pw.TableRow(
-        children: [
-          pw.Text('Category',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Text('Date', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Text('Price', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Text('Employee',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Text('Vehicle',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-        ],
-      ),
-    ];
-
-    for (var outflowMap in outflowDataList) {
-      final outflowData = outflowMap['data'] as Map<String, dynamic>;
-      final date = outflowMap['date'] as DateTime;
-
-      outflowRows.add(
-        pw.TableRow(
-          children: [
-            pw.Text(outflowData['category'] ?? 'N/A'),
-            pw.Text(DateFormat('MM/dd/yyyy, hh:mm a').format(date)),
-            pw.Text(
-                'PHP ${outflowData['price']?.toStringAsFixed(2) ?? '0.00'}'),
-            pw.Text(outflowData['employee'] ?? 'N/A'),
-            pw.Text(outflowData['vehicle'] ?? 'N/A'),
-          ],
-        ),
-      );
-    }
-
-    // Add a footer with the total price outside the table
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         build: (context) => [
           pw.Text(
             'Outflow Report',
-            style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+            style: pw.TextStyle(
+                fontSize: 24,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.green),
           ),
           pw.SizedBox(height: 20),
-          pw.Table(children: outflowRows, border: pw.TableBorder.all()),
+          pw.Table(
+            border: pw.TableBorder.all(width: 1, color: PdfColors.black),
+            children: [
+              pw.TableRow(
+                decoration: pw.BoxDecoration(color: PdfColors.green100),
+                children: [
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(8.0),
+                    child: pw.Text('Category',
+                        style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold, fontSize: 12)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(8.0),
+                    child: pw.Text('Date',
+                        style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold, fontSize: 12)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(8.0),
+                    child: pw.Text('Price',
+                        style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold, fontSize: 12)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(8.0),
+                    child: pw.Text('Employee',
+                        style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold, fontSize: 12)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(8.0),
+                    child: pw.Text('Vehicle',
+                        style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold, fontSize: 12)),
+                  ),
+                ],
+              ),
+              ...outflowDataList.map((outflowMap) {
+                final outflowData = outflowMap['data'] as Map<String, dynamic>;
+                final date = outflowMap['date'] as DateTime;
+
+                return pw.TableRow(
+                  children: [
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(8.0),
+                      child: pw.Text(outflowData['category'] ?? 'N/A',
+                          style: pw.TextStyle(fontSize: 10)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(8.0),
+                      child: pw.Text(
+                          DateFormat('MM/dd/yyyy, hh:mm a').format(date),
+                          style: pw.TextStyle(fontSize: 10)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(8.0),
+                      child: pw.Text(
+                          'PHP ${outflowData['price']?.toStringAsFixed(2) ?? '0.00'}',
+                          style: pw.TextStyle(fontSize: 10)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(8.0),
+                      child: pw.Text(outflowData['employee'] ?? 'N/A',
+                          style: pw.TextStyle(fontSize: 10)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(8.0),
+                      child: pw.Text(outflowData['vehicle'] ?? 'N/A',
+                          style: pw.TextStyle(fontSize: 10)),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ],
+          ),
           pw.SizedBox(height: 20),
           pw.Align(
             alignment: pw.Alignment.centerRight,
@@ -695,10 +793,13 @@ class _OutflowState extends State<Outflow> {
     // Convert PDF to Uint8List
     final pdfBytes = await pdf.save();
 
-    // Create a Blob and open in a new tab
+    // Create a Blob and download the PDF as a file
     final blob = html.Blob([pdfBytes], 'application/pdf');
     final url = html.Url.createObjectUrlFromBlob(blob);
-    html.window.open(url, '_blank');
+    final anchor = html.AnchorElement(href: url)
+      ..target = 'blank'
+      ..download = 'Outflow_Report.pdf'
+      ..click();
     html.Url.revokeObjectUrl(url); // Clean up the object URL
   }
 
