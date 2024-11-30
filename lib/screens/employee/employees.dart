@@ -498,6 +498,38 @@ class _EmployeesState extends State<Employees> {
                     ],
                   ),
                 ),
+
+                const SizedBox(width: 20), // Spacing between buttons
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/driverpayroll');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30)),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(width: 8),
+                      Text(
+                        'Driver Payroll',
+                        style: GoogleFonts.roboto(
+                            textStyle: const TextStyle(
+                                fontWeight: FontWeight.w300,
+                                color: Colors.white)),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(
+                        Icons.payment_outlined,
+                        color: Colors.white,
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 20),

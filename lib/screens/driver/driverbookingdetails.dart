@@ -1438,18 +1438,30 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
     String employee = bookingData['driver'] ?? 'Unknown Driver';
     String employeeId = bookingData['driverId'] ?? 'Unknown Driver ID';
 
-    // Add outflow entry for driver share
-    await FirebaseFirestore.instance.collection('outflow').add({
-      'date': Timestamp.now(),
-      'price': double.parse(totalDriverShare.toStringAsFixed(2)),
-      'vehicle': vehicle,
-      'vehicleId': vehicleId,
-      'employee': employee,
-      'employeeId': employeeId,
-      'bookingId': bookingId,
-      'status': 'collected',
-      'category': 'driver share',
-    });
+    // Check if the employee has a payslip subcollection
+    var employeeRef =
+        FirebaseFirestore.instance.collection('employees').doc(employeeId);
+
+    var employeeDoc = await employeeRef.get();
+    if (employeeDoc.exists) {
+      // Check if the payslip subcollection exists
+
+      // Add a new payslip entry for the employee
+      var payslipCollectionRef = employeeRef.collection('payslip');
+      await payslipCollectionRef.add({
+        'date': Timestamp.now(),
+        'price': double.parse(totalDriverShare.toStringAsFixed(2)),
+        'vehicle': vehicle,
+        'vehicleId': vehicleId,
+        'bookingId': bookingId,
+        'status': 'pending',
+        'category': 'driver share',
+      });
+
+      print('New payslip entry added for employee $employeeId');
+    } else {
+      print('Employee $employeeId not found.');
+    }
 
     // Add outflow entry for fuel payment if applicable
     if (userRole.toLowerCase() == 'driver' && fuelPayment.isNotEmpty) {
