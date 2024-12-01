@@ -377,20 +377,22 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
 
 // Calculate the driver share
                                   double driverShare = 0.0;
+
                                   if (userStatus != 'failed') {
-                                    if (firstName == "Guest") {
-                                      // Guest users: No subtraction of 40
+                                    if (firstName == "Guest" ||
+                                        userData['category'] == 'business') {
+                                      // Guest or Business users: No subtraction of 40
                                       driverShare =
                                           (((effectiveTotalPrice / (1 - 0.30)) -
                                                   effectiveTotalPrice) *
                                               sharePercentage);
                                     } else {
-                                      // Non-guest users: Include subtraction of 40
-                                      driverShare =
-                                          (((effectiveTotalPrice / (1 - 0.30)) +
-                                                  40 -
-                                                  effectiveTotalPrice) *
-                                              sharePercentage);
+                                      // Non-guest and non-business users: Include subtraction of 40
+                                      driverShare = ((((effectiveTotalPrice /
+                                                  (1 - 0.30)) +
+                                              40 -
+                                              effectiveTotalPrice) *
+                                          sharePercentage));
                                     }
                                   }
 
@@ -1399,13 +1401,14 @@ class _DriverBookingDetailsState extends State<DriverBookingDetails> {
             ? userData['total_price'] ?? 0.0
             : finalTotalPrice;
 
-        if (userData['firstName'] == "Guest") {
-          // Guest users: No subtraction of 40
+        if (userData['firstName'] == "Guest" ||
+            userData['category'] == "business") {
+          // Guest or Business users: No subtraction of 40
           driverShare =
               ((((effectiveTotalPrice / (1 - 0.30)) - effectiveTotalPrice) *
                   sharePercentage));
         } else {
-          // Non-guest users: Include subtraction of 40
+          // Non-guest and non-business users: Include subtraction of 40
           driverShare = ((((effectiveTotalPrice / (1 - 0.30)) +
                   40 -
                   effectiveTotalPrice) *
